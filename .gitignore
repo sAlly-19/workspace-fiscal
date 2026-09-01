@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+dist-ssr/
+dist-electron/
+build/
+release/
+out/
+coverage/
+.vite/
+.turbo/
+*.tsbuildinfo
+*.local
+
+# Database & Storage (local only, recriado automaticamente)
+sqlite.db
+sqlite.db-shm
+sqlite.db-wal
+sqlite.db-journal
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+storage/
+# Electron userData (quando empacotado)
+# O SQLite em produção vai para AppData/Roaming/Electron/workspace-fiscal.sqlite
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor & IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+
+# Electron
+*.exe
+*.dmg
+*.AppImage
+*.snap

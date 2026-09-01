@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   0. ELECTRON: barra de título customizada (renderizada em React)
+   ========================================================================= */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.titlebar-no-drag,
+.titlebar-no-drag * {
+  -webkit-app-region: no-drag;
+}
+
+body:not(.electron-app) #custom-titlebar {
+  display: none !important;
+}
+
+/* =========================================================================
+   1. SCROLLBAR ESTILIZADA (acessível, fina, não oculta)
+   ========================================================================= */
+*::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+.theme-light *::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.theme-light *::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}
+.theme-light * {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html, body {
+  background-color: #09090b;
+  color: #fafafa;
+  margin: 0;
+  padding: 0;
+}
+
+/* =========================================================================
+   2. SISTEMA DE TEMAS: DARK E LIGHT
+   ========================================================================= */
+
+/* --- TEMA: DARK (Escuro Profissional) --- */
+.theme-dark {
+  color-scheme: dark;
+  --bg-app: #09090b;
+  --bg-header: #111114;
+  --bg-panel-left: #0d0d10;
+  --bg-panel-center: #101014;
+  --bg-panel-right: #09090b;
+  --bg-card: #141418;
+  --bg-card-hover: #1c1c22;
+  --bg-card-selected: #1e293b;
+  --bg-subtle: #18181b;
+  --bg-input: #18181b;
+  --border-app: #27272a;
+  --border-subtle: #1f1f23;
+  --border-strong: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --preview-canvas-bg: #09090b;
+  --split-resizer: #27272a;
+  --split-resizer-hover: #3b82f6;
+}
+
+/* --- TEMA: LIGHT (Claro Elegante & Limpo) --- */
+.theme-light {
+  color-scheme: light;
+  --bg-app: #f8fafc;
+  --bg-header: #ffffff;
+  --bg-panel-left: #f1f5f9;
+  --bg-panel-center: #f8fafc;
+  --bg-panel-right: #e2e8f0;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-card-selected: #dbeafe;
+  --bg-subtle: #e2e8f0;
+  --bg-input: #ffffff;
+  --border-app: #e2e8f0;
+  --border-subtle: #cbd5e1;
+  --border-strong: #94a3b8;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --preview-canvas-bg: #e2e8f0;
+  --split-resizer: #cbd5e1;
+  --split-resizer-hover: #2563eb;
+}
+
+/* =========================================================================
+   3. IMPRESSÃO E EXPORTAÇÃO EM PDF A4
+   ========================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    font-size: 10pt;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  header, footer, aside, nav, .print-hidden, .no-print, [class*="print:hidden"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Permitir que o conteúdo dos DANFEs seja renderizado em página cheia */
+  body.electron-app { padding-top: 0 !important; }
+  #custom-titlebar { display: none !important; }
+
+  .danfe-sheet, .print-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  .danfe-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
