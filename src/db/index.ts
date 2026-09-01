@@ -2,34 +2,21 @@ import { createClient, type Client } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../api/utils/logger';
 import * as schema from './schema';
 
 function resolveDbPath(): string {
-  // Em Electron, usa userData para persistência correta quando empacotado
+  // Em Electron, usa userData para persistência correta quando empacotado.
+  // IMPORTANT: Electron só está pronto para `app.getPath()` após `app.whenReady()`.
+  // Aqui apenas capturamos o caminho; a inicialização do DB em si é feita por
+  // `initDatabase()` (chamado após app ready em Electron, ou no startup do web).
   try {
     const electron = require('electron');
     const app = electron?.app;
-    if (app && typeof app.getPath === 'function') {
+    if (app && typeof app.getPath === 'function' && app.isReady()) {
       const userData = app.getPath('userData');
       if (userData) {
-        // Migração: se existe arquivo antigo nfview.sqlite, renomeia para workspace-fiscal.sqlite
-        const oldPath = path.join(userData, 'nfview.sqlite');
-        const newPath = path.join(userData, 'workspace-fiscal.sqlite');
-        try {
-          if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
-            fs.renameSync(oldPath, newPath);
-            // Também migra WAL/SHM se existirem
-            for (const suffix of ['-wal', '-shm', '-journal']) {
-              const oldAux = oldPath + suffix;
-              const newAux = newPath + suffix;
-              if (fs.existsSync(oldAux) && !fs.existsSync(newAux)) {
-                try { fs.renameSync(oldAux, newAux); } catch {}
-              }
-            }
-            console.log(`[Database] Migrado ${oldPath} -> ${newPath}`);
-          }
-        } catch {}
-        return newPath;
+        return getRenamedUserDataDbPath(userData);
       }
     }
   } catch {}
@@ -38,13 +25,36 @@ function resolveDbPath(): string {
   return path.resolve(process.cwd(), 'sqlite.db');
 }
 
-export const DB_PATH = resolveDbPath();
+function getRenamedUserDataDbPath(userData: string): string {
+  const oldPath = path.join(userData, 'nfview.sqlite');
+  const newPath = path.join(userData, 'workspace-fiscal.sqlite');
+  try {
+    if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+      fs.renameSync(oldPath, newPath);
+      for (const suffix of ['-wal', '-shm', '-journal']) {
+        const oldAux = oldPath + suffix;
+        const newAux = newPath + suffix;
+        if (fs.existsSync(oldAux) && !fs.existsSync(newAux)) {
+          try {
+            fs.renameSync(oldAux, newAux);
+          } catch {}
+        }
+      }
+      logger.info({ from: oldPath, to: newPath }, 'database_migrated_filename');
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'database_filename_migration_failed');
+  }
+  return newPath;
+}
+
+export let DB_PATH: string = resolveDbPath();
 
 function getStorageBasePath(): string {
   try {
     const electron = require('electron');
     const app = electron?.app;
-    if (app && typeof app.getPath === 'function') {
+    if (app && typeof app.getPath === 'function' && app.isReady()) {
       return path.join(app.getPath('userData'), 'storage');
     }
   } catch {}
@@ -61,34 +71,39 @@ function createDbClient(): Client {
   });
 }
 
-function backupAndRemoveCorruptedDbFiles() {
-  const filesToDelete = [
+/**
+ * Move arquivos do DB para `.corrupt.<ts>.bak` mas **NÃO** deleta.
+ * O Electron app (no próximo startup) deve ser capaz de recuperar do backup.
+ * Esta função NÃO toca nos backups — apenas os cria. O caller decide se apaga.
+ */
+function backupCorruptedDbFiles(): string[] {
+  const filesToBackup = [
     DB_PATH,
     `${DB_PATH}-wal`,
     `${DB_PATH}-shm`,
     `${DB_PATH}-journal`,
   ];
-  for (const f of filesToDelete) {
+  const backups: string[] = [];
+  for (const f of filesToBackup) {
     try {
       if (fs.existsSync(f)) {
         const backup = `${f}.corrupt.${Date.now()}.bak`;
         try {
           fs.renameSync(f, backup);
-          console.warn(`[Database] Corrupted file backed up: ${f} -> ${backup}`);
-        } catch {
-          fs.unlinkSync(f);
-          console.warn(`[Database] Removed corrupted file (backup failed): ${f}`);
+          backups.push(backup);
+          logger.warn({ file: f, backup }, 'database_corrupted_file_backed_up');
+        } catch (err) {
+          logger.error(
+            { file: f, err: (err as Error).message },
+            'database_corrupted_backup_failed'
+          );
         }
       }
     } catch (err) {
-      console.error(`[Database] Error handling file ${f}:`, err);
+      logger.error({ file: f, err: (err as Error).message }, 'database_corrupted_file_check_failed');
     }
   }
-}
-
-// Mantido para compatibilidade com código legado
-function removeCorruptedDbFiles() {
-  return backupAndRemoveCorruptedDbFiles();
+  return backups;
 }
 
 let rawClient: Client;
@@ -96,8 +111,8 @@ let rawClient: Client;
 try {
   rawClient = createDbClient();
 } catch (err) {
-  console.error('[Database] Failed to open client, resetting database file:', err);
-  removeCorruptedDbFiles();
+  logger.error({ err: (err as Error).message }, 'database_open_failed_attempting_reset');
+  backupCorruptedDbFiles();
   rawClient = createDbClient();
 }
 
@@ -105,7 +120,8 @@ export const db = drizzle(rawClient, { schema });
 
 export async function initDatabase() {
   try {
-    // 1. Check database integrity
+    // 1. Check database integrity. Se falhar, faz backup e cria novo — mas
+    //    PRESERVA os arquivos originais (`.corrupt.<ts>.bak`) para recuperação.
     try {
       const integrity = await rawClient.execute('PRAGMA integrity_check;');
       const integrityResult = integrity.rows?.[0]?.[0] ?? (integrity.rows?.[0] as any)?.integrity_check;
@@ -113,14 +129,26 @@ export async function initDatabase() {
         throw new Error(`Integrity check failed: ${JSON.stringify(integrity.rows)}`);
       }
     } catch (integrityErr: any) {
-      console.error('[Database] SQLite corruption detected on startup:', integrityErr?.message || integrityErr);
-      removeCorruptedDbFiles();
+      logger.error(
+        { err: integrityErr?.message || String(integrityErr) },
+        'database_corruption_detected_recovering'
+      );
+      const backups = backupCorruptedDbFiles();
+      if (backups.length > 0) {
+        logger.warn(
+          { backups },
+          'database_corruption_backups_available_for_manual_recovery'
+        );
+      }
       rawClient = createDbClient();
     }
 
-    // 2. Configure performance & durability pragmas
+    // 2. Configure performance & durability pragmas.
+    //    Em PRODUÇÃO, usar synchronous=FULL para sobreviver a quedas de energia
+    //    (crítico para dados fiscais). Em dev, manter NORMAL para velocidade.
+    const isProd = process.env.NODE_ENV === 'production';
     await rawClient.execute('PRAGMA journal_mode = WAL;');
-    await rawClient.execute('PRAGMA synchronous = NORMAL;');
+    await rawClient.execute(`PRAGMA synchronous = ${isProd ? 'FULL' : 'NORMAL'};`);
     await rawClient.execute('PRAGMA busy_timeout = 5000;');
     await rawClient.execute('PRAGMA foreign_keys = ON;');
 
@@ -153,7 +181,7 @@ export async function initDatabase() {
       if (!compCols.includes('city')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "city" TEXT;');
       if (!compCols.includes('depreciation_rule')) await rawClient.execute(`ALTER TABLE "companies" ADD COLUMN "depreciation_rule" TEXT DEFAULT 'PROPORTIONAL';`);
     } catch (e) {
-      console.warn('[Database] companies migration note', e);
+      logger.warn({ err: (e as Error).message }, 'database_companies_migration_note');
     }
 
     await rawClient.execute(`
@@ -216,10 +244,10 @@ export async function initDatabase() {
       const columns = tableInfo.rows.map((row: any) => row.name || row[1]);
       if (!columns.includes('billing')) {
         await rawClient.execute('ALTER TABLE "documents" ADD COLUMN "billing" TEXT;');
-        console.log('[Database] Migrated "documents" table: added "billing" column.');
+        logger.info({ table: 'documents', column: 'billing' }, 'database_column_migrated');
       }
     } catch (migErr) {
-      console.warn('[Database] Column migration note:', migErr);
+      logger.warn({ err: (migErr as Error).message }, 'database_documents_migration_note');
     }
 
     await rawClient.execute(`
@@ -243,6 +271,21 @@ export async function initDatabase() {
         "base" REAL
       );
     `);
+
+    await rawClient.execute(`
+      CREATE TABLE IF NOT EXISTS "document_events" (
+        "id" TEXT PRIMARY KEY NOT NULL,
+        "document_id" TEXT NOT NULL REFERENCES "documents"("id") ON DELETE CASCADE,
+        "event_type" TEXT NOT NULL,
+        "sequence" INTEGER NOT NULL DEFAULT 1,
+        "event_date" INTEGER,
+        "protocol" TEXT,
+        "raw_xml_path" TEXT,
+        "correction_text" TEXT,
+        "created_at" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL
+      );
+    `);
+    await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_events_document" ON "document_events"("document_id");');
 
     // --- Depreciação: Categorias, Bens, Lançamentos e Exportações ---
     await rawClient.execute(`
@@ -284,7 +327,7 @@ export async function initDatabase() {
       if (!assetCols.includes('disposed_at')) await rawClient.execute(`ALTER TABLE "assets" ADD COLUMN "disposed_at" INTEGER;`);
       if (!assetCols.includes('disposed_reason')) await rawClient.execute(`ALTER TABLE "assets" ADD COLUMN "disposed_reason" TEXT;`);
     } catch (e) {
-      console.warn('[Database] assets dar baixa migration note', e);
+      logger.warn({ err: (e as Error).message }, 'database_assets_migration_note');
     }
 
     await rawClient.execute(`
@@ -336,10 +379,10 @@ export async function initDatabase() {
             args: [id, name, rate],
           });
         }
-        console.log('[Database] Seeded default categories');
+        logger.info({ count: defaultCats.length }, 'database_seeded_default_categories');
       }
     } catch (e) {
-      console.warn('[Database] categories seed note', e);
+      logger.warn({ err: (e as Error).message }, 'database_categories_seed_note');
     }
 
     // 4. Create indexes
@@ -362,8 +405,8 @@ export async function initDatabase() {
     await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_exports_company" ON "depreciation_exports"("company_id");');
     await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_exports_comp" ON "depreciation_exports"("competence");');
 
-    console.log(`[Database] SQLite initialized at ${DB_PATH} and schema verified successfully.`);
+    logger.info({ path: DB_PATH }, 'database_initialized');
   } catch (error) {
-    console.error('[Database] Critical error during initDatabase:', error);
+    logger.error({ err: (error as Error).message }, 'database_init_critical_error');
   }
 }

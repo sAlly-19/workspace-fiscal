@@ -30,7 +30,7 @@ function QrCodePattern({ seed, size = 120 }: { seed: string; size?: number }) {
     if (finder(0, 0) || finder(14, 0) || finder(0, 14)) return true;
     return false;
   };
-  const cells = [];
+  const cells: React.ReactElement[] = [];
   for (let y = 0; y < modules; y++) {
     for (let x = 0; x < modules; x++) {
       // Reserva separadores (linha branca em volta dos finders)

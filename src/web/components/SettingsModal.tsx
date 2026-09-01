@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Settings,
   X,
@@ -12,14 +12,37 @@ import {
   LayoutTemplate,
   Trash2,
   AlertTriangle,
-  Keyboard
+  Keyboard,
+  HardDrive,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { ConfirmModal } from './ConfirmModal';
+import { toast } from './Toast';
+import { apiFetch } from '../lib/api';
 
-export function SettingsModal() {
+interface BackupFile {
+  filename: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+interface BackupConfig {
+  enabled: boolean;
+  intervalDays: number;
+  retentionCount: number;
+  destination: string;
+}
+
+interface DedupePolicy {
+  policy: 'IGNORE' | 'OVERWRITE' | 'CREATE_VERSION';
+  updatedAt: string | null;
+}
+
+export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () => void } = {}) {
   const {
-    isSettingsOpen,
+    isSettingsOpen: storeIsSettingsOpen,
     setIsSettingsOpen,
     settings,
     updateSettings,
@@ -28,13 +51,114 @@ export function SettingsModal() {
     resetWorkspaceDatabase
   } = useWorkspaceStore();
 
+  // Suporta tanto o store global quanto props explícitas (DepreciationApp)
+  const isOpen = open ?? storeIsSettingsOpen;
+  const close = () => {
+    if (onClose) onClose();
+    setIsSettingsOpen(false);
+  };
+
   const currentTheme = settings.theme || 'dark';
   const isLight = currentTheme === 'light';
 
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  if (!isSettingsOpen) return null;
+  // F17: Backup
+  const [backupConfig, setBackupConfig] = useState<BackupConfig | null>(null);
+  const [backupList, setBackupList] = useState<BackupFile[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupRunning, setBackupRunning] = useState(false);
+
+  // F3: Dedupe
+  const [dedupePolicy, setDedupePolicy] = useState<DedupePolicy | null>(null);
+  const [dedupeSaving, setDedupeSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        setBackupLoading(true);
+        const cfg = await apiFetch('/api/backup/settings').then((r) => (r.ok ? r.json() : null));
+        if (cfg) setBackupConfig(cfg);
+        const list = await apiFetch('/api/backup/list').then((r) => (r.ok ? r.json() : []));
+        if (Array.isArray(list)) setBackupList(list);
+      } catch (e) {
+        console.warn('Falha ao carregar config de backup:', e);
+      } finally {
+        setBackupLoading(false);
+      }
+
+      try {
+        const dp = await apiFetch('/api/settings/dedupe-policy').then((r) => (r.ok ? r.json() : null));
+        if (dp) setDedupePolicy(dp);
+      } catch (e) {
+        console.warn('Falha ao carregar dedupe policy:', e);
+      }
+    })();
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const saveBackupConfig = async (partial: Partial<BackupConfig>) => {
+    try {
+      const res = await apiFetch('/api/backup/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partial),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setBackupConfig(updated);
+        toast.success('Backup atualizado', 'Configurações salvas com sucesso.');
+      } else {
+        toast.error('Erro ao salvar backup', 'Tente novamente.');
+      }
+    } catch (e) {
+      toast.error('Erro ao salvar backup', (e as Error).message);
+    }
+  };
+
+  const runBackupNow = async () => {
+    try {
+      setBackupRunning(true);
+      const res = await apiFetch('/api/backup/run', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success('Backup criado', `${data.filename} (${(data.sizeBytes / 1024).toFixed(0)} KB)`);
+        const list = await apiFetch('/api/backup/list').then((r) => (r.ok ? r.json() : []));
+        if (Array.isArray(list)) setBackupList(list);
+      } else {
+        toast.error('Falha no backup', 'Verifique permissões da pasta de destino.');
+      }
+    } catch (e) {
+      toast.error('Erro no backup', (e as Error).message);
+    } finally {
+      setBackupRunning(false);
+    }
+  };
+
+  const saveDedupePolicy = async (policy: DedupePolicy['policy']) => {
+    try {
+      setDedupeSaving(true);
+      const res = await apiFetch('/api/settings/dedupe-policy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setDedupePolicy(updated);
+        toast.success('Política de dedupe atualizada', `Agora usando ${policy}.`);
+      } else {
+        toast.error('Política inválida', 'Use IGNORE, OVERWRITE ou CREATE_VERSION.');
+      }
+    } catch (e) {
+      toast.error('Erro ao salvar', (e as Error).message);
+    } finally {
+      setDedupeSaving(false);
+    }
+  };
 
   const exportCsv = () => {
     if (documents.length === 0) return;
@@ -64,8 +188,7 @@ export function SettingsModal() {
     try {
       setIsResetting(true);
       await resetWorkspaceDatabase();
-      setIsResetConfirmOpen(false);
-      setIsSettingsOpen(false);
+      close();
     } catch (error) {
       console.error('Erro ao resetar banco de dados:', error);
     } finally {
@@ -100,7 +223,7 @@ export function SettingsModal() {
               </div>
             </div>
             <button
-              onClick={() => setIsSettingsOpen(false)}
+              onClick={close}
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isLight
                   ? 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#e2e8f0]'
@@ -259,6 +382,164 @@ export function SettingsModal() {
               </div>
             </div>
 
+            {/* Section 3.5: F3 - Política de Deduplicação */}
+            <div>
+              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                <Copy className="w-4 h-4 text-amber-400" />
+                <span>Política de Deduplicação de Importação</span>
+              </div>
+
+              <div
+                className={`rounded-xl p-4 space-y-3 border ${
+                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
+                }`}
+              >
+                <p className={`text-[11px] leading-relaxed ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
+                  Define o comportamento ao tentar importar um XML cuja chave de acesso já existe no banco.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['IGNORE', 'OVERWRITE', 'CREATE_VERSION'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => saveDedupePolicy(p)}
+                      disabled={dedupeSaving || dedupePolicy?.policy === p}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer disabled:cursor-not-allowed ${
+                        dedupePolicy?.policy === p
+                          ? 'border-blue-500 bg-blue-500/15 text-blue-400 shadow-sm ring-1 ring-blue-500/30'
+                          : isLight
+                            ? 'border-[#cbd5e1] bg-white text-[#475569] hover:border-blue-400 hover:text-blue-700'
+                            : 'border-[#27272a] bg-[#18181b] text-[#a1a1aa] hover:border-blue-500/60 hover:text-white'
+                      }`}
+                    >
+                      {p === 'IGNORE' && 'Ignorar'}
+                      {p === 'OVERWRITE' && 'Sobrescrever'}
+                      {p === 'CREATE_VERSION' && 'Versionar'}
+                    </button>
+                  ))}
+                </div>
+                <p className={`text-[10px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                  Atual: <strong className="font-mono">{dedupePolicy?.policy ?? 'IGNORE'}</strong>
+                  {dedupePolicy?.updatedAt && (
+                    <> · salvo em {new Date(dedupePolicy.updatedAt).toLocaleString('pt-BR')}</>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Section 3.6: F17 - Backup Automático */}
+            <div>
+              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                <HardDrive className="w-4 h-4 text-cyan-400" />
+                <span>Backup Automático do Banco</span>
+              </div>
+
+              <div
+                className={`rounded-xl p-4 space-y-3 border ${
+                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
+                }`}
+              >
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <div className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Backup automático habilitado</div>
+                    <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                      Roda a cada abertura do app se o último for mais antigo que o intervalo.
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={!!backupConfig?.enabled}
+                    onChange={(e) => saveBackupConfig({ enabled: e.target.checked })}
+                    disabled={!backupConfig}
+                    className="w-4 h-4 rounded border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </label>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                  <div>
+                    <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                      Intervalo (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={backupConfig?.intervalDays ?? 7}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (Number.isFinite(v) && v >= 1) setBackupConfig((c) => c ? { ...c, intervalDays: v } : c);
+                      }}
+                      onBlur={() => backupConfig && saveBackupConfig({ intervalDays: backupConfig.intervalDays })}
+                      className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none ${
+                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                      Retenção (backups)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={backupConfig?.retentionCount ?? 30}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (Number.isFinite(v) && v >= 1) setBackupConfig((c) => c ? { ...c, retentionCount: v } : c);
+                      }}
+                      onBlur={() => backupConfig && saveBackupConfig({ retentionCount: backupConfig.retentionCount })}
+                      className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none ${
+                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/10">
+                  <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                    Pasta de destino
+                  </label>
+                  <input
+                    type="text"
+                    value={backupConfig?.destination ?? ''}
+                    onChange={(e) => setBackupConfig((c) => c ? { ...c, destination: e.target.value } : c)}
+                    onBlur={() => backupConfig && saveBackupConfig({ destination: backupConfig.destination })}
+                    placeholder="/caminho/absoluto/para/backups"
+                    className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none font-mono ${
+                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
+                    {backupList.length === 0 ? (
+                      'Nenhum backup salvo ainda.'
+                    ) : (
+                      <>
+                        <strong className="text-blue-400">{backupList.length}</strong> backup{backupList.length > 1 ? 's' : ''} ·
+                        último: <span className="font-mono">{new Date(backupList[0].createdAt).toLocaleString('pt-BR')}</span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={runBackupNow}
+                    disabled={backupRunning || backupLoading}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-md shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {backupRunning ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <HardDrive className="w-3.5 h-3.5" />
+                    )}
+                    Rodar Backup Agora
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Section 4: Atalhos de Teclado */}
             <div>
               <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
@@ -391,7 +672,7 @@ export function SettingsModal() {
             }`}
           >
             <button
-              onClick={() => setIsSettingsOpen(false)}
+              onClick={close}
               className="px-5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-xs font-semibold text-white rounded-lg shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />

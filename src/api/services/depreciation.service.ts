@@ -2,7 +2,7 @@ import { assets, companies, depreciationEntries, depreciationExports } from '../
 import { db } from '../../db';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
-import { generateSchedule, DepreciationRule, getLastClosedCompetence, getCompetencesBetween } from '../../core/depreciation/calculate';
+import { generateSchedule, DepreciationRule, getLastClosedCompetence, getCompetencesBetween, competenceFromDate } from '../../core/depreciation/calculate';
 
 function getDisposedCompetence(asset: any): string | null {
   if (!asset || asset.status !== 'DISPOSED' || !asset.disposedAt) return null;
@@ -33,7 +33,7 @@ export interface DepreciationRow {
   isFirstProportional?: boolean;
   isLastResidual?: boolean;
   exported: boolean;
-  status: 'exported' | 'current' | 'future';
+  status: 'exported' | 'current' | 'not_issued' | 'future';
 }
 
 export class DepreciationService {
@@ -101,18 +101,33 @@ export class DepreciationService {
       // Se baixado e competência é após baixa, já filtrado acima, mas se competência == baixa ainda deprecia
 
       const exported = exportedMap.has(asset.id);
-      let status: DepreciationRow['status'] = 'future';
-      if (exported) status = 'exported';
-      else if (competence === lastClosed) status = 'current';
-      else status = 'future'; // meses passados não exportados permanecem Futuro conforme regra contábil
-      // Se competência < atual e não exportado, poderia ser "pendente", mas usamos future/current/exported
+      // Verifica se já existe entry gerada para esta competência (independente de export)
+      const existingEntry = await db.query.depreciationEntries.findFirst({
+        where: and(eq(depreciationEntries.assetId, asset.id), eq(depreciationEntries.competence, competence)),
+      });
+      const hasEntry = !!existingEntry;
 
-      // Se já exportado, busca valor da entry (para garantir que total bate com exportado)
+      let status: DepreciationRow['status'] = 'future';
+      if (exported) {
+        status = 'exported';
+      } else if (hasEntry) {
+        // Já existe lançamento gerado (retroativa ou cálculo) → tratado como "atual/processado"
+        status = 'current';
+      } else if (competence === lastClosed) {
+        status = 'current';
+      } else if (competence < lastClosed) {
+        // Competência anterior ao último mês fechado e sem lançamento gerado → "Não Lançado"
+        status = 'not_issued';
+      } else {
+        status = 'future';
+      }
+
+      // Se já exportado ou já tem entry, busca valor da entry (para garantir que total bate com gerado/exportado)
       let depVal = month.depreciationValue;
       let accum = month.accumulatedValue;
       let curr = month.currentValue;
-      if (exported) {
-        const entry = await db.query.depreciationEntries.findFirst({
+      if (exported || hasEntry) {
+        const entry = existingEntry ?? await db.query.depreciationEntries.findFirst({
           where: and(eq(depreciationEntries.assetId, asset.id), eq(depreciationEntries.competence, competence)),
         });
         if (entry) {
@@ -185,13 +200,17 @@ export class DepreciationService {
       where: eq(depreciationEntries.assetId, assetId),
     });
     const exportedSet = new Set(entries.filter((e) => e.exported).map((e) => e.competence));
+    const hasEntrySet = new Set(entries.map((e) => e.competence));
     const lastClosed = this.getLastClosedCompetence();
 
     const schedule: DepreciationRow[] = scheduleRaw.map((m) => {
       const exported = exportedSet.has(m.competence);
+      const hasEntry = hasEntrySet.has(m.competence);
       let status: DepreciationRow['status'] = 'future';
       if (exported) status = 'exported';
+      else if (hasEntry) status = 'current';
       else if (m.competence === lastClosed) status = 'current';
+      else if (m.competence < lastClosed) status = 'not_issued';
       else status = 'future';
 
       return {
@@ -426,6 +445,201 @@ export class DepreciationService {
     }
 
     return { csv, filename, total, count: rows.length, competences: retroComps };
+  }
+
+  /**
+   * Recalcula o cronograma de depreciação de um bem quando a taxa ou categoria muda.
+   * Estratégia:
+   * - Bloqueia se houver entries já marcadas como exported=true (competências imutáveis).
+   * - Remove apenas entries com exported=0 (futuras/pendentes) e reinsere com novos valores.
+   * - Retorna o número de meses recalculados.
+   */
+  async recalculateAsset(assetId: string, options?: { force?: boolean }): Promise<{
+    assetId: string;
+    monthsRecalculated: number;
+    monthsPreserved: number;
+    schedule: Array<{ competence: string; depreciationValue: number; accumulatedValue: number; currentValue: number }>;
+  }> {
+    const asset = await assetsRepository.findById(assetId);
+    if (!asset) throw new Error('Bem não encontrado');
+
+    const company = await companiesRepository.findById(asset.companyId);
+    const rule = (company?.depreciationRule as DepreciationRule) || 'PROPORTIONAL';
+
+    const newSchedule = generateSchedule({
+      acquisitionValue: asset.acquisitionValue,
+      annualRate: asset.annualRate,
+      acquisitionDate: asset.acquisitionDate,
+      depreciationRule: rule,
+    });
+
+    // Busca entries existentes
+    const existing = await db.query.depreciationEntries.findMany({
+      where: eq(depreciationEntries.assetId, assetId),
+    });
+    const exportedEntries = existing.filter((e) => e.exported);
+
+    if (exportedEntries.length > 0 && !options?.force) {
+      const exportedComps = exportedEntries.map((e) => e.competence).sort();
+      throw new Error(
+        `Existem ${exportedEntries.length} competências já exportadas (${exportedComps[0]} a ${exportedComps[exportedComps.length - 1]}). ` +
+          `Para recalcular desde o início, é necessário apagar essas exportações. Use force=true para confirmar.`
+      );
+    }
+
+    // Remove entries não-exportadas (passadas não exportadas e futuras)
+    const toDeleteIds = existing.filter((e) => !e.exported).map((e) => e.id);
+    for (const id of toDeleteIds) {
+      await db.delete(depreciationEntries).where(eq(depreciationEntries.id, id));
+    }
+
+    // Insere novas entries para o cronograma, exceto as competências já exportadas (que permanecem como estavam)
+    const exportedSet = new Set(exportedEntries.map((e) => e.competence));
+    let inserted = 0;
+    for (const m of newSchedule) {
+      if (exportedSet.has(m.competence)) continue; // preserva
+      await db.insert(depreciationEntries).values({
+        id: crypto.randomUUID(),
+        assetId,
+        competence: m.competence,
+        depreciationValue: m.depreciationValue,
+        accumulatedValue: m.accumulatedValue,
+        currentValue: m.currentValue,
+        exported: false,
+      });
+      inserted += 1;
+    }
+
+    return {
+      assetId,
+      monthsRecalculated: inserted,
+      monthsPreserved: exportedEntries.length,
+      schedule: newSchedule.map((m) => ({
+        competence: m.competence,
+        depreciationValue: m.depreciationValue,
+        accumulatedValue: m.accumulatedValue,
+        currentValue: m.currentValue,
+      })),
+    };
+  }
+
+  /**
+   * F8: Depreciação retroativa em lote.
+   * Recebe lista de assetIds + range de competências e gera entries para cada par (asset, competence),
+   * respeitando a regra da empresa, a data de aquisição de cada bem e a competência da baixa (se houver).
+   * Substitui entries não-exportadas existentes; preserva exportadas.
+   */
+  async generateRetroactiveBatch(params: {
+    companyId: string;
+    assetIds: string[];
+    startCompetence: string;
+    endCompetence: string;
+  }): Promise<{
+    processed: number;
+    skipped: number;
+    entriesCreated: number;
+    entriesPreserved: number;
+    details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }>;
+  }> {
+    const { companyId, assetIds, startCompetence, endCompetence } = params;
+    if (!companyId || !Array.isArray(assetIds) || assetIds.length === 0) {
+      throw new Error('companyId e assetIds são obrigatórios');
+    }
+    if (!/^\d{4}-\d{2}$/.test(startCompetence) || !/^\d{4}-\d{2}$/.test(endCompetence)) {
+      throw new Error('Competências inválidas (use YYYY-MM)');
+    }
+    if (startCompetence > endCompetence) {
+      throw new Error('Competência inicial deve ser anterior à final');
+    }
+
+    const company = await companiesRepository.findById(companyId);
+    if (!company) throw new Error('Empresa não encontrada');
+    const rule = (company.depreciationRule as DepreciationRule) || 'PROPORTIONAL';
+
+    const lastClosed = this.getLastClosedCompetence();
+    const effectiveEnd = endCompetence > lastClosed ? lastClosed : endCompetence;
+
+    let processed = 0;
+    let skipped = 0;
+    let totalCreated = 0;
+    let totalPreserved = 0;
+    const details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }> = [];
+
+    for (const assetId of assetIds) {
+      const asset = await assetsRepository.findById(assetId);
+      if (!asset || asset.companyId !== companyId) {
+        skipped += 1;
+        continue;
+      }
+
+      const schedule = generateSchedule({
+        acquisitionValue: asset.acquisitionValue,
+        annualRate: asset.annualRate,
+        acquisitionDate: asset.acquisitionDate,
+        depreciationRule: rule,
+      });
+      const disposedComp = getDisposedCompetence(asset);
+
+      // Determina start efetivo baseado na aquisição
+      const acqComp = competenceFromDate(asset.acquisitionDate);
+      const effectiveStart = acqComp > startCompetence ? acqComp : startCompetence;
+      const finalEnd = disposedComp && disposedComp < effectiveEnd ? disposedComp : effectiveEnd;
+      if (effectiveStart > finalEnd) {
+        skipped += 1;
+        continue;
+      }
+
+      const competences = getCompetencesBetween(effectiveStart, finalEnd);
+      const scheduleByComp = new Map(schedule.map((m) => [m.competence, m]));
+
+      const existing = await db.query.depreciationEntries.findMany({
+        where: eq(depreciationEntries.assetId, assetId),
+      });
+      const exportedSet = new Set(existing.filter((e) => e.exported).map((e) => e.competence));
+      const existingByComp = new Map(existing.map((e) => [e.competence, e]));
+
+      let created = 0;
+      let preserved = 0;
+      for (const comp of competences) {
+        if (exportedSet.has(comp)) {
+          preserved += 1;
+          continue;
+        }
+        const m = scheduleByComp.get(comp);
+        if (!m) continue;
+        const prior = existingByComp.get(comp);
+        const values = {
+          depreciationValue: m.depreciationValue,
+          accumulatedValue: m.accumulatedValue,
+          currentValue: m.currentValue,
+        };
+        if (prior) {
+          await db.update(depreciationEntries).set(values).where(eq(depreciationEntries.id, prior.id));
+        } else {
+          await db.insert(depreciationEntries).values({
+            id: crypto.randomUUID(),
+            assetId,
+            competence: comp,
+            ...values,
+            exported: false,
+          });
+        }
+        created += 1;
+      }
+
+      details.push({ assetId, entriesCreated: created, entriesPreserved: preserved });
+      processed += 1;
+      totalCreated += created;
+      totalPreserved += preserved;
+    }
+
+    return {
+      processed,
+      skipped,
+      entriesCreated: totalCreated,
+      entriesPreserved: totalPreserved,
+      details,
+    };
   }
 
   async getDashboard(companyId: string) {

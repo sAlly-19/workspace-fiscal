@@ -2,10 +2,37 @@ import { storageService } from './storage.service';
 import { detectFiscalDocument } from '../../core/detector';
 import { parseFiscalDocument } from '../../core/parsers';
 import { db } from '../../db';
-import { importJobs, documents, documentItems, documentTaxes, folders } from '../../db/schema';
+import { importJobs, documents, documentItems, documentTaxes, folders, applicationSettings } from '../../db/schema';
 import { eq, sql, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { FiscalDocument } from '../../core/fiscal.types';
+
+export type DedupePolicy = 'IGNORE' | 'OVERWRITE' | 'CREATE_VERSION';
+
+interface DedupeSettings {
+  policy: DedupePolicy;
+  updatedAt: number;
+}
+
+const DEFAULT_DEDUPE: DedupeSettings = { policy: 'IGNORE', updatedAt: 0 };
+
+async function loadDedupeSettings(): Promise<DedupeSettings> {
+  try {
+    const row = await db.query.applicationSettings.findFirst({
+      where: eq(applicationSettings.key, 'import_dedupe_policy'),
+    });
+    if (!row) return DEFAULT_DEDUPE;
+    const parsed = JSON.parse(row.value);
+    return {
+      policy: ['IGNORE', 'OVERWRITE', 'CREATE_VERSION'].includes(parsed.policy)
+        ? parsed.policy
+        : 'IGNORE',
+      updatedAt: row.updatedAt ? new Date(row.updatedAt).getTime() : 0,
+    };
+  } catch {
+    return DEFAULT_DEDUPE;
+  }
+}
 
 export class ImportService {
   private jobDuplicates = new Map<string, number>();
@@ -91,16 +118,13 @@ export class ImportService {
       }
 
       // 4. PREVENT DUPLICATES: Check if document already exists in DB
-      let isDuplicate = false;
+      let existingDocId: string | null = null;
       if (parsedDoc?.accessKey) {
         const existingByAccessKey = await db.query.documents.findFirst({
           where: eq(documents.accessKey, parsedDoc.accessKey),
         });
-        if (existingByAccessKey) {
-          isDuplicate = true;
-        }
+        if (existingByAccessKey) existingDocId = existingByAccessKey.id;
       } else if (parsedDoc?.number && parsedDoc?.issuer?.document) {
-        // Monta condições dinamicamente para evitar `and(undefined)`
         const conditions = [
           eq(documents.number, parsedDoc.number),
           eq(documents.issuerDocument, parsedDoc.issuer.document),
@@ -110,16 +134,22 @@ export class ImportService {
         const existingByNumber = await db.query.documents.findFirst({
           where: whereClause,
         });
-        if (existingByNumber) {
-          isDuplicate = true;
-        }
+        if (existingByNumber) existingDocId = existingByNumber.id;
       }
 
-      if (isDuplicate) {
-        const currentDupes = this.jobDuplicates.get(jobId) || 0;
-        this.jobDuplicates.set(jobId, currentDupes + 1);
-        console.log(`[ImportService] Ignorando nota duplicada: ${parsedDoc?.accessKey || parsedDoc?.number || file.originalname}`);
-        return { duplicate: true };
+      if (existingDocId) {
+        const policy = await loadDedupeSettings();
+        if (policy.policy === 'IGNORE') {
+          const currentDupes = this.jobDuplicates.get(jobId) || 0;
+          this.jobDuplicates.set(jobId, currentDupes + 1);
+          console.log(`[ImportService] Política IGNORE: ignorando duplicado ${parsedDoc?.accessKey || parsedDoc?.number || file.originalname}`);
+          return { duplicate: true, skipped: 'ignore' };
+        }
+        if (policy.policy === 'OVERWRITE') {
+          // Remove o existente para reinserir com dados novos
+          await db.delete(documents).where(eq(documents.id, existingDocId)).catch(() => {});
+        }
+        // CREATE_VERSION: mantém o existente; este será inserido com id novo (comportamento padrão abaixo)
       }
 
       // 5. Save raw XML securely only if not duplicate
@@ -169,7 +199,7 @@ export class ImportService {
           }
 
           if (parsedDoc.totals?.taxes) {
-            const taxesToInsert = [];
+            const taxesToInsert: Array<{ id: string; documentId: string; taxType: string; amount: number }> = [];
             for (const [taxType, amount] of Object.entries(parsedDoc.totals.taxes)) {
               if (amount && amount > 0) {
                 taxesToInsert.push({

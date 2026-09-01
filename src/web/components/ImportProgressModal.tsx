@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { RotateCw, Minimize2, Maximize2, CheckCircle2, FileCode, FolderOpen, X, AlertTriangle } from 'lucide-react';
+import { RotateCw, Minimize2, Maximize2, CheckCircle2, FileCode, FolderOpen, X, AlertTriangle, Clock } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 
 interface ImportProgressModalProps {
@@ -28,6 +28,11 @@ export function ImportProgressModal({
   const currentTheme = settings.theme || 'dark';
   const isLight = currentTheme === 'light';
   const [isMinimized, setIsMinimized] = useState(false);
+  const startTimeRef = useRef<number>(performance.now());
+
+  useEffect(() => {
+    if (isOpen && !isComplete) startTimeRef.current = performance.now();
+  }, [isOpen, isComplete]);
 
   const calculatedPercent =
     total > 0
@@ -38,6 +43,19 @@ export function ImportProgressModal({
 
   const displayPercent = isComplete ? 100 : percent > 0 ? percent : calculatedPercent;
   const remaining = Math.max(0, total - processed);
+
+  // UX9: ETA em segundos baseada em throughput atual
+  const elapsedSec = isOpen && !isComplete ? (performance.now() - startTimeRef.current) / 1000 : 0;
+  const throughput = elapsedSec > 0 ? processed / elapsedSec : 0;
+  const etaSec = isComplete || throughput <= 0 ? 0 : Math.ceil(remaining / throughput);
+  const etaLabel = isComplete
+    ? 'Concluído'
+    : throughput <= 0
+      ? 'Calculando…'
+      : etaSec < 60
+        ? `${etaSec}s restantes`
+        : `${Math.ceil(etaSec / 60)}min restantes`;
+  const throughputLabel = throughput > 0 ? `${throughput.toFixed(1)} docs/s` : '';
 
   return (
     <AnimatePresence>
@@ -93,7 +111,7 @@ export function ImportProgressModal({
                   <span>{isComplete ? 'Concluído!' : `Importando: ${processed} de ${total}`}</span>
                 </div>
                 <span className={`text-[10px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                  {isComplete ? `${total} notas salvas` : `${displayPercent}% concluído • ${remaining} restantes`}
+                  {isComplete ? `${total} notas salvas` : `${displayPercent}% • ${remaining} restantes • ${etaLabel}`}
                 </span>
               </div>
 
@@ -238,6 +256,27 @@ export function ImportProgressModal({
                         ) : (
                           <span>
                             {processed} de {total} ({remaining} restantes)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span
+                        className={`text-[10px] uppercase font-bold tracking-wider ${
+                          isLight ? 'text-[#64748b]' : 'text-[#71717a]'
+                        }`}
+                      >
+                        Tempo Restante
+                      </span>
+                      <div className={`font-semibold mt-0.5 flex items-center gap-1 ${
+                        isLight ? 'text-[#0f172a]' : 'text-white'
+                      }`}>
+                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <span>{etaLabel}</span>
+                        {throughputLabel && !isComplete && (
+                          <span className={`text-[10px] font-normal ml-1 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
+                            ({throughputLabel})
                           </span>
                         )}
                       </div>

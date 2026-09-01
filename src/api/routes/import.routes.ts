@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import { importService } from '../services/import.service';
 
 const router = Router();
@@ -95,6 +97,76 @@ router.get('/:jobId', async (req, res) => {
   } catch (error) {
     console.error('[ImportRoute] Erro ao buscar status:', error);
     res.status(500).json({ error: 'Erro ao buscar status da importação.' });
+  }
+});
+
+// Importação por caminho de arquivo (usado por importação de diretório).
+// O front envia os paths selecionados via Electron IPC `dialog:openDirectory`
+// ou `dialog:openXml`. Aceita array de strings em `filePaths`.
+router.post('/paths', async (req, res) => {
+  try {
+    const { filePaths, batchId } = req.body as { filePaths?: string[]; batchId?: string };
+    if (!Array.isArray(filePaths) || filePaths.length === 0) {
+      return res.status(400).json({ error: 'filePaths deve ser um array não vazio.' });
+    }
+
+    // Validação: cada path deve apontar para arquivo .xml existente e ter tamanho <= 10MB
+    const MAX_SIZE = 10 * 1024 * 1024;
+    const validFiles: { path: string; buffer: Buffer; originalname: string }[] = [];
+    for (const p of filePaths) {
+      try {
+        if (typeof p !== 'string') continue;
+        if (!p.toLowerCase().endsWith('.xml')) continue;
+        const stat = fs.statSync(p);
+        if (!stat.isFile()) continue;
+        if (stat.size > MAX_SIZE) continue;
+        if (stat.size === 0) continue;
+        const buffer = fs.readFileSync(p);
+        validFiles.push({ path: p, buffer, originalname: path.basename(p) });
+      } catch {
+        // skip unreadable
+      }
+    }
+
+    if (validFiles.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo .xml válido encontrado nos paths.' });
+    }
+
+    const job = await importService.createImportJob(validFiles.length);
+
+    (async () => {
+      try {
+        for (const f of validFiles) {
+          const fakeFile: Express.Multer.File = {
+            fieldname: 'files',
+            originalname: f.originalname,
+            encoding: '7bit',
+            mimetype: 'text/xml',
+            size: f.buffer.length,
+            buffer: f.buffer,
+            destination: '',
+            filename: '',
+            path: f.path,
+            stream: null as any,
+          };
+          await importService.processFile(job.id, fakeFile, batchId);
+        }
+      } catch (err) {
+        console.error('[ImportRoute] Erro no loop de paths:', err);
+      } finally {
+        await importService.markJobCompleted(job.id);
+      }
+    })();
+
+    res.status(202).json({
+      message: 'Importação por diretório iniciada.',
+      jobId: job.id,
+      queued: validFiles.length,
+      skipped: filePaths.length - validFiles.length,
+    });
+  } catch (e) {
+    console.error('[ImportRoute] Erro em /paths:', e);
+    res.status(500).json({ error: 'Erro ao iniciar importação por diretório.' });
   }
 });
 

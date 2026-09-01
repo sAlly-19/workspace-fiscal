@@ -24,6 +24,7 @@ export interface FiscalItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  ncm?: string;
 }
 
 export interface FiscalTaxes {

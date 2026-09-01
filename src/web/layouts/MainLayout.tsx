@@ -33,6 +33,9 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { SplashScreen } from '../components/SplashScreen';
 import { ImportProgressModal } from '../components/ImportProgressModal';
 import { TitleBar } from '../components/TitleBar';
+import { ToastHost, toast } from '../components/Toast';
+import { EmptyState } from '../components/EmptyState';
+import { DocumentCardSkeleton } from '../components/Skeleton';
 import { apiFetch } from '../lib/api';
 
 export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
@@ -69,6 +72,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   const [uploadProgress, setUploadProgress] = useState<{ total: number; processed: number; percent: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isDocsLoading, setIsDocsLoading] = useState(false);
 
   // Active target folder for file uploads
   const [targetUploadFolderId, setTargetUploadFolderId] = useState<string | null>(null);
@@ -107,6 +111,16 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     fetchWorkspace();
     fetchDocuments();
   }, [fetchWorkspace, fetchDocuments]);
+
+  // UX4: Skeleton — escuta sinal de loading do store
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ loading: boolean }>;
+      setIsDocsLoading(!!ce.detail?.loading);
+    };
+    window.addEventListener('wsf:docs-loading', handler);
+    return () => window.removeEventListener('wsf:docs-loading', handler);
+  }, []);
 
   // Debounced server-side search: refetch quando searchQuery muda
   useEffect(() => {
@@ -367,6 +381,83 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     fileInputRef.current?.click();
   };
 
+  // F2: Importação por diretório (via Electron IPC `dialog:openDirectory`)
+  const handleImportDirectory = async () => {
+    try {
+      const api = (window as any).api;
+      if (!api?.openDirectory) {
+        toast.warning('Modo web', 'Importação de pasta requer o app desktop.');
+        return;
+      }
+      const result = await api.openDirectory({ recursive: true, maxFiles: 5000 });
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) return;
+
+      setUploadError(null);
+      setIsUploading(true);
+      setUploadProgress({ total: result.filePaths.length, processed: 0, percent: 0 });
+
+      const targetFolder = targetUploadFolderId || selectedFolderId;
+      const res = await apiFetch('/api/import/paths', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePaths: result.filePaths,
+          batchId: targetFolder || undefined,
+        }),
+      });
+      if (!res.ok) {
+        let errMsg = 'Erro ao iniciar importação por diretório.';
+        try {
+          const data = await res.json();
+          if (data?.error) errMsg = data.error;
+        } catch {}
+        setUploadError(errMsg);
+        setIsUploading(false);
+        setUploadProgress(null);
+        toast.error('Falha ao importar pasta', errMsg);
+        return;
+      }
+      const data = await res.json();
+      toast.info(
+        'Importação de pasta iniciada',
+        `${data.queued} arquivos serão processados${data.skipped ? ` (${data.skipped} ignorados)` : ''}.`
+      );
+      // Poll para progresso usando jobId retornado
+      const jobId = data.jobId;
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await apiFetch(`/api/import/${jobId}`);
+          if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
+          const statusData = await statusRes.json();
+          const processed = statusData.processed ?? 0;
+          const total = statusData.total ?? data.queued;
+          const isCompleted = statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
+          const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
+          setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
+          if (isCompleted) {
+            clearInterval(poll);
+            setTargetUploadFolderId(null);
+            await fetchDocuments(selectedFolderId);
+            await fetchWorkspace();
+            toast.success(
+              'Importação de pasta concluída',
+              `${total} arquivos processados${statusData.duplicates ? `, ${statusData.duplicates} duplicados ignorados` : ''}.`
+            );
+            setTimeout(() => { setIsUploading(false); setUploadProgress(null); }, 2200);
+          }
+        } catch {
+          clearInterval(poll);
+          setIsUploading(false);
+          setUploadProgress(null);
+        }
+      }, 180);
+    } catch (err: any) {
+      toast.error('Erro ao abrir diretório', err?.message || 'Tente novamente.');
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+
   // Trigger single deletion with confirm modal
   const handleTriggerSingleDelete = (id: string, docLabel: string) => {
     setConfirmConfig({
@@ -379,6 +470,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         try {
           await deleteDocument(id);
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          toast.success('Documento excluído', 'A nota fiscal foi removida do workspace.');
+        } catch (err: any) {
+          toast.error('Erro ao excluir', err?.message || 'Tente novamente.');
         } finally {
           setIsConfirmLoading(false);
         }
@@ -399,6 +493,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         try {
           await bulkDeleteDocuments(selectedDocIds);
           setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          toast.success(`${selectedDocIds.length} documento(s) excluído(s)`, 'Remoção em lote concluída.');
+        } catch (err: any) {
+          toast.error('Erro ao excluir em lote', err?.message || 'Tente novamente.');
         } finally {
           setIsConfirmLoading(false);
         }
@@ -550,6 +647,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
 
       {/* Custom Title Bar (Electron only) — drag area + min/max/close */}
       <TitleBar />
+
+      {/* Toast Notifications */}
+      <ToastHost />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -839,6 +939,22 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
             <span>Importar XML</span>
           </button>
 
+          {typeof window !== 'undefined' && (window as any).api?.openDirectory && (
+            <button
+              onClick={handleImportDirectory}
+              disabled={isUploading}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${
+                currentTheme === 'light'
+                  ? 'border border-[#cbd5e1] text-[#475569] bg-white hover:bg-[#f1f5f9]'
+                : 'border border-[#27272a] text-[#a1a1aa] bg-[#18181b] hover:bg-[#27272a] hover:text-white'
+              }`}
+              title="Importar todos os XMLs de uma pasta"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>Importar Pasta</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsSettingsOpen(true)}
             className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-xs font-medium transition-colors cursor-pointer ${
@@ -1024,7 +1140,14 @@ style={{ width: `${listWidth}px` }}
 
           {/* Document Cards List */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {filteredDocuments.map(doc => {
+            {isDocsLoading && filteredDocuments.length === 0 ? (
+              <>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <DocumentCardSkeleton key={i} />
+                ))}
+              </>
+            ) : (
+              filteredDocuments.map(doc => {
               const isSelected = selectedDocumentId === doc.id;
               const isChecked = selectedDocIds.includes(doc.id);
 
@@ -1150,17 +1273,22 @@ style={{ width: `${listWidth}px` }}
                   </div>
                 </div>
               );
-            })}
+              })
+            )}
 
-            {/* Clean empty state for documents list */}
-            {filteredDocuments.length === 0 && (
-              <div className={`h-44 flex flex-col items-center justify-center p-4 text-center border border-dashed rounded-lg mt-3 ${
-                currentTheme === 'light' ? 'border-[#cbd5e1] text-[#64748b]' : 'border-[#27272a] text-[#71717a]'
-              }`}>
-                <FileText className="w-7 h-7 mb-2 opacity-40" />
-                <p className={`text-xs font-semibold ${currentTheme === 'light' ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>Nenhum XML nesta pasta</p>
-                <p className="text-[11px] mt-0.5">Arraste arquivos ou use o botão superior</p>
-              </div>
+            {/* Empty state for documents list */}
+            {filteredDocuments.length === 0 && !isDocsLoading && (
+              <EmptyState
+                icon="file"
+                title="Nenhum XML nesta pasta"
+                description={searchQuery ? 'Tente outra busca ou remova os filtros.' : 'Arraste arquivos aqui ou clique em Importar XML no topo.'}
+                ctaLabel="Importar XML"
+                ctaIcon={<UploadCloud className="w-3.5 h-3.5" />}
+                onCta={() => {
+                  setTargetUploadFolderId(selectedFolderId);
+                  fileInputRef.current?.click();
+                }}
+              />
             )}
           </div>
         </div>

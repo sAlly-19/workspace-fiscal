@@ -1,4 +1,4 @@
-import React, { useState, useRef, memo, useCallback } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Folder,
   FolderOpen,
@@ -48,6 +48,25 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
   // Folder deletion modal state
   const [folderToDelete, setFolderToDelete] = useState<FolderNode | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const breadcrumb = useMemo(() => {
+    const path: FolderNode[] = [];
+    const find = (nodes: FolderNode[], id: string): boolean => {
+      for (const n of nodes) {
+        if (n.id === id) {
+          path.unshift(n);
+          return true;
+        }
+        if (n.children && find(n.children, id)) {
+          path.unshift(n);
+          return true;
+        }
+      }
+      return false;
+    };
+    if (selectedFolderId) find(folders, selectedFolderId);
+    return path;
+  }, [folders, selectedFolderId]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -418,6 +437,31 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
           Nova Pasta
         </button>
       </div>
+
+      {/* Breadcrumb (caminho da pasta atual) */}
+      {selectedFolderId && breadcrumb.length > 0 && (
+        <div
+          className={`px-3 py-1.5 text-[10px] flex items-center gap-1 overflow-x-auto whitespace-nowrap shrink-0 ${
+            currentTheme === 'light'
+              ? 'bg-[#f1f5f9] text-[#475569] border-b border-[#e2e8f0]'
+              : 'bg-[#0a0a0c] text-[#a1a1aa] border-b border-[#27272a]'
+          }`}
+          aria-label="Caminho da pasta atual"
+        >
+          {breadcrumb.map((node, idx) => (
+            <React.Fragment key={node.id}>
+              {idx > 0 && <ChevronRight className="w-3 h-3 opacity-50 shrink-0" />}
+              <button
+                onClick={() => selectFolder(node.id, node.name)}
+                className="hover:underline truncate max-w-[120px]"
+                title={node.name}
+              >
+                {node.name}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
 
       {/* Folders Tree Scrollable Area */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">

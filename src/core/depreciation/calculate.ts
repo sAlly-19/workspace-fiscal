@@ -48,6 +48,8 @@ function competenceFromDate(d: Date): string {
   return formatCompetence(d.getFullYear(), d.getMonth() + 1);
 }
 
+export { competenceFromDate };
+
 /**
  * Calcula valor mensal cheio em centavos (arredondado)
  */

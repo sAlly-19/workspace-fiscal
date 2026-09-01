@@ -6,8 +6,15 @@ import { promises as fs } from 'fs';
 
 import { initDatabase } from '../src/db';
 import { createApp } from '../src/api/app';
+import { backupService } from '../src/api/services/backup.service';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1';
+
+// Em produção desktop, garantir NODE_ENV=production para que o DB use
+// `synchronous=FULL` (segurança contra corrupção por queda de energia).
+if (!isDev && process.env.NODE_ENV !== 'production') {
+  process.env.NODE_ENV = 'production';
+}
 
 let apiServer: { port: number; close: () => void } | null = null;
 let mainWindow: BrowserWindow | null = null;
@@ -65,8 +72,58 @@ function registerIpcHandlers(apiBaseUrl: string) {
     userData: app.getPath('userData'),
     documents: app.getPath('documents'),
     downloads: app.getPath('downloads'),
-    home: app.getPath('home'),
   }));
+
+  ipcMain.handle(
+    'dialog:openDirectory',
+    async (_e, options: { recursive?: boolean; maxFiles?: number } = {}) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return { canceled: true, directory: null, filePaths: [] as string[], totalFound: 0, skipped: 0 };
+      }
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Selecionar pasta com XMLs',
+        properties: ['openDirectory'],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true, directory: null, filePaths: [] as string[], totalFound: 0, skipped: 0 };
+      }
+      const root = result.filePaths[0];
+      const recursive = options.recursive !== false;
+      const maxFiles = options.maxFiles ?? 5000;
+      const found: string[] = [];
+      const MAX_DEPTH = 6;
+      const walk = async (dir: string, depth: number) => {
+        if (depth > MAX_DEPTH || found.length >= maxFiles) return;
+        let entries: import('fs').Dirent[];
+        try {
+          entries = await fs.readdir(dir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+        for (const entry of entries) {
+          if (found.length >= maxFiles) return;
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (recursive) await walk(full, depth + 1);
+            continue;
+          }
+          if (entry.isFile() && entry.name.toLowerCase().endsWith('.xml')) {
+            found.push(full);
+          }
+        }
+      };
+      await walk(root, 0);
+      // Autoriza leitura de cada arquivo encontrado
+      for (const p of found) trackReadFile(p);
+      return {
+        canceled: false,
+        directory: root,
+        filePaths: found,
+        totalFound: found.length,
+        skipped: Math.max(0, (options.maxFiles ?? 5000) - found.length),
+      };
+    }
+  );
 
   ipcMain.handle('dialog:openXml', async (_e, options: { multiSelections?: boolean }) => {
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -83,6 +140,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
         { name: 'Todos os arquivos', extensions: ['*'] },
       ],
     });
+    for (const p of result.filePaths) trackReadFile(p);
     return { canceled: result.canceled, filePaths: result.filePaths };
   });
 
@@ -116,6 +174,8 @@ function registerIpcHandlers(apiBaseUrl: string) {
           continue;
         }
         const content = await fs.readFile(filePath, 'utf-8');
+        // Já autorizado pelo dialog; também registramos para fs:readFile.
+        trackReadFile(filePath);
         results.push({
           filePath,
           fileName: path.basename(filePath),
@@ -136,69 +196,79 @@ function registerIpcHandlers(apiBaseUrl: string) {
         defaultPath: options?.defaultPath,
         filters: options?.filters,
       });
+      if (!result.canceled && result.filePath) {
+        userAuthorizedWriteFiles.add(path.resolve(result.filePath));
+      }
       return { canceled: result.canceled, filePath: result.filePath };
     }
   );
 
-  // Hardened file access: apenas dentro de userData / documents / downloads
-  const allowedBasePaths = [
-    app.getPath('userData'),
-    app.getPath('documents'),
-    app.getPath('downloads'),
-    app.getPath('home'),
-  ];
+  // IPC handlers `fs:readFile` / `fs:writeFile` operam EXCLUSIVAMENTE sobre
+  // paths previamente autorizados via `dialog:openXml` / `dialog:openImport` /
+  // `dialog:saveFile`. A whitelist abaixo é populada quando o usuário escolhe
+  // arquivos via dialog e validada em toda chamada subsequente.
+  const userAuthorizedFiles = new Set<string>();
+  const userAuthorizedWriteFiles = new Set<string>();
 
-  function isPathAllowed(targetPath: string): boolean {
-    try {
-      const resolved = path.resolve(targetPath);
-      return allowedBasePaths.some((base) => {
-        const baseResolved = path.resolve(base);
-        return resolved === baseResolved || resolved.startsWith(baseResolved + path.sep);
-      });
-    } catch {
-      return false;
-    }
-  }
+  const trackReadFile = (filePath: string) => {
+    userAuthorizedFiles.add(path.resolve(filePath));
+  };
 
   ipcMain.handle(
-    'fs:writeFile',
-    async (_e, payload: { filePath: string; content: string | Uint8Array }) => {
+    'fs:readFile',
+    async (_e, filePath: string): Promise<{ ok: true; content: string } | { ok: false; error: string }> => {
+      if (!filePath || typeof filePath !== 'string') {
+        return { ok: false, error: 'invalid_path' };
+      }
+      const resolved = path.resolve(filePath);
+      if (!userAuthorizedFiles.has(resolved)) {
+        return { ok: false, error: 'forbidden' };
+      }
       try {
-        if (!payload?.filePath || typeof payload.filePath !== 'string') return false;
-        if (!isPathAllowed(payload.filePath)) {
-          console.warn('[fs:writeFile] blocked disallowed path', payload.filePath);
-          return false;
-        }
-        // Limite 20MB
-        const byteLength = typeof payload.content === 'string'
-          ? Buffer.byteLength(payload.content, 'utf-8')
-          : payload.content.byteLength;
-        if (byteLength > 20 * 1024 * 1024) {
-          console.warn('[fs:writeFile] blocked oversized write', byteLength);
-          return false;
-        }
-        const data =
-          typeof payload.content === 'string'
-            ? Buffer.from(payload.content, 'utf-8')
-            : Buffer.from(payload.content);
-        await fs.writeFile(payload.filePath, data);
-        return true;
-      } catch (err) {
-        console.error('[fs:writeFile] failed', err);
-        return false;
+        const stat = await fs.stat(resolved);
+        if (!stat.isFile()) return { ok: false, error: 'not_a_file' };
+        if (stat.size > 10 * 1024 * 1024) return { ok: false, error: 'too_large' };
+        const content = await fs.readFile(resolved, 'utf-8');
+        // Consumed (one-shot auth). Renderer deve re-invocar dialog se precisar de novo.
+        userAuthorizedFiles.delete(resolved);
+        return { ok: true, content };
+      } catch {
+        return { ok: false, error: 'read_failed' };
       }
     }
   );
 
-  ipcMain.handle('fs:readFile', async (_e, filePath: string) => {
-    if (!isPathAllowed(filePath)) {
-      throw new Error('Acesso negado: caminho fora das pastas permitidas');
+  ipcMain.handle(
+    'fs:writeFile',
+    async (
+      _e,
+      payload: { filePath: string; content: string | Uint8Array }
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      if (!payload?.filePath || typeof payload.filePath !== 'string') {
+        return { ok: false, error: 'invalid_path' };
+      }
+      const resolved = path.resolve(payload.filePath);
+      if (!userAuthorizedWriteFiles.has(resolved)) {
+        return { ok: false, error: 'forbidden' };
+      }
+      try {
+        const byteLength =
+          typeof payload.content === 'string'
+            ? Buffer.byteLength(payload.content, 'utf-8')
+            : payload.content.byteLength;
+        if (byteLength > 20 * 1024 * 1024) return { ok: false, error: 'too_large' };
+        const data =
+          typeof payload.content === 'string'
+            ? Buffer.from(payload.content, 'utf-8')
+            : Buffer.from(payload.content);
+        await fs.writeFile(resolved, data);
+        userAuthorizedWriteFiles.delete(resolved);
+        return { ok: true };
+      } catch {
+        return { ok: false, error: 'write_failed' };
+      }
     }
-    const stat = await fs.stat(filePath).catch(() => null);
-    if (!stat || !stat.isFile()) throw new Error('Arquivo não encontrado');
-    if (stat.size > 10 * 1024 * 1024) throw new Error('Arquivo excede limite de 10MB');
-    return await fs.readFile(filePath, 'utf-8');
-  });
+  );
 
   // Custom title bar — fully React-rendered, no native overlay.
   const allowedActions = new Set(['minimize', 'maximize', 'close', 'fullscreen']);
@@ -305,6 +375,12 @@ app.whenReady().then(async () => {
   registerIpcHandlers(apiBaseUrl);
   await createWindow(apiBaseUrl);
 
+  // Inicia agendador de backup e tenta um check imediato
+  backupService.startScheduler(6);
+  backupService.maybeRunIfDue().catch((err) =>
+    console.error('[backup] startup check failed:', err)
+  );
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow(apiBaseUrl);
@@ -326,4 +402,5 @@ app.on('before-quit', () => {
       console.error('[shutdown] apiServer.close failed', err);
     }
   }
+  backupService.stopScheduler();
 });

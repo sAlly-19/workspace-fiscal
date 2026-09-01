@@ -9,6 +9,10 @@ import { useDepreciationStore } from '../../stores/depreciation.store';
 import { apiFetch } from '../../lib/api';
 import { TitleBar } from '../../components/TitleBar';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { ToastHost, toast } from '../../components/Toast';
+import { SettingsModal } from '../../components/SettingsModal';
+import { CompetencePicker } from '../../components/CompetencePicker';
+import { RetroactiveBatchModal } from './RetroactiveBatchModal';
 
 type Tab = 'dashboard' | 'assets' | 'companies' | 'categories';
 
@@ -18,11 +22,12 @@ function formatCents(cents: number): string {
 function formatCentsBRL(cents: number): string {
   return `R$ ${formatCents(cents)}`;
 }
+const MONTHS_PT_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
 function competenceLabel(comp: string): string {
   const [y, m] = comp.split('-');
-  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const idx = Number(m)-1;
-  return `${months[idx]} ${y}`;
+  return `${MONTHS_PT_FULL[idx]} ${y}`;
 }
 function formatDateBR(d: string | Date): string {
   const date = new Date(d);
@@ -65,6 +70,12 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const [disposeDate, setDisposeDate] = useState(new Date().toISOString().slice(0,10));
   const [disposeReason, setDisposeReason] = useState('');
   const [isDisposing, setIsDisposing] = useState(false);
+  const [reactivateTarget, setReactivateTarget] = useState<any>(null);
+  const [isReactivating, setIsReactivating] = useState(false);
+  // F8: Depreciação retroativa em lote
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [showRetroBatchModal, setShowRetroBatchModal] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const selectedCompany = useMemo(() => companies.find(c=> c.id===selectedCompanyId) || null, [companies, selectedCompanyId]);
 
@@ -137,7 +148,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
       fetchMonthly();
       fetchDashboard();
     } catch (e:any) {
-      alert(e.message);
+      toast.error('Erro', e.message);
     } finally { setIsGenerating(false); }
   }
 
@@ -212,7 +223,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
               <Moon className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button onClick={()=> setTab('companies')} className={`p-2 rounded-lg border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#27272a] hover:bg-[#27272a]'}`}>
+          <button onClick={()=> setIsSettingsOpen(true)} className={`p-2 rounded-lg border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#27272a] hover:bg-[#27272a]'}`} title="Configurações do Sistema">
             <Settings2 className="w-4 h-4 text-[#71717a]" />
           </button>
         </div>
@@ -267,7 +278,12 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                         <div className={`text-sm font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{competenceLabel(competence)}</div>
                       </div>
                     </div>
-                    <input type="month" value={competence} onChange={(e)=> setCompetence(e.target.value)} className={`text-sm rounded-lg px-3 py-1.5 border cursor-pointer ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`} />
+                    <CompetencePicker
+                      value={competence}
+                      onChange={setCompetence}
+                      isLight={isLight}
+                      label={`${MONTHS_PT_FULL[parseInt(competence.split('-')[1], 10) - 1]} / ${competence.split('-')[0]}`}
+                    />
                   </div>
 
                   {/* Cards */}
@@ -322,7 +338,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                               <td className="px-3 py-2">{r.categoryName || '—'}</td>
                               <td className="px-3 py-2 text-right font-bold">{formatCentsBRL(r.depreciationValue)}</td>
                               <td className="px-3 py-2 text-center">
-                                {r.exported ? <span className="inline-flex items-center gap-1 text-emerald-600 font-bold"><Check className="w-3 h-3" /> ✓</span> : <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.status==='current' ? 'bg-blue-500 text-white' : (isLight ? 'bg-[#e2e8f0] text-[#475569]' : 'bg-[#27272a] text-[#71717a]')}`}>{r.status==='current' ? 'ATUAL' : 'FUTURO'}</span>}
+                                {r.exported ? <span className="inline-flex items-center gap-1 text-emerald-600 font-bold"><Check className="w-3 h-3" /> ✓</span> : r.status === 'current' ? <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500 text-white">ATUAL</span> : r.status === 'not_issued' ? <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 border border-amber-500/30">NÃO LANÇADO</span> : <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${isLight ? 'bg-[#e2e8f0] text-[#475569]' : 'bg-[#27272a] text-[#71717a]'}`}>FUTURO</span>}
                               </td>
                             </tr>
                           )) : (
@@ -353,6 +369,11 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                         <Search className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`} />
                         <input value={searchAssets} onChange={(e)=> setSearchAssets(e.target.value)} placeholder="Buscar..." className={`pl-8 pr-3 py-1.5 rounded-lg border text-xs w-56 ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`} />
                       </div>
+                      {selectedAssetIds.size > 0 && (
+                        <button onClick={()=> setShowRetroBatchModal(true)} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95">
+                          <Calendar className="w-3.5 h-3.5" /> Depreciar Retroativa ({selectedAssetIds.size})
+                        </button>
+                      )}
                       <button onClick={()=> { setEditingAsset(null); setShowAssetModal(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Plus className="w-3.5 h-3.5" /> Novo bem</button>
                     </div>
                   </div>
@@ -361,6 +382,20 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                     <table className="w-full text-xs">
                       <thead className={`${isLight ? 'bg-[#f1f5f9] text-[#475569]' : 'bg-[#18181b] text-[#a1a1aa]'}`}>
                         <tr>
+                          <th className="px-3 py-2 w-8">
+                            <input
+                              type="checkbox"
+                              checked={filteredAssets.length > 0 && filteredAssets.every((a:any) => selectedAssetIds.has(a.id))}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedAssetIds(new Set(filteredAssets.map((a:any) => a.id)));
+                                } else {
+                                  setSelectedAssetIds(new Set());
+                                }
+                              }}
+                              className="w-3.5 h-3.5 cursor-pointer"
+                            />
+                          </th>
                           <th className="text-left px-3 py-2">Fornecedor</th>
                           <th className="text-left px-3 py-2">NF / Descrição</th>
                           <th className="text-left px-3 py-2">Categoria</th>
@@ -372,6 +407,19 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                       <tbody className={`divide-y ${isLight ? 'divide-[#e2e8f0]' : 'divide-[#27272a]'}`}>
                         {filteredAssets.map(a=> (
                           <tr key={a.id} className={`${isLight ? 'hover:bg-[#f8fafc]' : 'hover:bg-white/[0.02]'} cursor-pointer`} onClick={()=> openAssetHistory(a)}>
+                            <td className="px-3 py-2" onClick={(e)=> e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedAssetIds.has(a.id)}
+                                onChange={(e) => {
+                                  const next = new Set(selectedAssetIds);
+                                  if (e.target.checked) next.add(a.id);
+                                  else next.delete(a.id);
+                                  setSelectedAssetIds(next);
+                                }}
+                                className="w-3.5 h-3.5 cursor-pointer"
+                              />
+                            </td>
                             <td className="px-3 py-2 font-medium">{a.supplier}</td>
                             <td className="px-3 py-2"><div className="font-mono font-bold">NF {a.documentNumber}</div><div className={`text-[11px] truncate max-w-[260px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>{a.description}</div></td>
                             <td className="px-3 py-2">{a.categoryName || '—'}</td>
@@ -381,7 +429,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                               {a.status === 'DISPOSED' ? (
                                 <>
                                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${isLight ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'}`}>Baixado</span>
-                                  <button onClick={()=> { if(confirm('Reativar bem?')) reactivateAsset(a.id).then(()=> { fetchMonthly(); fetchDashboard(); }); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-emerald-50' : 'bg-[#18181b] border-[#3f3f46] hover:bg-emerald-500/10'} text-emerald-600`} title="Reativar"><ArchiveRestore className="w-3 h-3" /></button>
+                                  <button onClick={()=> { setReactivateTarget(a); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-emerald-50' : 'bg-[#18181b] border-[#3f3f46] hover:bg-emerald-500/10'} text-emerald-600`} title="Reativar"><ArchiveRestore className="w-3 h-3" /></button>
                                 </>
                               ) : (
                                 <button onClick={()=> { setDisposeTarget(a); setDisposeDate(new Date().toISOString().slice(0,10)); setDisposeReason(''); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-amber-50' : 'bg-[#18181b] border-[#3f3f46] hover:bg-amber-500/10'} text-amber-600`} title="Dar Baixa"><Archive className="w-3 h-3" /></button>
@@ -392,7 +440,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                             </td>
                           </tr>
                         ))}
-                        {filteredAssets.length===0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-[#71717a]">Nenhum bem cadastrado</td></tr>}
+                        {filteredAssets.length===0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[#71717a]">Nenhum bem cadastrado</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -589,7 +637,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                     // Atualiza histórico se aberto
                     if (selectedAsset) openAssetHistory(selectedAsset);
                   } catch (e:any) {
-                    alert(e.message);
+                    toast.error('Erro', e.message);
                   } finally {
                     setIsRetroGenerating(false);
                   }
@@ -641,7 +689,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                     fetchMonthly();
                     fetchDashboard();
                   } catch (e:any) {
-                    alert(e.message);
+                    toast.error('Erro ao dar baixa', e.message);
                   } finally {
                     setIsDisposing(false);
                   }
@@ -662,6 +710,73 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
         if (confirmDelete.type==='category') await deleteCategory(confirmDelete.id);
         setConfirmDelete(null);
       }} onCancel={()=> setConfirmDelete(null)} />
+
+      <ConfirmModal
+        isOpen={!!reactivateTarget}
+        title="Reativar Bem"
+        description={`Deseja reativar o bem "${reactivateTarget?.supplier} - NF ${reactivateTarget?.documentNumber}"? Lançamentos não-exportados serão removidos.`}
+        confirmLabel="Reativar"
+        isLoading={isReactivating}
+        onConfirm={async () => {
+          if (!reactivateTarget) return;
+          try {
+            setIsReactivating(true);
+            await reactivateAsset(reactivateTarget.id);
+            toast.success('Bem reativado', 'Lançamentos pendentes foram removidos.');
+            setReactivateTarget(null);
+            fetchMonthly();
+            fetchDashboard();
+            if (selectedAsset) openAssetHistory(selectedAsset);
+          } catch (e:any) {
+            toast.error('Erro ao reativar', e.message);
+          } finally {
+            setIsReactivating(false);
+          }
+        }}
+        onCancel={() => setReactivateTarget(null)}
+      />
+
+      {/* F8: Modal de depreciação retroativa em lote */}
+      {showRetroBatchModal && (
+        <RetroactiveBatchModal
+          isLight={isLight}
+          assets={assets.filter((a:any) => selectedAssetIds.has(a.id))}
+          lastClosed={getLastClosedCompetence()}
+          onClose={() => setShowRetroBatchModal(false)}
+          onConfirm={async (startComp: string, endComp: string) => {
+            try {
+              setIsRetroGenerating(true);
+              const ids = Array.from(selectedAssetIds);
+              const res = await apiFetch('/api/depreciation/retroactive/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId: selectedCompanyId, assetIds: ids, startCompetence: startComp, endCompetence: endComp }),
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                toast.error('Erro na retroativa', err.error || 'Falha ao processar');
+                return;
+              }
+              const data = await res.json();
+              toast.success(
+                'Retroativa concluída',
+                `${data.processed} bens processados, ${data.entriesCreated} entries geradas.`
+              );
+              setShowRetroBatchModal(false);
+              setSelectedAssetIds(new Set());
+              fetchMonthly();
+              fetchDashboard();
+            } catch (e:any) {
+              toast.error('Erro', e.message);
+            } finally {
+              setIsRetroGenerating(false);
+            }
+          }}
+        />
+      )}
+
+      <ToastHost />
+      <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }
@@ -886,13 +1001,13 @@ function AssetHistoryModal({ isLight, assetHistory, asset, onClose }: any) {
             </thead>
             <tbody className={`divide-y ${isLight ? 'divide-[#e2e8f0]' : 'divide-[#27272a]'}`}>
               {schedule.map((m:any)=> (
-                <tr key={m.competence} className={`${m.status==='exported' ? (isLight ? 'bg-emerald-50' : 'bg-emerald-500/10') : m.status==='current' ? (isLight ? 'bg-blue-50' : 'bg-blue-500/10') : ''}`}>
+                <tr key={m.competence} className={`${m.status==='exported' ? (isLight ? 'bg-emerald-50' : 'bg-emerald-500/10') : m.status==='current' ? (isLight ? 'bg-blue-50' : 'bg-blue-500/10') : m.status==='not_issued' ? (isLight ? 'bg-amber-50' : 'bg-amber-500/10') : ''}`}>
                   <td className="px-4 py-2 font-mono font-medium">{m.competence.slice(0,7).split('-').reverse().join('/')}</td>
                   <td className="px-4 py-2 text-right font-bold">{formatCentsBRL(m.depreciationValue)}{m.isFirstProportional ? ' *' : ''}{m.isLastResidual ? ' †' : ''}</td>
                   <td className="px-4 py-2 text-right">{formatCentsBRL(m.accumulatedValue)}</td>
                   <td className="px-4 py-2 text-right">{formatCentsBRL(m.currentValue)}</td>
                   <td className="px-4 py-2 text-center">
-                    {m.status==='exported' ? <span className="text-emerald-600 font-bold text-[11px]">✓ Exportado</span> : m.status==='current' ? <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">ATUAL</span> : <span className={`px-1.5 py-0.5 rounded text-[10px] ${isLight ? 'bg-[#e2e8f0] text-[#475569]' : 'bg-[#27272a] text-[#71717a]'}`}>Futuro</span>}
+                    {m.status==='exported' ? <span className="text-emerald-600 font-bold text-[11px]">✓ Exportado</span> : m.status==='current' ? <span className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">ATUAL</span> : m.status==='not_issued' ? <span className="bg-amber-500/20 text-amber-600 border border-amber-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold">NÃO LANÇADO</span> : <span className={`px-1.5 py-0.5 rounded text-[10px] ${isLight ? 'bg-[#e2e8f0] text-[#475569]' : 'bg-[#27272a] text-[#71717a]'}`}>Futuro</span>}
                   </td>
                 </tr>
               ))}

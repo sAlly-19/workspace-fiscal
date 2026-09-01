@@ -18,6 +18,28 @@ export const applicationSettings = sqliteTable('application_settings', {
     .notNull(),
 });
 
+export const documentEvents = sqliteTable(
+  'document_events',
+  {
+    id: text('id').primaryKey(),
+    documentId: text('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(), // 'CCE' = 110110, 'CANCEL' = 110111, 'OTHER'
+    sequence: integer('sequence').notNull().default(1),
+    eventDate: integer('event_date', { mode: 'timestamp' }),
+    protocol: text('protocol'),
+    rawXmlPath: text('raw_xml_path'),
+    correctionText: text('correction_text'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`(strftime('%s', 'now'))`)
+      .notNull(),
+  },
+  (table) => ({
+    docIdx: index('idx_events_document').on(table.documentId),
+  })
+);
+
 export const companies = sqliteTable('companies', {
   id: text('id').primaryKey(), // UUID
   name: text('name').notNull(), // Razão social

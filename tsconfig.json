@@ -19,6 +19,8 @@
       "@/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "strictNullChecks": true,
+    "noFallthroughCasesInSwitch": true
   }
 }

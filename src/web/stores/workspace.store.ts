@@ -1,6 +1,41 @@
 import { create } from 'zustand';
 import { apiFetch, apiUrl } from '../lib/api';
 
+function readUrlParams(): { folderId: string | null; folderName: string; search: string } {
+  if (typeof window === 'undefined') return { folderId: null, folderName: 'Todos os Documentos', search: '' };
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const folderId = sp.get('folder');
+    const search = sp.get('q') || '';
+    return {
+      folderId: folderId || null,
+      folderName: sp.get('folderName') || (folderId ? 'Pasta' : 'Todos os Documentos'),
+      search,
+    };
+  } catch {
+    return { folderId: null, folderName: 'Todos os Documentos', search: '' };
+  }
+}
+
+function writeUrlParams(folderId: string | null, folderName: string, search: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (folderId) {
+      sp.set('folder', folderId);
+      sp.set('folderName', folderName);
+    } else {
+      sp.delete('folder');
+      sp.delete('folderName');
+    }
+    if (search) sp.set('q', search);
+    else sp.delete('q');
+    const next = sp.toString();
+    const url = window.location.pathname + (next ? ` ? : ${next}` : '');
+    window.history.replaceState({}, '', url);
+  } catch {}
+}
+
 export interface FolderNode {
   id: string;
   name: string;
@@ -136,15 +171,17 @@ async function safeFetchJson<T>(path: string, options?: RequestInit, retries = 2
   return null;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  folders: [],
-  selectedFolderId: null,
-  selectedFolderName: 'Todos os Documentos',
-  documents: [],
-  selectedDocumentId: null,
-  selectedDocIds: [],
-  searchQuery: '',
-  expandedFolderIds: {},
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
+  const initial = readUrlParams();
+  return {
+    folders: [],
+    selectedFolderId: initial.folderId,
+    selectedFolderName: initial.folderName,
+    documents: [],
+    selectedDocumentId: null,
+    selectedDocIds: [],
+    searchQuery: initial.search,
+    expandedFolderIds: {},
 
   isImporting: false,
   importProgress: null,
@@ -246,9 +283,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   selectFolder: (folderId: string | null, folderName?: string) => {
+    const name = folderName || (folderId ? 'Pasta Selecionada' : 'Todos os Documentos');
+    writeUrlParams(folderId, name, get().searchQuery);
     set({
       selectedFolderId: folderId,
-      selectedFolderName: folderName || (folderId ? 'Pasta Selecionada' : 'Todos os Documentos'),
+      selectedFolderName: name,
       selectedDocIds: [],
     });
     get().fetchDocuments(folderId);
@@ -263,8 +302,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       if (search) params.set('search', search);
       const query = params.toString() ? `?${params.toString()}` : '';
       const url = `/api/documents${query}`;
-      
+
+      // Sinaliza loading via window flag (sem dependência circular com MainLayout)
+      try {
+        window.dispatchEvent(new CustomEvent('wsf:docs-loading', { detail: { loading: true } }));
+      } catch {}
+
       const documents = await safeFetchJson<DocumentItem[]>(url);
+      try {
+        window.dispatchEvent(new CustomEvent('wsf:docs-loading', { detail: { loading: false } }));
+      } catch {}
       if (Array.isArray(documents)) {
         set({ documents });
 
@@ -276,6 +323,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         }
       }
     } catch (error) {
+      try { window.dispatchEvent(new CustomEvent('wsf:docs-loading', { detail: { loading: false } })); } catch {}
       console.warn('Failed to fetch documents:', error);
     }
   },
@@ -419,7 +467,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ selectedDocIds: [] });
   },
 
-  setSearchQuery: (query: string) => set({ searchQuery: query }),
+  setSearchQuery: (query: string) => {
+    writeUrlParams(get().selectedFolderId, get().selectedFolderName, query);
+    set({ searchQuery: query });
+  },
 
   setImporting: (importing: boolean, progress?: ImportProgress | null) => {
     set({
@@ -447,4 +498,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return { settings: nextSettings };
     });
   },
-}));
+  };
+});

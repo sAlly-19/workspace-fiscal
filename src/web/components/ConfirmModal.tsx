@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 
@@ -8,6 +9,8 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   confirmVariant?: 'danger' | 'primary';
   isLoading?: boolean;
+  /** Quando definido, exige que o usuário digite exatamente este texto para habilitar o botão de confirmação. */
+  requireText?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,15 +22,22 @@ export function ConfirmModal({
   confirmLabel = 'Excluir',
   confirmVariant = 'danger',
   isLoading = false,
+  requireText,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   const { settings } = useWorkspaceStore();
   const currentTheme = settings.theme || 'dark';
+  const [typed, setTyped] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) setTyped('');
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isLight = currentTheme === 'light';
+  const canConfirm = !requireText || typed.trim() === requireText.trim();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs">
@@ -82,6 +92,29 @@ export function ConfirmModal({
         {/* Body */}
         <div className={`p-5 text-xs leading-relaxed ${isLight ? 'text-[#334155]' : 'text-[#d4d4d8]'}`}>
           {description}
+          {requireText && (
+            <div className="mt-4">
+              <label
+                className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+                  isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'
+                }`}
+              >
+                Digite <span className="font-mono text-red-500 font-bold">{requireText}</span> para confirmar
+              </label>
+              <input
+                type="text"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                autoFocus
+                placeholder={requireText}
+                className={`w-full px-3 py-1.5 text-xs rounded-lg border outline-none font-mono ${
+                  isLight
+                    ? 'bg-[#f8fafc] border-[#cbd5e1] text-[#0f172a] focus:border-red-500'
+                    : 'bg-[#09090b] border-[#3f3f46] text-white focus:border-red-500'
+                }`}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -103,12 +136,12 @@ export function ConfirmModal({
           </button>
           <button
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || !canConfirm}
             className={`px-4 py-1.5 text-xs font-semibold text-white rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer ${
               confirmVariant === 'danger'
                 ? 'bg-red-600 hover:bg-red-500 active:scale-95'
                 : 'bg-blue-600 hover:bg-blue-500 active:scale-95'
-            } ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}
+            } ${isLoading || !canConfirm ? 'opacity-50 pointer-events-none' : ''}`}
           >
             {isLoading && (
               <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

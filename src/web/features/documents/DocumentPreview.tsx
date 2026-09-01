@@ -8,9 +8,10 @@ import { useWorkspaceStore } from '../../stores/workspace.store';
 import { DanfeNFCe } from './DanfeNFCe';
 import { DanfeDACTE } from './DanfeDACTE';
 import { DanfeNFSe } from './DanfeNFSe';
+import { EventTimeline } from './EventTimeline';
 import { getPaymentLabel } from '../../../core/danfe/helpers';
 
-type PreviewMode = 'visualizar' | 'dados' | 'xml';
+type PreviewMode = 'visualizar' | 'dados' | 'xml' | 'eventos';
 
 interface TabItem {
   id: PreviewMode;
@@ -23,6 +24,7 @@ const TABS: TabItem[] = [
   { id: 'visualizar', label: 'DANFE (PDF)', shortLabel: 'DANFE', icon: FileText },
   { id: 'dados', label: 'Dados da Nota', shortLabel: 'Dados', icon: Table },
   { id: 'xml', label: 'XML Original', shortLabel: 'XML', icon: Code2 },
+  { id: 'eventos', label: 'Eventos (CC-e)', shortLabel: 'Eventos', icon: CalendarClock },
 ];
 
 export function DocumentPreview({ 
@@ -275,6 +277,7 @@ export function DocumentPreview({
           >
             {mode === 'visualizar' && <DanfeView doc={docDetails} theme={currentTheme} />}
             {mode === 'dados' && <DadosView doc={docDetails} theme={currentTheme} />}
+            {mode === 'eventos' && <EventTimeline documentId={docDetails.id} />}
             {mode === 'xml' && (
               <div className="absolute inset-0 p-4">
                 {loadingXml ? (

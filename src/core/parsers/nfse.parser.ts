@@ -19,7 +19,7 @@ export class NFSeParser extends FiscalParser {
     }
 
     // 3. ABRASF Standard (CompNfse / ConsultarNfseResposta / Nfse / InfNfse)
-    let nfse = null;
+    let nfse: any = null;
     if (jsonObj.CompNfse?.Nfse) {
       nfse = jsonObj.CompNfse.Nfse;
     } else if (jsonObj.ConsultarNfseResposta?.ListaNfse?.CompNfse?.Nfse) {
@@ -30,7 +30,7 @@ export class NFSeParser extends FiscalParser {
       nfse = jsonObj.NFSe;
     }
 
-    const inf = nfse?.InfNfse || nfse?.infNfse || nfse?.infNFSe || nfse;
+    const inf: any = nfse?.InfNfse || nfse?.infNfse || nfse?.infNFSe || nfse;
     if (inf && (inf.Servico || inf.servico || inf.Numero || inf.nNFSe)) {
       return this.parseAbrasf(inf, rawXmlPath, batchId);
     }

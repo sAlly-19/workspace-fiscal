@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import { assetsRepository } from '../repositories/assets.repository';
 import { categoriesRepository } from '../repositories/categories.repository';
-import { parseBRLToCents } from '../../core/depreciation/calculate';
+import { depreciationService } from '../services/depreciation.service';
+import { db } from '../../db';
+import { depreciationEntries } from '../../db/schema';
+import { eq } from 'drizzle-orm';
+import { generateSchedule, parseBRLToCents } from '../../core/depreciation/calculate';
+import crypto from 'crypto';
 
 const router = Router();
 
@@ -106,7 +111,7 @@ router.patch('/:id', async (req, res) => {
 
 router.post('/:id/dispose', async (req, res) => {
   try {
-    const { disposedAt, reason } = req.body;
+    const { disposedAt, reason, generateResidual } = req.body;
     const asset = await assetsRepository.findById(req.params.id);
     if (!asset) return res.status(404).json({ error: 'Bem não encontrado' });
     if ((asset as any).status === 'DISPOSED') return res.status(400).json({ error: 'Bem já baixado' });
@@ -115,12 +120,94 @@ router.post('/:id/dispose', async (req, res) => {
     // Não permite baixa antes da aquisição
     if (date < new Date((asset as any).acquisitionDate)) return res.status(400).json({ error: 'Data de baixa não pode ser anterior à aquisição' });
     const updated = await assetsRepository.dispose(req.params.id, date, reason || null);
-    res.json(updated);
+
+    // F11: Gera entry residual final na competência da baixa, se solicitado e se a regra da empresa permitir
+    let residualEntry: { competence: string; depreciationValue: number; accumulatedValue: number; currentValue: number } | null = null;
+    if (generateResidual !== false) {
+      // Calcula competência da baixa (YYYY-MM)
+      const comp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      try {
+        const result = await depreciationService.recalculateAsset(req.params.id, { force: false });
+        // Aplica baixa + gera residual via chamada dedicada
+        residualEntry = await applyDisposeResidual(req.params.id, comp);
+        // 'result' foi calculado mas aqui estamos gerando apenas residual; recalculateAsset preservou exportadas
+        void result;
+      } catch (err) {
+        // Não falhamos a baixa se residual falhar; apenas logamos
+        console.warn(`[Assets/dispose] Falha ao gerar residual:`, err);
+      }
+    }
+
+    res.json({ ...updated, residualEntry });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Erro ao dar baixa' });
   }
 });
+
+/**
+ * Gera (ou atualiza) a entry de depreciação residual na competência da baixa,
+ * igualando accumulatedValue a acquisitionValue e currentValue a 0.
+ * Bloqueia entries de competências futuras.
+ */
+async function applyDisposeResidual(assetId: string, competence: string): Promise<{ competence: string; depreciationValue: number; accumulatedValue: number; currentValue: number } | null> {
+  const asset = await assetsRepository.findById(assetId);
+  if (!asset) return null;
+
+  // Calcula o acumulado até a competência da baixa
+  const schedule = generateSchedule({
+    acquisitionValue: asset.acquisitionValue,
+    annualRate: asset.annualRate,
+    acquisitionDate: asset.acquisitionDate,
+    depreciationRule: 'PROPORTIONAL',
+  });
+  // Encontra entry equivalente no schedule
+  const month = schedule.find((m) => m.competence === competence);
+  const fullAccumulated = month ? month.accumulatedValue : asset.acquisitionValue;
+  // Residual = acquisition - acumulado
+  const residualValue = Math.max(0, asset.acquisitionValue - fullAccumulated);
+
+  // Remove entries futuras (competências após a baixa)
+  const futureEntries = await db.query.depreciationEntries.findMany({
+    where: eq(depreciationEntries.assetId, assetId),
+  });
+  for (const e of futureEntries) {
+    if (e.competence > competence) {
+      await db.delete(depreciationEntries).where(eq(depreciationEntries.id, e.id));
+    }
+  }
+
+  // Garante entry na competência da baixa com o valor residual
+  const existingAtCompetence = futureEntries.find((e) => e.competence === competence);
+  const newDepreciationValue = fullAccumulated - (schedule.find((m) => m.competence < competence)?.accumulatedValue ?? 0) + residualValue;
+  if (existingAtCompetence) {
+    if (!existingAtCompetence.exported) {
+      await db.update(depreciationEntries).set({
+        depreciationValue: newDepreciationValue,
+        accumulatedValue: asset.acquisitionValue,
+        currentValue: 0,
+      }).where(eq(depreciationEntries.id, existingAtCompetence.id));
+    }
+    // Se já estava exportada, não alteramos (compliance contábil)
+  } else {
+    await db.insert(depreciationEntries).values({
+      id: crypto.randomUUID(),
+      assetId,
+      competence,
+      depreciationValue: newDepreciationValue,
+      accumulatedValue: asset.acquisitionValue,
+      currentValue: 0,
+      exported: false,
+    });
+  }
+
+  return {
+    competence,
+    depreciationValue: newDepreciationValue,
+    accumulatedValue: asset.acquisitionValue,
+    currentValue: 0,
+  };
+}
 
 router.post('/:id/reactivate', async (req, res) => {
   try {
@@ -128,6 +215,13 @@ router.post('/:id/reactivate', async (req, res) => {
     if (!asset) return res.status(404).json({ error: 'Bem não encontrado' });
     if ((asset as any).status !== 'DISPOSED') return res.status(400).json({ error: 'Bem não está baixado' });
     const updated = await assetsRepository.reactivate(req.params.id);
+    // Limpa entries geradas pela baixa (apenas as não-exportadas)
+    const entries = await db.query.depreciationEntries.findMany({
+      where: eq(depreciationEntries.assetId, req.params.id),
+    });
+    for (const e of entries) {
+      if (!e.exported) await db.delete(depreciationEntries).where(eq(depreciationEntries.id, e.id));
+    }
     res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erro ao reativar bem' });

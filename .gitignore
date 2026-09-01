@@ -61,6 +61,7 @@ Desktop.ini
 *.sln
 *.sw?
 *.code-workspace
+.kilo/
 
 # Electron
 *.exe

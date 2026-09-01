@@ -1,4 +1,5 @@
 import path from 'path';
+import express from 'express';
 import { createServer as createViteServer } from 'vite';
 
 import { initDatabase } from './src/db';
@@ -8,7 +9,8 @@ async function startServer() {
   await initDatabase();
 
   const app = createApp();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
+  const HOST = process.env.HOST ?? '127.0.0.1';
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
@@ -26,8 +28,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
 }
 

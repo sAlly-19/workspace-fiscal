@@ -99,6 +99,45 @@ router.get('/retroactive/csv', async (req, res) => {
   }
 });
 
+// POST /api/depreciation/retroactive/batch  { companyId, assetIds, startCompetence, endCompetence }
+router.post('/retroactive/batch', async (req, res) => {
+  try {
+    const { companyId, assetIds, startCompetence, endCompetence } = req.body;
+    if (!companyId || !Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({ error: 'companyId e assetIds são obrigatórios' });
+    }
+    if (!startCompetence || !endCompetence) {
+      return res.status(400).json({ error: 'startCompetence e endCompetence são obrigatórios' });
+    }
+    const result = await depreciationService.generateRetroactiveBatch({
+      companyId,
+      assetIds,
+      startCompetence,
+      endCompetence,
+    });
+    res.json(result);
+  } catch (e: any) {
+    if (e.message?.includes('devem ser')) {
+      return res.status(400).json({ error: e.message });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/depreciation/asset/:id/recalculate { force?: boolean }
+router.post('/asset/:id/recalculate', async (req, res) => {
+  try {
+    const force = req.body?.force === true;
+    const result = await depreciationService.recalculateAsset(req.params.id, { force });
+    res.json(result);
+  } catch (e: any) {
+    if (e.message?.includes('exportadas')) {
+      return res.status(409).json({ error: e.message, requiresForce: true });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/depreciation/dashboard?companyId=xxx
 router.get('/dashboard', async (req, res) => {
   try {

@@ -72,7 +72,18 @@ export function apiUrlSync(path: string): string {
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = await getApiBaseUrl();
   const url = base + (path.startsWith('/') ? path : '/' + path);
-  return fetch(url, init);
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    // Falha de rede → marca cache como inválido e dispara evento global para UI.
+    _cachedApiBaseUrl = null;
+    try {
+      window.dispatchEvent(new CustomEvent('wsf:api-unreachable'));
+    } catch {
+      // ignore
+    }
+    throw err;
+  }
 }
 
 /** Inicializa cache de base URL em background (chamar no startup) */
