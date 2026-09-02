@@ -357,7 +357,16 @@ async function createWindow(apiBaseUrl: string) {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        shell.openExternal(url);
+      } else {
+        console.warn('[security] blocked non-http external url:', url);
+      }
+    } catch {
+      console.warn('[security] blocked malformed external url:', url);
+    }
     return { action: 'deny' };
   });
 

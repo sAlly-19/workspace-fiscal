@@ -13,6 +13,7 @@ import { ToastHost, toast } from '../../components/Toast';
 import { SettingsModal } from '../../components/SettingsModal';
 import { CompetencePicker } from '../../components/CompetencePicker';
 import { RetroactiveBatchModal } from './RetroactiveBatchModal';
+import { AssetXmlDropZone } from './AssetXmlDropZone';
 
 type Tab = 'dashboard' | 'assets' | 'companies' | 'categories';
 
@@ -843,6 +844,23 @@ function AssetModal({ isLight, editing, categories, selectedCompanyId, onClose, 
           <button onClick={onClose} className={`p-1.5 rounded-lg cursor-pointer ${isLight ? 'hover:bg-[#e2e8f0]' : 'hover:bg-white/10'}`}><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4 overflow-y-auto">
+          {!editing && (
+            <AssetXmlDropZone
+              onPrefill={(data) => {
+                setForm((f) => ({
+                  ...f,
+                  supplier: data.supplier || f.supplier,
+                  documentNumber: data.documentNumber || f.documentNumber,
+                  description: data.description || f.description,
+                  acquisitionDate: data.acquisitionDate || f.acquisitionDate,
+                  acquisitionValue: data.acquisitionValue
+                    ? Number(data.acquisitionValue).toFixed(2).replace('.', ',')
+                    : f.acquisitionValue,
+                  ncm: data.ncm || f.ncm,
+                }));
+              }}
+            />
+          )}
           <div>
             <label className={`text-xs font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>Fornecedor *</label>
             <input value={form.supplier} onChange={(e)=> setForm({...form, supplier: e.target.value})} className={`w-full mt-1 px-3 py-2 rounded-lg border text-sm ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`} placeholder="XYZ Informática Ltda." />

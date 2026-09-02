@@ -106,7 +106,7 @@ function backupCorruptedDbFiles(): string[] {
   return backups;
 }
 
-let rawClient: Client;
+export let rawClient: Client;
 
 try {
   rawClient = createDbClient();
@@ -116,10 +116,25 @@ try {
   rawClient = createDbClient();
 }
 
-export const db = drizzle(rawClient, { schema });
+export let db = drizzle(rawClient, { schema });
 
-export async function initDatabase() {
+export function reconfigureDatabase(customPath?: string): void {
+  const newPath = customPath || resolveDbPath();
+  DB_PATH = newPath;
   try {
+    rawClient = createDbClient();
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, 'database_reconfigure_open_failed');
+    backupCorruptedDbFiles();
+    rawClient = createDbClient();
+  }
+  db = drizzle(rawClient, { schema });
+}
+
+export async function initDatabase(customPath?: string) {
+  try {
+    reconfigureDatabase(customPath);
+
     // 1. Check database integrity. Se falhar, faz backup e cria novo — mas
     //    PRESERVA os arquivos originais (`.corrupt.<ts>.bak`) para recuperação.
     try {
@@ -141,6 +156,7 @@ export async function initDatabase() {
         );
       }
       rawClient = createDbClient();
+      db = drizzle(rawClient, { schema });
     }
 
     // 2. Configure performance & durability pragmas.

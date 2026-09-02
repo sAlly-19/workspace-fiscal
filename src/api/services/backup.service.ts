@@ -1,6 +1,8 @@
 import { promises as fs, existsSync, statSync, readdirSync, unlinkSync } from 'fs';
 import path from 'path';
-import { DB_PATH } from '../../db';
+import { DB_PATH, rawClient, db } from '../../db';
+import { applicationSettings } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
 export interface BackupSettings {
@@ -9,13 +11,6 @@ export interface BackupSettings {
   retentionCount: number;
   destination: string; // absolute path
 }
-
-const DEFAULT_SETTINGS: BackupSettings = {
-  enabled: true,
-  intervalDays: 7,
-  retentionCount: 30,
-  destination: '', // resolvido em runtime para ~/Documents/workspace-fiscal-backups
-};
 
 function getDefaultDestination(): string {
   // Usa Documents como fallback amigável cross-platform.
@@ -29,34 +24,83 @@ function getDefaultDestination(): string {
   return path.join(process.cwd(), 'backups');
 }
 
-function loadSettings(): BackupSettings {
-  try {
-    const raw = localStorage?.getItem?.('wsf_backup_settings');
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {}
-  return { ...DEFAULT_SETTINGS, destination: getDefaultDestination() };
-}
-
-function saveSettings(s: BackupSettings): void {
-  try {
-    localStorage?.setItem?.('wsf_backup_settings', JSON.stringify(s));
-  } catch (err) {
-    logger.warn({ err: (err as Error).message }, 'backup_settings_save_failed');
-  }
-}
+const DEFAULT_SETTINGS: BackupSettings = {
+  enabled: true,
+  intervalDays: 7,
+  retentionCount: 30,
+  destination: getDefaultDestination(),
+};
 
 export class BackupService {
-  private settings: BackupSettings = loadSettings();
+  private settings: BackupSettings = { ...DEFAULT_SETTINGS };
   private lastRunAt: number | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private initialized = false;
+
+  constructor() {
+    this.init();
+  }
+
+  private async init(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+    await this.loadSettingsFromDb();
+  }
+
+  async loadSettingsFromDb(): Promise<BackupSettings> {
+    try {
+      if (!this.settings.destination) {
+        this.settings.destination = getDefaultDestination();
+      }
+      const row = await db.query.applicationSettings.findFirst({
+        where: eq(applicationSettings.key, 'backup_settings'),
+      });
+      if (row?.value) {
+        const parsed = JSON.parse(row.value);
+        this.settings = { ...this.settings, ...parsed };
+      }
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'backup_settings_load_db_note');
+    }
+    return this.settings;
+  }
+
+  private async saveSettingsToDb(): Promise<void> {
+    try {
+      const value = JSON.stringify(this.settings);
+      const existing = await db.query.applicationSettings.findFirst({
+        where: eq(applicationSettings.key, 'backup_settings'),
+      });
+      if (existing) {
+        await db
+          .update(applicationSettings)
+          .set({ value, updatedAt: new Date() })
+          .where(eq(applicationSettings.key, 'backup_settings'));
+      } else {
+        await db.insert(applicationSettings).values({
+          key: 'backup_settings',
+          value,
+          updatedAt: new Date(),
+        });
+      }
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'backup_settings_save_db_failed');
+    }
+  }
 
   getSettings(): BackupSettings {
+    if (!this.settings.destination) {
+      this.settings.destination = getDefaultDestination();
+    }
     return { ...this.settings };
   }
 
   updateSettings(partial: Partial<BackupSettings>): BackupSettings {
     this.settings = { ...this.settings, ...partial };
-    saveSettings(this.settings);
+    if (!this.settings.destination) {
+      this.settings.destination = getDefaultDestination();
+    }
+    this.saveSettingsToDb().catch(() => {});
     logger.info({ settings: this.settings }, 'backup_settings_updated');
     return this.getSettings();
   }
@@ -66,17 +110,25 @@ export class BackupService {
       throw new Error(`Database file not found: ${DB_PATH}`);
     }
 
-    await fs.mkdir(this.settings.destination, { recursive: true });
+    const destination = this.settings.destination || getDefaultDestination();
+    await fs.mkdir(destination, { recursive: true });
 
     const ts = new Date();
     const stamp = `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, '0')}-${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}${String(ts.getSeconds()).padStart(2, '0')}`;
     const baseName = path.basename(DB_PATH, path.extname(DB_PATH));
     const filename = `${baseName}-${stamp}.db`;
-    const destPath = path.join(this.settings.destination, filename);
+    const destPath = path.join(destination, filename);
 
-    // Copia arquivo + auxiliares WAL/SHM/JOURNAL para garantir consistência via sqlite3 .backup API.
-    // Aqui usamos cópia de arquivo com checkpoint do WAL ativo primeiro (libSQL/sqlite expõe .backup()).
-    // Estratégia: copia WAL/SHM/journal auxiliares para garantir leitura consistente.
+    // 1. Força flush atômico do WAL para o arquivo principal antes de copiar
+    try {
+      if (rawClient) {
+        await rawClient.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      }
+    } catch (chkErr) {
+      logger.warn({ err: (chkErr as Error).message }, 'backup_wal_checkpoint_note');
+    }
+
+    // 2. Copia arquivo + auxiliares WAL/SHM/JOURNAL para garantir consistência
     const auxFiles = ['-wal', '-shm', '-journal'];
     for (const suffix of auxFiles) {
       const auxSrc = DB_PATH + suffix;
@@ -93,21 +145,22 @@ export class BackupService {
     const stat = statSync(destPath);
     this.lastRunAt = Date.now();
 
-    // Aplica retenção
-    await this.applyRetention();
+    // 3. Aplica retenção
+    await this.applyRetention(destination);
 
     logger.info({ filename, sizeBytes: stat.size, destPath }, 'backup_completed');
     return { filename, path: destPath, sizeBytes: stat.size };
   }
 
-  private async applyRetention(): Promise<void> {
+  private async applyRetention(destination?: string): Promise<void> {
+    const dest = destination || this.settings.destination || getDefaultDestination();
     try {
-      const files = readdirSync(this.settings.destination)
+      const files = readdirSync(dest)
         .filter((f) => f.endsWith('.db') && !f.endsWith('.bak'))
         .map((f) => ({
           name: f,
-          full: path.join(this.settings.destination, f),
-          mtime: statSync(path.join(this.settings.destination, f)).mtime.getTime(),
+          full: path.join(dest, f),
+          mtime: statSync(path.join(dest, f)).mtime.getTime(),
         }))
         .sort((a, b) => b.mtime - a.mtime);
 
@@ -122,9 +175,11 @@ export class BackupService {
   }
 
   async maybeRunIfDue(): Promise<{ ran: boolean; reason: string }> {
+    await this.loadSettingsFromDb();
     if (!this.settings.enabled) {
       return { ran: false, reason: 'disabled' };
     }
+    const destination = this.settings.destination || getDefaultDestination();
     if (this.lastRunAt) {
       const elapsedDays = (Date.now() - this.lastRunAt) / (1000 * 60 * 60 * 24);
       if (elapsedDays < this.settings.intervalDays) {
@@ -133,11 +188,11 @@ export class BackupService {
     } else {
       // Primeira execução: tenta descobrir o último backup pelo timestamp no nome
       try {
-        const files = readdirSync(this.settings.destination)
+        const files = readdirSync(destination)
           .filter((f) => f.endsWith('.db') && !f.endsWith('.bak'))
           .map((f) => ({
             name: f,
-            mtime: statSync(path.join(this.settings.destination, f)).mtime.getTime(),
+            mtime: statSync(path.join(destination, f)).mtime.getTime(),
           }))
           .sort((a, b) => b.mtime - a.mtime);
         if (files.length > 0) {
@@ -175,13 +230,14 @@ export class BackupService {
   }
 
   async listBackups(): Promise<Array<{ filename: string; sizeBytes: number; createdAt: string }>> {
+    const destination = this.settings.destination || getDefaultDestination();
     try {
-      await fs.mkdir(this.settings.destination, { recursive: true });
-      const files = readdirSync(this.settings.destination)
+      await fs.mkdir(destination, { recursive: true });
+      const files = readdirSync(destination)
         .filter((f) => f.endsWith('.db') && !f.endsWith('.bak'));
       return files
         .map((f) => {
-          const full = path.join(this.settings.destination, f);
+          const full = path.join(destination, f);
           const st = statSync(full);
           return {
             filename: f,
@@ -195,8 +251,5 @@ export class BackupService {
     }
   }
 }
-
-// `localStorage` não existe no main process; usamos shim.
-declare const localStorage: { getItem(k: string): string | null; setItem(k: string, v: string): void } | undefined;
 
 export const backupService = new BackupService();

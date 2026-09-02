@@ -171,8 +171,9 @@ export class NFeParser extends FiscalParser {
   }
 
   private parseParty(partyData: any): Party {
-    const document = partyData.CNPJ || partyData.CPF || 'NÃO INFORMADO';
-    const name = partyData.xNome || 'NÃO INFORMADO';
+    const rawDoc = partyData.CNPJ ?? partyData.CPF;
+    const document = rawDoc !== undefined && rawDoc !== null ? String(rawDoc) : 'NÃO INFORMADO';
+    const name = partyData.xNome ? String(partyData.xNome) : 'NÃO INFORMADO';
     
     let address: Address | undefined;
     const end = partyData.enderEmit || partyData.enderDest;

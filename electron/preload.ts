@@ -5,6 +5,14 @@ export interface OpenXmlResult {
   filePaths: string[];
 }
 
+export interface OpenDirectoryResult {
+  canceled: boolean;
+  directory: string | null;
+  filePaths: string[];
+  totalFound: number;
+  skipped: number;
+}
+
 export interface SaveFileResult {
   canceled: boolean;
   filePath?: string;
@@ -32,6 +40,8 @@ const api = {
   getAppPaths: () => ipcRenderer.invoke('app:getPaths'),
   openXmlDialog: (options?: { multiSelections?: boolean }): Promise<OpenXmlResult> =>
     ipcRenderer.invoke('dialog:openXml', options || {}),
+  openDirectory: (options?: { recursive?: boolean; maxFiles?: number }): Promise<OpenDirectoryResult> =>
+    ipcRenderer.invoke('dialog:openDirectory', options || {}),
   openImportDialog: (): Promise<ImportResult> =>
     ipcRenderer.invoke('dialog:openImport'),
   saveFileDialog: (options: {

@@ -24,6 +24,13 @@ declare global {
         canceled: boolean;
         filePaths: string[];
       }>;
+      openDirectory: (options?: { recursive?: boolean; maxFiles?: number }) => Promise<{
+        canceled: boolean;
+        directory: string | null;
+        filePaths: string[];
+        totalFound: number;
+        skipped: number;
+      }>;
       openImportDialog: () => Promise<{
         canceled: boolean;
         results: Array<{ filePath: string; fileName: string; content: string; size: number }>;

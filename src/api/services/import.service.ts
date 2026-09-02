@@ -1,8 +1,9 @@
 import { storageService } from './storage.service';
 import { detectFiscalDocument } from '../../core/detector';
 import { parseFiscalDocument } from '../../core/parsers';
+import { CartaCorrecaoParser } from '../../core/parsers/cce.parser';
 import { db } from '../../db';
-import { importJobs, documents, documentItems, documentTaxes, folders, applicationSettings } from '../../db/schema';
+import { importJobs, documents, documentItems, documentTaxes, documentEvents, folders, applicationSettings } from '../../db/schema';
 import { eq, sql, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { FiscalDocument } from '../../core/fiscal.types';
@@ -73,7 +74,7 @@ export class ImportService {
   private decodeXmlBuffer(buffer: Buffer): string {
     // Tenta UTF-8, fallback ISO-8859-1 (comum em XMLs SEFAZ antigos)
     const utf8 = buffer.toString('utf-8');
-    // Se contém � (replacement char) tenta latin1
+    // Se contém  (replacement char) tenta latin1
     if (utf8.includes('\uFFFD')) {
       try {
         return buffer.toString('latin1');
@@ -90,6 +91,36 @@ export class ImportService {
     try {
       // 1. Read XML (com fallback de encoding)
       const xmlContent = this.decodeXmlBuffer(file.buffer);
+
+      // 1.1 Se for evento CC-e, associa diretamente ao documento pai se existir
+      const cceParser = new CartaCorrecaoParser();
+      const cceEvents = cceParser.parse(xmlContent);
+      if (cceEvents.length > 0) {
+        const chNFeMatch = xmlContent.match(/<chNFe>(\d{44})<\/chNFe>/i);
+        const chNFe = chNFeMatch ? chNFeMatch[1] : '';
+        if (chNFe) {
+          const parentDoc = await db.query.documents.findFirst({
+            where: eq(documents.accessKey, chNFe),
+          });
+          if (parentDoc) {
+            const filename = `${crypto.randomUUID()}.xml`;
+            rawXmlPath = await storageService.saveXml(filename, xmlContent);
+            for (const cce of cceEvents) {
+              await db.insert(documentEvents).values({
+                id: crypto.randomUUID(),
+                documentId: parentDoc.id,
+                eventType: 'CCE',
+                sequence: cce.sequencia,
+                eventDate: cce.dataHoraEvento ? new Date(cce.dataHoraEvento) : new Date(),
+                protocol: cce.protocolo,
+                rawXmlPath,
+                correctionText: cce.textoCorrecao,
+              });
+            }
+            return { event: true, documentId: parentDoc.id };
+          }
+        }
+      }
 
       // 2. Detect Document Type
       docType = detectFiscalDocument(xmlContent);

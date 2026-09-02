@@ -31,7 +31,7 @@ function writeUrlParams(folderId: string | null, folderName: string, search: str
     if (search) sp.set('q', search);
     else sp.delete('q');
     const next = sp.toString();
-    const url = window.location.pathname + (next ? ` ? : ${next}` : '');
+    const url = window.location.pathname + (next ? `?${next}` : '');
     window.history.replaceState({}, '', url);
   } catch {}
 }

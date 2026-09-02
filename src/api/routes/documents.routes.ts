@@ -216,7 +216,7 @@ function renderDanfeNFeHtml(doc: any, pageIndex: number, totalPages: number): st
   const billing = (doc as any).billing;
   if (billing && ((billing.duplicates && billing.duplicates.length > 0) || billing.invoice)) {
     const dupBoxes = (billing.duplicates || []).map((dup: any) => {
-      const numFormatted = String(dup.number).padStart(3, '0');
+      const numFormatted = String(dup.number || '').padStart(3, '0');
       const dateFormatted = dup.dueDate ? (
         dup.dueDate.includes('-') 
           ? dup.dueDate.split('T')[0].split('-').reverse().join('/') 
@@ -224,8 +224,8 @@ function renderDanfeNFeHtml(doc: any, pageIndex: number, totalPages: number): st
       ) : '-';
       return `
         <div style="border: 1px solid #000; padding: 3px 6px; min-width: 110px; font-size: 8px;">
-          <div style="display: flex; justify-content: space-between;"><span style="color: #555;">Num.</span> <b>${numFormatted}</b></div>
-          <div style="display: flex; justify-content: space-between;"><span style="color: #555;">Venc.</span> <b>${dateFormatted}</b></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: #555;">Num.</span> <b>${escapeHtml(numFormatted)}</b></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: #555;">Venc.</span> <b>${escapeHtml(dateFormatted)}</b></div>
           <div style="display: flex; justify-content: space-between;"><span style="color: #555;">Valor</span> <b>R$ ${escapeHtml((dup.amount || 0).toFixed(2))}</b></div>
         </div>
       `;
@@ -485,10 +485,10 @@ function renderDanfeDACTEHtml(doc: any, pageIndex: number, totalPages: number): 
   };
   const issAliq = doc.icmsAliq || 0;
 
-  const field = (label: string, value: string | number, w: number) =>
+  const field = (label: string, value: string | number | undefined | null, w: number) =>
     `<div style="padding: 3px 5px; width: ${w}%;">
-       <div style="font-size: 7.5px; color: #92400e; text-transform: uppercase; font-weight: bold;">${label}</div>
-       <div style="font-weight: bold; font-size: 9.5px;">${value || '-'}</div>
+       <div style="font-size: 7.5px; color: #92400e; text-transform: uppercase; font-weight: bold;">${escapeHtml(label)}</div>
+       <div style="font-weight: bold; font-size: 9.5px;">${escapeHtml(String(value ?? '-'))}</div>
      </div>`;
 
   return `
@@ -514,7 +514,7 @@ function renderDanfeDACTEHtml(doc: any, pageIndex: number, totalPages: number): 
         <div class="dacte-tipo-row">
           ${field('Modelo', '57 - CT-e', 25)}
           ${field('Tipo do CT-e', 'Normal', 25)}
-          ${escapeHtml(field('Data/Hora Emissão', `${formatDate(doc.issueDate)} ${formatTime(doc.issueDate)}`, 25))}
+          ${field('Data/Hora Emissão', `${formatDate(doc.issueDate)} ${formatTime(doc.issueDate)}`, 25)}
           ${field('Situação', 'Autorizado', 25)}
         </div>
 
@@ -563,14 +563,14 @@ function renderDanfeDACTEHtml(doc: any, pageIndex: number, totalPages: number): 
               <div style="display: flex; gap: 6px; font-size: 9px;">
                 ${field('CFOP', `${cfop} - ${cfop.startsWith('5') ? 'Prestação' : 'Aquisição'}`, 33.33)}
                 ${field('Natureza da Operação', 'Prestação de Serviço', 33.33)}
-                ${escapeHtml(field('Código NCM', doc.items?.[0]?.ncm || '00000000', 33.34))}
+                ${field('Código NCM', doc.items?.[0]?.ncm || '00000000', 33.34)}
               </div>
               <div style="display: flex; gap: 6px; font-size: 9px; margin-top: 4px;">
-                ${escapeHtml(field('Qtd. Volumes', String(doc.items?.length || 1), 50))}
-                ${escapeHtml(field('Peso Bruto (kg)', (doc.totalWeight || 0).toFixed(3), 50))}
+                ${field('Qtd. Volumes', String(doc.items?.length || 1), 50)}
+                ${field('Peso Bruto (kg)', (doc.totalWeight || 0).toFixed(3), 50)}
               </div>
               <div style="display: flex; gap: 6px; font-size: 9px; margin-top: 4px;">
-                ${escapeHtml(field('Valor da Mercadoria', formatMoney(doc.totalAmount), 50))}
+                ${field('Valor da Mercadoria', formatMoney(doc.totalAmount), 50)}
                 ${field('Modal do Frete', modFreteLabel[modFrete] || '-', 50)}
               </div>
             </div>
@@ -579,20 +579,20 @@ function renderDanfeDACTEHtml(doc: any, pageIndex: number, totalPages: number): 
             <div class="dacte-section-title">📝 Componentes do Valor da Prestação</div>
             <div style="padding: 4px 6px;">
               <div style="display: flex; gap: 6px; font-size: 9px;">
-                ${escapeHtml(field('Valor Total do Serviço', formatMoney(doc.totalAmount), 50))}
-                ${escapeHtml(field('Valor a Receber', formatMoney(doc.totalAmount), 50))}
+                ${field('Valor Total do Serviço', formatMoney(doc.totalAmount), 50)}
+                ${field('Valor a Receber', formatMoney(doc.totalAmount), 50)}
               </div>
               <div style="display: flex; gap: 6px; font-size: 9px; margin-top: 4px;">
-                ${escapeHtml(field('Frete Peso', formatMoney(doc.fretePeso), 25))}
-                ${escapeHtml(field('Frete Valor', formatMoney(doc.freteValor), 25))}
-                ${escapeHtml(field('ICMS', formatMoney(doc.icms), 25))}
-                ${escapeHtml(field('Pedágio', formatMoney(doc.pedagio), 25))}
+                ${field('Frete Peso', formatMoney(doc.fretePeso), 25)}
+                ${field('Frete Valor', formatMoney(doc.freteValor), 25)}
+                ${field('ICMS', formatMoney(doc.icms), 25)}
+                ${field('Pedágio', formatMoney(doc.pedagio), 25)}
               </div>
               <div style="display: flex; gap: 6px; font-size: 9px; margin-top: 4px;">
-                ${escapeHtml(field('GRIS', formatMoney(doc.gris), 25))}
-                ${escapeHtml(field('SEC/CAT', formatMoney(doc.secat), 25))}
-                ${escapeHtml(field('Desconto', formatMoney(doc.desconto), 25))}
-                ${escapeHtml(field('Outros', formatMoney(doc.outros), 25))}
+                ${field('GRIS', formatMoney(doc.gris), 25)}
+                ${field('SEC/CAT', formatMoney(doc.secat), 25)}
+                ${field('Desconto', formatMoney(doc.desconto), 25)}
+                ${field('Outros', formatMoney(doc.outros), 25)}
               </div>
             </div>
           </div>
@@ -646,10 +646,10 @@ function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: number):
   const serviceDescription = doc.serviceDescription || doc.items?.[0]?.description || 'Prestação de serviço conforme contratado. Detalhes da execução descritos em contrato anexo.';
   const issValue = ((doc.totalAmount || 0) * issAliquot) / 100;
 
-  const field = (label: string, value: string | number, w: number, highlight = false) =>
+  const field = (label: string, value: string | number | undefined | null, w: number, highlight = false) =>
     `<div style="padding: 4px 6px; width: ${w}%; ${highlight ? 'background: #f5f3ff;' : ''}">
-       <div style="font-size: 7.5px; color: #5b21b6; text-transform: uppercase; font-weight: bold;">${label}</div>
-       <div style="font-weight: bold; font-size: ${highlight ? '11px' : '9.5px'}; ${highlight ? 'color: #4c1d95;' : ''}">${value || '-'}</div>
+       <div style="font-size: 7.5px; color: #5b21b6; text-transform: uppercase; font-weight: bold;">${escapeHtml(label)}</div>
+       <div style="font-weight: bold; font-size: ${highlight ? '11px' : '9.5px'}; ${highlight ? 'color: #4c1d95;' : ''}">${escapeHtml(String(value ?? '-'))}</div>
      </div>`;
 
   return `
@@ -666,14 +666,14 @@ function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: number):
           </div>
           <div style="text-align: right; font-size: 9px;">
             <div><span style="color: #ddd6fe;">NFS-e Nº:</span> <span style="font-weight: bold; font-size: 14px;">${escapeHtml(doc.number || '000.000')}</span></div>
-            <div><span style="color: #ddd6fe;">RPS:</span> <span style="font-weight: bold;">${rpsNumber} / Série ${rpsSeries}</span></div>
+            <div><span style="color: #ddd6fe;">RPS:</span> <span style="font-weight: bold;">${escapeHtml(rpsNumber)} / Série ${escapeHtml(rpsSeries)}</span></div>
           </div>
         </div>
 
         <!-- Identificação -->
         <div class="nfse-ident">
-          ${escapeHtml(field('Data de Emissão', formatDate(doc.issueDate), 25))}
-          ${escapeHtml(field('Competência', formatDate(doc.issueDate), 25))}
+          ${field('Data de Emissão', formatDate(doc.issueDate), 25)}
+          ${field('Competência', formatDate(doc.issueDate), 25)}
           ${field('Cód. Município', municipalCode, 25)}
           ${field('Natureza da Operação', 'Tributação no município', 25)}
         </div>
@@ -743,7 +743,7 @@ function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: number):
             </div>
             <div style="margin-top: 4px;">
               <div style="font-size: 7.5px; color: #5b21b6; text-transform: uppercase; font-weight: bold; margin-bottom: 2px;">Discriminação dos Serviços</div>
-              <div class="nfse-desc">${serviceDescription}</div>
+              <div class="nfse-desc">${escapeHtml(serviceDescription)}</div>
             </div>
           </div>
         </div>
@@ -752,11 +752,11 @@ function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: number):
         <div class="nfse-section">
           <div class="nfse-section-title">🧮 Valores e Tributos</div>
           <div style="padding: 4px 0; display: flex; flex-wrap: wrap;">
-            ${escapeHtml(field('Valor dos Serviços', formatMoney(doc.totalAmount), 25, true))}
-            ${escapeHtml(field('(-) Descontos', formatMoney(doc.discountAmount), 25))}
-            ${escapeHtml(field('(-) Retenções Federais', formatMoney(doc.federalRetentions), 25))}
-            ${escapeHtml(field('(=) Valor Líquido', formatMoney((doc.totalAmount || 0) - (doc.discountAmount || 0)), 25, true))}
-            ${escapeHtml(field('Base de Cálculo ISS', formatMoney(doc.totalAmount), 25))}
+            ${field('Valor dos Serviços', formatMoney(doc.totalAmount), 25, true)}
+            ${field('(-) Descontos', formatMoney(doc.discountAmount), 25)}
+            ${field('(-) Retenções Federais', formatMoney(doc.federalRetentions), 25)}
+            ${field('(=) Valor Líquido', formatMoney((doc.totalAmount || 0) - (doc.discountAmount || 0)), 25, true)}
+            ${field('Base de Cálculo ISS', formatMoney(doc.totalAmount), 25)}
             ${field('Alíquota ISS', `${issAliquot}%`, 25)}
             ${field('Valor do ISS', formatMoney(issValue), 25, true)}
             ${field('ISS Retido', issRetained, 25)}
@@ -766,7 +766,7 @@ function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: number):
         <!-- Verificação -->
         <div style="padding: 6px 8px;">
           <div style="font-size: 7.5px; color: #5b21b6; text-transform: uppercase; font-weight: bold; margin-bottom: 3px;"># Código de Verificação de Autenticidade</div>
-          <div class="nfse-key">${verificationCode}</div>
+          <div class="nfse-key">${escapeHtml(verificationCode)}</div>
           <div style="text-align: center; font-size: 7.5px; color: #555; font-style: italic; margin-top: 3px;">Consulte a autenticidade no portal da Prefeitura Municipal ou em <b style="color: #5b21b6;">www.nfse.gov.br</b></div>
           <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #ddd6fe; font-size: 7.5px; color: #555; font-style: italic;">
             <strong style="color: #4c1d95;">Documento emitido por ME/EPP optante pelo Simples Nacional.</strong>

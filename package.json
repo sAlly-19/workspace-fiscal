@@ -1,24 +1,50 @@
 {
   "name": "workspace-fiscal",
   "productName": "Workspace Fiscal",
+  "description": "Hub desktop para visualização e gestão de documentos fiscais e depreciação patrimonial.",
+  "author": "Workspace Fiscal",
   "private": true,
   "version": "2.5.0",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"npm:dev:web\" \"npm:dev:electron\"",
     "dev:web": "vite",
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/run-electron.cjs dist-electron/main.cjs",
-    "electron:dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"npm:dev:web\" \"npm:dev:electron\"",
     "build:web": "vite build",
     "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --packages=external --external:electron --sourcemap --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --format=cjs --packages=external --external:electron --sourcemap --outfile=dist-electron/preload.cjs",
-    "build:server": "esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "build": "npm run build:web && npm run build:electron && npm run build:server",
-    "electron:start": "node scripts/run-electron.cjs --build",
-    "start": "node dist/server.cjs",
-    "lint": "tsc --noEmit",
+    "build": "npm run build:web && npm run build:electron",
+    "start": "node scripts/run-electron.cjs --build",
+    "package": "npm run build && electron-builder",
+    "package:dir": "npm run build && electron-builder --dir",
+    "lint": "tsc --noEmit && tsc --noEmit --project electron/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "build": {
+    "appId": "com.workspacefiscal.app",
+    "productName": "Workspace Fiscal",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
@@ -56,6 +82,7 @@
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "electron": "^33.2.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
