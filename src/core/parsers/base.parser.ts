@@ -10,6 +10,11 @@ export abstract class FiscalParser {
       attributeNamePrefix: '@_',
       parseTagValue: true,
       textNodeName: '#text',
+      numberParseOptions: {
+        leadingZeros: false,
+        hex: false,
+        skipLike: /^\d{12,}$/,
+      },
     });
   }
 

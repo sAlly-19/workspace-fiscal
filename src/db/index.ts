@@ -274,9 +274,22 @@ export async function initDatabase(customPath?: string) {
         "description" TEXT NOT NULL,
         "quantity" REAL NOT NULL,
         "unit_price" REAL NOT NULL,
-        "total_price" REAL NOT NULL
+        "total_price" REAL NOT NULL,
+        "cfop" TEXT,
+        "ncm" TEXT,
+        "unit" TEXT
       );
     `);
+
+    try {
+      const itemsInfo = await rawClient.execute('PRAGMA table_info(document_items);');
+      const itemCols = itemsInfo.rows.map((r: any) => r.name || r[1]);
+      if (!itemCols.includes('cfop')) await rawClient.execute('ALTER TABLE "document_items" ADD COLUMN "cfop" TEXT;');
+      if (!itemCols.includes('ncm')) await rawClient.execute('ALTER TABLE "document_items" ADD COLUMN "ncm" TEXT;');
+      if (!itemCols.includes('unit')) await rawClient.execute('ALTER TABLE "document_items" ADD COLUMN "unit" TEXT;');
+    } catch (migErr) {
+      logger.warn({ err: (migErr as Error).message }, 'database_items_migration_note');
+    }
 
     await rawClient.execute(`
       CREATE TABLE IF NOT EXISTS "document_taxes" (
@@ -284,9 +297,18 @@ export async function initDatabase(customPath?: string) {
         "document_id" TEXT NOT NULL REFERENCES "documents"("id") ON DELETE CASCADE,
         "tax_type" TEXT NOT NULL,
         "amount" REAL NOT NULL,
-        "base" REAL
+        "base" REAL,
+        "rate" REAL
       );
     `);
+
+    try {
+      const taxesInfo = await rawClient.execute('PRAGMA table_info(document_taxes);');
+      const taxCols = taxesInfo.rows.map((r: any) => r.name || r[1]);
+      if (!taxCols.includes('rate')) await rawClient.execute('ALTER TABLE "document_taxes" ADD COLUMN "rate" REAL;');
+    } catch (migErr) {
+      logger.warn({ err: (migErr as Error).message }, 'database_taxes_migration_note');
+    }
 
     await rawClient.execute(`
       CREATE TABLE IF NOT EXISTS "document_events" (

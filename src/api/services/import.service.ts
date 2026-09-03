@@ -220,24 +220,30 @@ export class ImportService {
             const itemsToInsert = parsedDoc.items.map(item => ({
               id: crypto.randomUUID(),
               documentId: docId,
-              code: item.code,
+              code: item.code || null,
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice
+              totalPrice: item.totalPrice,
+              cfop: item.cfop || null,
+              ncm: item.ncm || null,
+              unit: item.unit || null,
             }));
             await db.insert(documentItems).values(itemsToInsert);
           }
 
           if (parsedDoc.totals?.taxes) {
-            const taxesToInsert: Array<{ id: string; documentId: string; taxType: string; amount: number }> = [];
+            const taxesToInsert: Array<{ id: string; documentId: string; taxType: string; amount: number; base?: number }> = [];
             for (const [taxType, amount] of Object.entries(parsedDoc.totals.taxes)) {
-              if (amount && amount > 0) {
+              if (amount !== undefined && amount !== null && typeof amount === 'number' && amount > 0 && !taxType.endsWith('Base') && !taxType.endsWith('Aliquot') && taxType !== 'totalTaxes') {
+                const baseKey = `${taxType}Base`;
+                const baseVal = (parsedDoc.totals.taxes as any)[baseKey] || (taxType === 'icms' ? parsedDoc.totals.icmsBase : undefined);
                 taxesToInsert.push({
                   id: crypto.randomUUID(),
                   documentId: docId,
                   taxType: taxType.toUpperCase(),
-                  amount: amount
+                  amount: amount,
+                  base: typeof baseVal === 'number' ? baseVal : undefined,
                 });
               }
             }

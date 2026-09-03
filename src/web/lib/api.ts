@@ -54,7 +54,13 @@ let _cachedApiBaseUrl: string | null = null;
 export async function getApiBaseUrl(): Promise<string> {
   if (_cachedApiBaseUrl) return _cachedApiBaseUrl;
   if (typeof window !== 'undefined' && window.api?.getApiBaseUrl) {
-    _cachedApiBaseUrl = await window.api.getApiBaseUrl();
+    try {
+      _cachedApiBaseUrl = await window.api.getApiBaseUrl();
+      if (_cachedApiBaseUrl) return _cachedApiBaseUrl;
+    } catch {}
+  }
+  if (typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')) {
+    _cachedApiBaseUrl = window.location.origin;
     return _cachedApiBaseUrl;
   }
   return '';
@@ -64,9 +70,12 @@ export function apiUrl(path: string): string {
   if (!path.startsWith('/')) path = '/' + path;
   // Usa cache síncrono se já resolvido
   if (_cachedApiBaseUrl) return _cachedApiBaseUrl + path;
-  // Fallback legado (window.apiBaseUrl setado por algum bootstrap)
+  // Fallback legado
   if (typeof window !== 'undefined' && (window as any).apiBaseUrl) {
     return (window as any).apiBaseUrl + path;
+  }
+  if (typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')) {
+    return window.location.origin + path;
   }
   return path;
 }
@@ -82,12 +91,18 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   try {
     return await fetch(url, init);
   } catch (err) {
-    // Falha de rede → marca cache como inválido e dispara evento global para UI.
-    _cachedApiBaseUrl = null;
+    // Só aciona o overlay se a API realmente estiver fora do ar
     try {
-      window.dispatchEvent(new CustomEvent('wsf:api-unreachable'));
+      const ping = await fetch(`${base}/api/health`, { method: 'GET' });
+      if (!ping.ok) {
+        _cachedApiBaseUrl = null;
+        window.dispatchEvent(new CustomEvent('wsf:api-unreachable'));
+      }
     } catch {
-      // ignore
+      _cachedApiBaseUrl = null;
+      try {
+        window.dispatchEvent(new CustomEvent('wsf:api-unreachable'));
+      } catch {}
     }
     throw err;
   }

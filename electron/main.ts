@@ -120,7 +120,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
         directory: root,
         filePaths: found,
         totalFound: found.length,
-        skipped: Math.max(0, (options.maxFiles ?? 5000) - found.length),
+        skipped: 0,
       };
     }
   );
@@ -327,7 +327,7 @@ async function createWindow(apiBaseUrl: string) {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: false,
     },
   });
 
@@ -370,11 +370,9 @@ async function createWindow(apiBaseUrl: string) {
     return { action: 'deny' };
   });
 
+  await mainWindow.loadURL(apiBaseUrl);
   if (isDev) {
-    await mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    await mainWindow.loadURL(apiBaseUrl);
   }
 }
 

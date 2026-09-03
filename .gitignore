@@ -63,6 +63,15 @@ Desktop.ini
 *.code-workspace
 .kilo/
 
+# AI & Agent artifacts
+.gemini/
+.claude/
+.cortex/
+.system_generated/
+scratch/
+temp/
+tmp/
+
 # Electron
 *.exe
 *.dmg

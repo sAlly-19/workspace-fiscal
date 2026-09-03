@@ -2,21 +2,22 @@ import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import AdmZip from 'adm-zip';
 import { importService } from '../services/import.service';
 
 const router = Router();
-// Limite apenas por tamanho (10MB por arquivo). Sem limite de quantidade, conforme solicitado.
+// Limite de 100MB para pacotes ZIP e 10MB para XMLs individuais
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB
+    fileSize: 100 * 1024 * 1024, // 100 MB
   },
   fileFilter: (_req, file, cb) => {
     const name = file.originalname.toLowerCase();
     const isXml = name.endsWith('.xml') || file.mimetype.includes('xml');
-    // Aceita apenas XML; outros serão ignorados no handler, mas bloqueia executáveis
-    if (!isXml && file.mimetype.startsWith('application/')) {
-      // Rejeita binários suspeitos, mas permite fluxo seguir para mensagem de skip
+    const isZip = name.endsWith('.zip') || file.mimetype.includes('zip') || file.mimetype.includes('compressed');
+    if (isXml || isZip) {
+      return cb(null, true);
     }
     cb(null, true);
   },
@@ -29,26 +30,53 @@ router.post('/', upload.array('files'), async (req, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
 
-    const { batchId } = req.body; // Optional target batch/folder
+    const { batchId } = req.body;
 
-    // Create the job tracking record
-    const job = await importService.createImportJob(files.length);
+    // Descompacta arquivos ZIP em itens XML individuais
+    const unpackedFiles: Express.Multer.File[] = [];
+    for (const file of files) {
+      const name = file.originalname.toLowerCase();
+      if (name.endsWith('.zip') || file.mimetype.includes('zip') || file.mimetype.includes('compressed')) {
+        try {
+          const zip = new AdmZip(file.buffer);
+          const entries = zip.getEntries();
+          for (const entry of entries) {
+            if (!entry.isDirectory && entry.entryName.toLowerCase().endsWith('.xml') && !entry.entryName.includes('__MACOSX')) {
+              const buffer = entry.getData();
+              unpackedFiles.push({
+                fieldname: 'files',
+                originalname: path.basename(entry.entryName),
+                encoding: '7bit',
+                mimetype: 'text/xml',
+                size: buffer.length,
+                buffer: buffer,
+                destination: '',
+                filename: '',
+                path: '',
+                stream: null as any,
+              });
+            }
+          }
+        } catch (zipErr) {
+          console.error(`[ImportRoute] Erro ao descompactar ZIP ${file.originalname}:`, zipErr);
+        }
+      } else if (name.endsWith('.xml') || file.mimetype.includes('xml')) {
+        unpackedFiles.push(file);
+      }
+    }
 
-    // Process files asynchronously in background
+    if (unpackedFiles.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo XML válido encontrado para importação.' });
+    }
+
+    // Cria o registro do Job
+    const job = await importService.createImportJob(unpackedFiles.length);
+
+    // Processa os arquivos em segundo plano
     (async () => {
       try {
-        for (const file of files) {
-          const isXml = 
-            file.mimetype === 'text/xml' || 
-            file.mimetype === 'application/xml' || 
-            file.originalname.toLowerCase().endsWith('.xml');
-
-          if (isXml) {
-            await importService.processFile(job.id, file, batchId);
-          } else {
-            console.warn(`[ImportRoute] Skipping non-XML file: ${file.originalname}`);
-            await importService.incrementProcessed(job.id);
-          }
+        for (const file of unpackedFiles) {
+          await importService.processFile(job.id, file, batchId);
         }
       } catch (loopErr) {
         console.error('[ImportRoute] Error during file processing loop:', loopErr);
@@ -57,10 +85,10 @@ router.post('/', upload.array('files'), async (req, res) => {
       }
     })();
 
-    // Return the Job ID immediately to the client
     res.status(202).json({
       message: 'Importação iniciada com sucesso.',
-      jobId: job.id
+      jobId: job.id,
+      totalFiles: unpackedFiles.length,
     });
   } catch (error) {
     console.error('[ImportRoute] Erro na importação:', error);
@@ -100,9 +128,7 @@ router.get('/:jobId', async (req, res) => {
   }
 });
 
-// Importação por caminho de arquivo (usado por importação de diretório).
-// O front envia os paths selecionados via Electron IPC `dialog:openDirectory`
-// ou `dialog:openXml`. Aceita array de strings em `filePaths`.
+// Importação por caminhos locais (suporta XML, ZIP e pastas)
 router.post('/paths', async (req, res) => {
   try {
     const { filePaths, batchId } = req.body as { filePaths?: string[]; batchId?: string };
@@ -110,60 +136,131 @@ router.post('/paths', async (req, res) => {
       return res.status(400).json({ error: 'filePaths deve ser um array não vazio.' });
     }
 
-    // Validação: cada path deve apontar para arquivo .xml existente e ter tamanho <= 10MB
-    const MAX_SIZE = 10 * 1024 * 1024;
-    const validFiles: { path: string; buffer: Buffer; originalname: string }[] = [];
-    for (const p of filePaths) {
+    // Coleta arquivos .xml e expande pastas e arquivos .zip
+    const targetXmlPaths: string[] = [];
+    const inMemoryFiles: Express.Multer.File[] = [];
+
+    const walkDir = (dir: string, depth = 0) => {
+      if (depth > 8) return;
       try {
-        if (typeof p !== 'string') continue;
-        if (!p.toLowerCase().endsWith('.xml')) continue;
-        const stat = fs.statSync(p);
-        if (!stat.isFile()) continue;
-        if (stat.size > MAX_SIZE) continue;
-        if (stat.size === 0) continue;
-        const buffer = fs.readFileSync(p);
-        validFiles.push({ path: p, buffer, originalname: path.basename(p) });
-      } catch {
-        // skip unreadable
-      }
-    }
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walkDir(full, depth + 1);
+          } else if (entry.isFile()) {
+            if (entry.name.toLowerCase().endsWith('.xml')) {
+              targetXmlPaths.push(full);
+            } else if (entry.name.toLowerCase().endsWith('.zip')) {
+              tryExtractZip(full);
+            }
+          }
+        }
+      } catch {}
+    };
 
-    if (validFiles.length === 0) {
-      return res.status(400).json({ error: 'Nenhum arquivo .xml válido encontrado nos paths.' });
-    }
-
-    const job = await importService.createImportJob(validFiles.length);
-
-    (async () => {
+    const tryExtractZip = (zipPath: string) => {
       try {
-        for (const f of validFiles) {
-          const fakeFile: Express.Multer.File = {
-            fieldname: 'files',
-            originalname: f.originalname,
-            encoding: '7bit',
-            mimetype: 'text/xml',
-            size: f.buffer.length,
-            buffer: f.buffer,
-            destination: '',
-            filename: '',
-            path: f.path,
-            stream: null as any,
-          };
-          await importService.processFile(job.id, fakeFile, batchId);
+        const zip = new AdmZip(zipPath);
+        const entries = zip.getEntries();
+        for (const entry of entries) {
+          if (!entry.isDirectory && entry.entryName.toLowerCase().endsWith('.xml') && !entry.entryName.includes('__MACOSX')) {
+            const buffer = entry.getData();
+            inMemoryFiles.push({
+              fieldname: 'files',
+              originalname: path.basename(entry.entryName),
+              encoding: '7bit',
+              mimetype: 'text/xml',
+              size: buffer.length,
+              buffer,
+              destination: '',
+              filename: '',
+              path: '',
+              stream: null as any,
+            });
+          }
         }
       } catch (err) {
-        console.error('[ImportRoute] Erro no loop de paths:', err);
+        console.error(`[ImportRoute] Falha ao ler ZIP ${zipPath}:`, err);
+      }
+    };
+
+    for (const p of filePaths) {
+      if (typeof p !== 'string') continue;
+      try {
+        if (!fs.existsSync(p)) continue;
+        const stat = fs.statSync(p);
+        if (stat.isDirectory()) {
+          walkDir(p);
+        } else if (stat.isFile()) {
+          if (p.toLowerCase().endsWith('.xml')) {
+            targetXmlPaths.push(p);
+          } else if (p.toLowerCase().endsWith('.zip')) {
+            tryExtractZip(p);
+          }
+        }
+      } catch {}
+    }
+
+    const totalCount = targetXmlPaths.length + inMemoryFiles.length;
+    if (totalCount === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo XML válido encontrado nos caminhos fornecidos.' });
+    }
+
+    const job = await importService.createImportJob(totalCount);
+
+    res.status(202).json({
+      message: 'Importação iniciada.',
+      jobId: job.id,
+      queued: totalCount,
+    });
+
+    // Worker assíncrono em background
+    (async () => {
+      const MAX_SIZE = 10 * 1024 * 1024;
+      try {
+        // 1. Processa arquivos XML em disco
+        for (const filePath of targetXmlPaths) {
+          try {
+            const stat = await fs.promises.stat(filePath);
+            if (!stat.isFile() || stat.size === 0 || stat.size > MAX_SIZE) {
+              await importService.incrementProcessed(job.id);
+              continue;
+            }
+            const buffer = await fs.promises.readFile(filePath);
+            const fakeFile: Express.Multer.File = {
+              fieldname: 'files',
+              originalname: path.basename(filePath),
+              encoding: '7bit',
+              mimetype: 'text/xml',
+              size: buffer.length,
+              buffer,
+              destination: '',
+              filename: '',
+              path: filePath,
+              stream: null as any,
+            };
+            await importService.processFile(job.id, fakeFile, batchId);
+          } catch (fileErr) {
+            console.error(`[ImportRoute] Erro ao ler ${filePath}:`, fileErr);
+            await importService.incrementProcessed(job.id);
+          }
+        }
+
+        // 2. Processa arquivos extraídos de ZIPs
+        for (const file of inMemoryFiles) {
+          try {
+            await importService.processFile(job.id, file, batchId);
+          } catch (zipFileErr) {
+            console.error('[ImportRoute] Erro ao processar arquivo de ZIP:', zipFileErr);
+          }
+        }
+      } catch (err) {
+        console.error('[ImportRoute] Erro no worker de paths:', err);
       } finally {
         await importService.markJobCompleted(job.id);
       }
     })();
-
-    res.status(202).json({
-      message: 'Importação por diretório iniciada.',
-      jobId: job.id,
-      queued: validFiles.length,
-      skipped: filePaths.length - validFiles.length,
-    });
   } catch (e) {
     console.error('[ImportRoute] Erro em /paths:', e);
     res.status(500).json({ error: 'Erro ao iniciar importação por diretório.' });

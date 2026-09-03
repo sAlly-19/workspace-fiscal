@@ -129,9 +129,13 @@ export const documentItems = sqliteTable('document_items', {
   quantity: real('quantity').notNull(),
   unitPrice: real('unit_price').notNull(),
   totalPrice: real('total_price').notNull(),
+  cfop: text('cfop'),
+  ncm: text('ncm'),
+  unit: text('unit'),
 }, (table) => {
   return {
     docIdx: index('idx_items_document').on(table.documentId),
+    cfopIdx: index('idx_items_cfop').on(table.cfop),
   };
 });
 
@@ -141,6 +145,7 @@ export const documentTaxes = sqliteTable('document_taxes', {
   taxType: text('tax_type').notNull(), // 'ICMS', 'IPI', 'PIS', 'COFINS', 'ISS', etc.
   amount: real('amount').notNull(),
   base: real('base'),
+  rate: real('rate'),
 }, (table) => {
   return {
     docIdx: index('idx_taxes_document').on(table.documentId),

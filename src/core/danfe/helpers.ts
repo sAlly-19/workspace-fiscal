@@ -3,34 +3,59 @@
  * Evita 4 cópias duplicadas de formatMoney/formatDate/getPaymentLabel.
  */
 
-export function formatDate(d?: string | Date): string {
+export function formatDate(d?: string | Date | null): string {
   if (!d) return '--/--/----';
-  if (typeof d === 'string') {
-    if (d.includes('-')) {
-      const [y, m, day] = d.split('T')[0].split('-');
-      return `${day}/${m}/${y}`;
+  try {
+    if (d instanceof Date) {
+      if (isNaN(d.getTime())) return '--/--/----';
+      return d.toLocaleDateString('pt-BR');
     }
-    return d;
+    const str = String(d).trim();
+    if (str.includes('-')) {
+      const parts = str.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const [y, m, day] = parts;
+        return `${day.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+    }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR');
+    return str;
+  } catch {
+    return '--/--/----';
   }
-  return d.toLocaleDateString('pt-BR');
 }
 
-export function formatTime(d?: string | Date): string {
+export function formatTime(d?: string | Date | null): string {
   if (!d) return '--:--';
-  if (typeof d === 'string' && d.includes('T')) return d.split('T')[1]?.substring(0, 5) || '--:--';
-  return '--:--';
+  try {
+    if (d instanceof Date) {
+      if (isNaN(d.getTime())) return '--:--';
+      return d.toLocaleTimeString('pt-BR');
+    }
+    const str = String(d).trim();
+    if (str.includes('T')) return str.split('T')[1]?.substring(0, 5) || '--:--';
+    if (str.includes(':')) return str.substring(0, 5);
+    return '--:--';
+  } catch {
+    return '--:--';
+  }
 }
 
-export function formatMoney(v?: number): string {
-  return `R$ ${(v || 0).toFixed(2)}`;
+export function formatMoney(v?: number | string | null): string {
+  const num = typeof v === 'number' ? v : (parseFloat(String(v || 0)) || 0);
+  return `R$ ${num.toFixed(2)}`;
 }
 
-export function formatCFOP(code?: string): string {
+export function formatCFOP(code?: string | number | null): string {
   if (!code) return '-';
-  return `${code} - ${code?.startsWith('5') ? 'Prestação' : 'Aquisição'}`;
+  const str = String(code).trim();
+  return `${str} - ${str.startsWith('5') ? 'Prestação' : 'Aquisição'}`;
 }
 
-export function formatModFrete(c?: number): string {
+export function formatModFrete(c?: number | string | null): string {
+  if (c === undefined || c === null || c === '') return '-';
+  const num = typeof c === 'number' ? c : parseInt(String(c), 10);
   const map: Record<number, string> = {
     0: '0 - Por conta do Remetente (CIF)',
     1: '1 - Por conta do Destinatário (FOB)',
@@ -39,7 +64,7 @@ export function formatModFrete(c?: number): string {
     4: '4 - Transporte Próprio por Destinatário',
     9: '9 - Sem Ocorrência de Transporte',
   };
-  return map[c ?? -1] || '-';
+  return map[num] || String(c);
 }
 
 export function getPaymentLabel(code?: string): string {
@@ -113,4 +138,40 @@ export function renderQrCodeSvg(seed: string, size: number): string {
     }
   }
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="shape-rendering: crispEdges;"><rect width="${size}" height="${size}" fill="white"/>${rects}</svg>`;
+}
+
+export function formatCnpjCpf(v?: string | number | null): string {
+  if (v === undefined || v === null || v === '') return '-';
+  const str = String(v).trim();
+  const clean = str.replace(/\D/g, '');
+  if (clean.length === 14) {
+    return clean.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  }
+  if (clean.length === 11) {
+    return clean.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  }
+  return str || '-';
+}
+
+export function formatCep(v?: string | number | null): string {
+  if (v === undefined || v === null || v === '') return '-';
+  const str = String(v).trim();
+  const clean = str.replace(/\D/g, '').padStart(8, '0');
+  if (clean.length === 8) {
+    return clean.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+  }
+  return str || '-';
+}
+
+export function formatPhone(v?: string | number | null): string {
+  if (v === undefined || v === null || v === '') return '-';
+  const str = String(v).trim();
+  const clean = str.replace(/\D/g, '');
+  if (clean.length === 11) {
+    return clean.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+  }
+  if (clean.length === 10) {
+    return clean.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+  }
+  return str || '-';
 }

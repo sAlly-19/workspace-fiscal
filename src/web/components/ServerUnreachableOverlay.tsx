@@ -28,19 +28,11 @@ export function ServerUnreachableOverlay({ visible, onRetry }: Props) {
               <ServerErrorSvg />
             </div>
             <h2 className="text-sm font-bold text-white tracking-tight mb-1">
-              Servidor da API não está respondendo
+              Serviço local indisponível
             </h2>
             <p className="text-xs text-[#a1a1aa] leading-relaxed mb-4">
-              O backend Express não foi encontrado em <span className="font-mono text-red-400">127.0.0.1:3000</span>.
-              <br />
-              Verifique se o servidor está rodando:
+              O motor de banco de dados e API local está iniciando ou enfrentou um erro temporário.
             </p>
-            <pre className="text-left text-[10px] font-mono text-[#d4d4d8] bg-[#0d0d10] border border-[#27272a] rounded-lg p-3 mb-4 overflow-x-auto">
-{`# Em outro terminal:
-$ npm run dev
-# ou em produção:
-$ npm run build && npm start`}
-            </pre>
             {onRetry && (
               <button
                 onClick={onRetry}

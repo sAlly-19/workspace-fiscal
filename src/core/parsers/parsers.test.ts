@@ -131,6 +131,13 @@ const SAMPLE_CTE_XML = `<?xml version="1.0" encoding="UTF-8"?>
         <dhEmi>2026-01-20T14:00:00-03:00</dhEmi>
         <tpImp>1</tpImp>
         <tpEmis>1</tpEmis>
+        <xMunIni>SAO PAULO</xMunIni>
+        <UFIni>SP</UFIni>
+        <xMunFim>CAMPINAS</xMunFim>
+        <UFFim>SP</UFFim>
+        <toma3>
+          <toma>0</toma>
+        </toma3>
       </ide>
       <emit>
         <CNPJ>12345678000199</CNPJ>
@@ -167,6 +174,35 @@ const SAMPLE_CTE_XML = `<?xml version="1.0" encoding="UTF-8"?>
           </ICMS00>
         </ICMS>
       </imp>
+      <infCTeNorm>
+        <infCarga>
+          <vCarga>50000.00</vCarga>
+          <proPred>EQUIPAMENTOS ELETRONICOS</proPred>
+          <infQ>
+            <cUnid>01</cUnid>
+            <tpMed>PESO BRUTO</tpMed>
+            <qCarga>1250.500</qCarga>
+          </infQ>
+        </infCarga>
+        <infDoc>
+          <infNFe>
+            <chave>35260111111111000111550010000001231000000123</chave>
+          </infNFe>
+        </infDoc>
+        <infModal versaoModal="3.00">
+          <rodo>
+            <RNTRC>12345678</RNTRC>
+            <veic>
+              <placa>ABC1D23</placa>
+              <UF>SP</UF>
+            </veic>
+            <moto>
+              <xNome>JOSE DA SILVA</xNome>
+              <CPF>12345678900</CPF>
+            </moto>
+          </rodo>
+        </infModal>
+      </infCTeNorm>
     </infCte>
   </CTe>
 </cteProc>`;
@@ -251,10 +287,18 @@ describe('Fiscal Detectors and Parsers', () => {
     expect(doc.issuer?.document).toBe('12345678000199');
     expect(doc.recipient?.name).toBe('CLIENTE DESTINO SA');
     expect(doc.items).toHaveLength(1);
+    expect(doc.items?.[0]?.code).toBe('PROD001');
     expect(doc.items?.[0]?.description).toBe('NOTEBOOK DELL INSPIRON 15');
+    expect(doc.items?.[0]?.ncm).toBe('84713012');
+    expect(doc.items?.[0]?.cfop).toBe('5102');
+    expect(doc.items?.[0]?.unit).toBe('UN');
     expect(doc.items?.[0]?.quantity).toBe(2);
     expect(doc.items?.[0]?.unitPrice).toBe(2500);
     expect(doc.totals?.products).toBe(5000);
+    expect(doc.totals?.icmsBase).toBe(4900);
+    expect(doc.totals?.taxes?.icms).toBe(882);
+    expect(doc.totals?.taxes?.pis).toBe(80.85);
+    expect(doc.totals?.taxes?.cofins).toBe(372.4);
     expect(doc.totals?.total).toBe(4900);
     expect(doc.billing?.duplicates).toHaveLength(1);
     expect(doc.billing?.duplicates?.[0]?.amount).toBe(4900);
@@ -269,6 +313,23 @@ describe('Fiscal Detectors and Parsers', () => {
     expect(doc.series).toBe('1');
     expect(doc.issuer?.name).toBe('TRANSPORTADORA RAPIDA LTDA');
     expect(doc.recipient?.name).toBe('DESTINATARIO COMERCIO LTDA');
+    expect(doc.sender?.name).toBe('REMETENTE INDUSTRIA SA');
+    expect(doc.cteRoute?.startCity).toBe('SAO PAULO');
+    expect(doc.cteRoute?.endCity).toBe('CAMPINAS');
+    expect(doc.cteTomador?.role).toBe('0');
+    expect(doc.cteCargo?.predominantProduct).toBe('EQUIPAMENTOS ELETRONICOS');
+    expect(doc.cteCargo?.cargoValue).toBe(50000);
+    expect(doc.cteCargo?.quantities?.[0]?.quantity).toBe(1250.5);
+    expect(doc.cteComponents).toHaveLength(2);
+    expect(doc.cteComponents?.[0]?.name).toBe('FRETE VALOR');
+    expect(doc.cteComponents?.[0]?.amount).toBe(1200);
+    expect(doc.cteDocs?.[0]?.key).toBe('35260111111111000111550010000001231000000123');
+    expect(doc.cteModal?.rntrc).toBe('12345678');
+    expect(doc.cteModal?.vehiclePlate).toBe('ABC1D23');
+    expect(doc.cteModal?.driverName).toBe('JOSE DA SILVA');
+    expect(doc.items?.[0]?.cfop).toBe('5353');
+    expect(doc.totals?.icmsBase).toBe(1500);
+    expect(doc.totals?.taxes?.icms).toBe(180);
     expect(doc.totals?.total).toBe(1500);
   });
 
@@ -280,6 +341,15 @@ describe('Fiscal Detectors and Parsers', () => {
     expect(doc.number).toBe('789');
     expect(doc.issuer?.name).toBe('CONSULTORIA E SOFTWARES LTDA');
     expect(doc.recipient?.name).toBe('EMPRESA CONTRATANTE SA');
+    expect(doc.serviceCode).toBe('0107');
+    expect(doc.serviceDescription).toBe('DESENVOLVIMENTO DE SOFTWARE SOB ENCOMENDA');
+    expect(doc.totals?.taxes?.iss).toBe(100);
+    expect(doc.totals?.taxes?.pis).toBe(13);
+    expect(doc.totals?.taxes?.cofins).toBe(60);
+    expect(doc.totals?.taxes?.inss).toBe(0);
+    expect(doc.totals?.taxes?.ir).toBe(30);
+    expect(doc.totals?.taxes?.csll).toBe(20);
+    expect(doc.totals?.taxes?.issRetained).toBe(0);
     expect(doc.totals?.total).toBe(2000);
   });
 

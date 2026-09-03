@@ -1,5 +1,5 @@
 import { FiscalParser } from './base.parser';
-import { FiscalDocument, DocumentType, Party, FiscalItem, FiscalTotals, Address, FiscalBilling } from '../fiscal.types';
+import { FiscalDocument, DocumentType, Party, FiscalItem, FiscalTotals, Address, FiscalBilling, FiscalTransport } from '../fiscal.types';
 import crypto from 'crypto';
 
 export class NFeParser extends FiscalParser {
@@ -104,6 +104,20 @@ export class NFeParser extends FiscalParser {
     const rawId = infNFe['@_Id'] || '';
     const accessKey = rawId.replace(/^NFe/, '');
 
+    // Extract Protocol
+    const infProt = jsonObj.nfeProc?.protNFe?.infProt || jsonObj.protNFe?.infProt;
+    let protocol: string | undefined;
+    if (infProt && infProt.nProt) {
+      let protDateStr = '';
+      if (infProt.dhRecbto) {
+        try {
+          const d = new Date(infProt.dhRecbto);
+          protDateStr = ` - ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR')}`;
+        } catch {}
+      }
+      protocol = `${infProt.nProt}${protDateStr}`;
+    }
+
     return {
       id: crypto.randomUUID(),
       type,
@@ -111,15 +125,48 @@ export class NFeParser extends FiscalParser {
       number: ide.nNF ? String(ide.nNF) : undefined,
       series: ide.serie ? String(ide.serie) : undefined,
       issueDate: ide.dhEmi ? new Date(ide.dhEmi) : (ide.dEmi ? new Date(ide.dEmi) : undefined),
+      exitDate: ide.dhSaiEnt ? new Date(ide.dhSaiEnt) : (ide.dSaiEnt ? new Date(ide.dSaiEnt) : undefined),
+      exitTime: ide.dhSaiEnt ? new Date(ide.dhSaiEnt).toLocaleTimeString('pt-BR') : (ide.hSaiEnt ? String(ide.hSaiEnt) : undefined),
+      operationNature: ide.natOp ? String(ide.natOp) : undefined,
+      protocol,
       status: 'VALID',
       issuer: this.parseParty(emit),
       recipient: dest && Object.keys(dest).length > 0 ? this.parseParty(dest) : undefined,
+      transport: this.parseTransport(infNFe.transp),
+      additionalInfo: infNFe.infAdic?.infCpl ? String(infNFe.infAdic.infCpl) : undefined,
+      fiscoInfo: infNFe.infAdic?.infAdFisco ? String(infNFe.infAdic.infAdFisco) : undefined,
       items: this.parseItems(det),
-      totals: this.parseTotals(total),
+      totals: this.parseTotals(total, infNFe.total?.ISSQNtot),
       billing: this.parseBilling(infNFe.cobr, infNFe.pag),
       rawXmlPath,
       batchId,
       createdAt: new Date(),
+    };
+  }
+
+  private parseTransport(transp: any): FiscalTransport | undefined {
+    if (!transp) return undefined;
+    const transporta = transp.transporta || {};
+    const veic = transp.veicTransp || {};
+    const vol = Array.isArray(transp.vol) ? transp.vol[0] : (transp.vol || {});
+
+    return {
+      modFrete: transp.modFrete !== undefined ? transp.modFrete : undefined,
+      name: transporta.xNome ? String(transporta.xNome) : undefined,
+      document: transporta.CNPJ || transporta.CPF ? String(transporta.CNPJ || transporta.CPF) : undefined,
+      ie: transporta.IE ? String(transporta.IE) : undefined,
+      address: transporta.xEnder ? String(transporta.xEnder) : undefined,
+      city: transporta.xMun ? String(transporta.xMun) : undefined,
+      state: transporta.UF ? String(transporta.UF) : undefined,
+      vehiclePlate: veic.placa ? String(veic.placa) : undefined,
+      vehicleUf: veic.UF ? String(veic.UF) : undefined,
+      anttCode: veic.RNTC ? String(veic.RNTC) : undefined,
+      volumeQuantity: vol.qVol !== undefined ? vol.qVol : undefined,
+      volumeSpecies: vol.esp ? String(vol.esp) : undefined,
+      volumeBrand: vol.marca ? String(vol.marca) : undefined,
+      volumeNumber: vol.nVol ? String(vol.nVol) : undefined,
+      grossWeight: vol.pesoB !== undefined ? parseFloat(vol.pesoB) : undefined,
+      netWeight: vol.pesoL !== undefined ? parseFloat(vol.pesoL) : undefined,
     };
   }
 
@@ -174,10 +221,12 @@ export class NFeParser extends FiscalParser {
     const rawDoc = partyData.CNPJ ?? partyData.CPF;
     const document = rawDoc !== undefined && rawDoc !== null ? String(rawDoc) : 'NÃO INFORMADO';
     const name = partyData.xNome ? String(partyData.xNome) : 'NÃO INFORMADO';
+    const ie = partyData.IE ? String(partyData.IE) : undefined;
+    const im = partyData.IM ? String(partyData.IM) : undefined;
+    const end = partyData.enderEmit || partyData.enderDest;
+    const phone = end?.fone ? String(end.fone) : undefined;
     
     let address: Address | undefined;
-    const end = partyData.enderEmit || partyData.enderDest;
-    
     if (end) {
       address = {
         street: end.xLgr,
@@ -191,35 +240,102 @@ export class NFeParser extends FiscalParser {
       };
     }
 
-    return { name, document, address };
+    return { name, document, ie, im, phone, address };
   }
 
   private parseItems(det: any[]): FiscalItem[] {
     return det.map(item => {
       const prod = item.prod || {};
+      const imp = item.imposto || {};
+
+      let cst = '00';
+      let orig = '0';
+      let icmsBase = 0;
+      let icmsAliq = 0;
+      let icmsValue = 0;
+
+      const icms = imp.ICMS || {};
+      for (const k of Object.keys(icms)) {
+        const node = icms[k];
+        if (node && typeof node === 'object') {
+          if (node.orig !== undefined) orig = String(node.orig);
+          if (node.CST !== undefined) cst = String(node.CST);
+          else if (node.CSOSN !== undefined) cst = String(node.CSOSN);
+          if (node.vBC !== undefined) icmsBase = parseFloat(node.vBC) || 0;
+          if (node.pICMS !== undefined) icmsAliq = parseFloat(node.pICMS) || 0;
+          if (node.vICMS !== undefined) icmsValue = parseFloat(node.vICMS) || 0;
+          break;
+        }
+      }
+
+      let ipiValue = 0;
+      let ipiAliq = 0;
+      const ipi = imp.IPI?.IPITrib || imp.IPI || {};
+      if (ipi.vIPI !== undefined) ipiValue = parseFloat(ipi.vIPI) || 0;
+      if (ipi.pIPI !== undefined) ipiAliq = parseFloat(ipi.pIPI) || 0;
+
       return {
-        code: prod.cProd ? String(prod.cProd) : undefined,
+        code: prod.cProd !== undefined && prod.cProd !== null ? String(prod.cProd) : undefined,
         description: prod.xProd || 'NÃO INFORMADO',
+        ncm: prod.NCM !== undefined && prod.NCM !== null ? String(prod.NCM) : undefined,
+        cst: `${orig}/${cst}`,
+        cfop: prod.CFOP !== undefined && prod.CFOP !== null ? String(prod.CFOP) : undefined,
+        unit: prod.uCom !== undefined && prod.uCom !== null ? String(prod.uCom) : undefined,
         quantity: parseFloat(prod.qCom) || 0,
         unitPrice: parseFloat(prod.vUnCom) || 0,
         totalPrice: parseFloat(prod.vProd) || 0,
+        discount: parseFloat(prod.vDesc) || 0,
+        icmsBase,
+        icmsAliq,
+        icmsValue,
+        ipiValue,
+        ipiAliq,
       };
     });
   }
 
-  private parseTotals(total: any): FiscalTotals {
+  private parseTotals(total: any, issqnTotal?: any): FiscalTotals {
+    const icms = parseFloat(total.vICMS) || 0;
+    const icmsBase = parseFloat(total.vBC) || 0;
+    const icmsSt = parseFloat(total.vST) || 0;
+    const icmsStBase = parseFloat(total.vBCST) || 0;
+    const ipi = parseFloat(total.vIPI) || 0;
+    const pis = parseFloat(total.vPIS) || (issqnTotal ? parseFloat(issqnTotal.vPIS) || 0 : 0);
+    const cofins = parseFloat(total.vCOFINS) || (issqnTotal ? parseFloat(issqnTotal.vCOFINS) || 0 : 0);
+    const iss = issqnTotal ? parseFloat(issqnTotal.vISS) || 0 : 0;
+    const ii = parseFloat(total.vII) || 0;
+    const fcp = parseFloat(total.vFCP) || 0;
+    const icmsUfDest = parseFloat(total.vICMSUFDest) || 0;
+    const icmsUfRemet = parseFloat(total.vICMSUFRemet) || 0;
+    const fcpUfDest = parseFloat(total.vFCPUFDest) || 0;
+    const totalTaxes = parseFloat(total.vTotTrib) || (icms + icmsSt + ipi + pis + cofins + iss + ii);
+
     return {
-      products: parseFloat(total.vProd) || 0,
+      products: parseFloat(total.vProd) || (issqnTotal ? parseFloat(issqnTotal.vServ) || 0 : 0),
       freight: parseFloat(total.vFrete) || 0,
       insurance: parseFloat(total.vSeg) || 0,
-      discount: parseFloat(total.vDesc) || 0,
+      discount: parseFloat(total.vDesc) || (issqnTotal ? parseFloat(issqnTotal.vDesc) || 0 : 0),
+      otherExpenses: parseFloat(total.vOutro) || 0,
+      icmsBase,
+      icmsStBase,
+      totalTaxes,
       taxes: {
-        icms: parseFloat(total.vICMS) || 0,
-        ipi: parseFloat(total.vIPI) || 0,
-        pis: parseFloat(total.vPIS) || 0,
-        cofins: parseFloat(total.vCOFINS) || 0,
+        icms,
+        icmsBase,
+        icmsSt,
+        icmsStBase,
+        ipi,
+        pis,
+        cofins,
+        iss,
+        ii,
+        fcp,
+        icmsUfDest,
+        icmsUfRemet,
+        fcpUfDest,
+        totalTaxes,
       },
-      total: parseFloat(total.vNF) || 0,
+      total: parseFloat(total.vNF) || (issqnTotal ? parseFloat(issqnTotal.vServ) || 0 : 0),
     };
   }
 }

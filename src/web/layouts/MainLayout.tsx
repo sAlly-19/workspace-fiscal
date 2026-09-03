@@ -353,6 +353,84 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     }
   };
 
+  const processPaths = async (paths: string[], folderId?: string | null) => {
+    if (!paths || paths.length === 0) return;
+    setUploadError(null);
+    setIsUploading(true);
+    setUploadProgress({ total: paths.length, processed: 0, percent: 0 });
+
+    const targetFolder = folderId !== undefined ? folderId : (targetUploadFolderId || selectedFolderId);
+
+    try {
+      const res = await apiFetch('/api/import/paths', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePaths: paths,
+          batchId: targetFolder || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        let errMsg = 'Erro ao processar caminhos para importação.';
+        try {
+          const errData = await res.json();
+          if (errData?.error) errMsg = errData.error;
+        } catch {}
+        setUploadError(errMsg);
+        setIsUploading(false);
+        setUploadProgress(null);
+        toast.error('Falha ao importar', errMsg);
+        return;
+      }
+
+      const data = await res.json();
+      if (data && data.jobId) {
+        const poll = setInterval(async () => {
+          try {
+            const statusRes = await apiFetch(`/api/import/${data.jobId}`);
+            if (!statusRes.ok) return;
+            const statusData = await statusRes.json();
+            const processed = statusData.processed ?? 0;
+            const total = statusData.total ?? data.queued ?? paths.length;
+            const isCompleted = statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
+            const isFailed = statusData.status === 'error' || statusData.status === 'failed';
+            const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
+            setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
+
+            if (isCompleted || isFailed) {
+              clearInterval(poll);
+              setTargetUploadFolderId(null);
+              await fetchDocuments(selectedFolderId);
+              await fetchWorkspace();
+              if (isCompleted && statusData.results && statusData.results.length > 0) {
+                selectDocument(statusData.results[0].id);
+              }
+              setTimeout(() => {
+                setIsUploading(false);
+                setUploadProgress(null);
+              }, 2000);
+            }
+          } catch {
+            clearInterval(poll);
+            setIsUploading(false);
+            setUploadProgress(null);
+          }
+        }, 200);
+      } else {
+        await fetchDocuments(selectedFolderId);
+        await fetchWorkspace();
+        setIsUploading(false);
+        setUploadProgress(null);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Falha ao importar arquivos.');
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       processFiles(e.target.files);
@@ -368,11 +446,29 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     setIsDraggingOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
+
+    const paths: string[] = [];
+    const filesToUpload: File[] = [];
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processFiles(e.dataTransfer.files);
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const file = e.dataTransfer.files[i];
+        const p = (file as any).path;
+        if (p && typeof p === 'string') {
+          paths.push(p);
+        } else if (file.size > 0) {
+          filesToUpload.push(file);
+        }
+      }
+    }
+
+    if (paths.length > 0) {
+      await processPaths(paths);
+    } else if (filesToUpload.length > 0) {
+      await processFiles(filesToUpload);
     }
   };
 
@@ -686,7 +782,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
 className="absolute inset-0 bg-blue-600/30 backdrop-blur-xs z-50 flex flex-col items-center justify-center border-4 border-dashed border-blue-400 m-4 rounded-2xl pointer-events-none animate-in fade-in zoom-in-95">
           <UploadCloud className="w-16 h-16 text-white mb-2 animate-bounce" />
           <h2 className="text-xl font-bold text-white shadow-xs">
-            Solte seus arquivos XML para importar
+            Solte seus arquivos XML, ZIP ou pastas para importar
           </h2>
           <p className="text-sm text-blue-100 mt-1">
             {selectedFolderId
@@ -696,12 +792,12 @@ className="absolute inset-0 bg-blue-600/30 backdrop-blur-xs z-50 flex flex-col i
         </div>
       )}
 
-      {/* Hidden File Input for XML Uploads */}
+      {/* Hidden File Input for XML/ZIP Uploads */}
       <input
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".xml,text/xml,application/xml"
+        accept=".xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed"
         onChange={handleFileUpload}
         className="hidden"
       />
@@ -828,7 +924,6 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
               title="Voltar para Home"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Home</span>
             </button>
           )}
           <img

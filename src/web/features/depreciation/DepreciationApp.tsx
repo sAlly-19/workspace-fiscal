@@ -14,6 +14,7 @@ import { SettingsModal } from '../../components/SettingsModal';
 import { CompetencePicker } from '../../components/CompetencePicker';
 import { RetroactiveBatchModal } from './RetroactiveBatchModal';
 import { AssetXmlDropZone } from './AssetXmlDropZone';
+import { DepreciationSplashScreen } from './DepreciationSplashScreen';
 
 type Tab = 'dashboard' | 'assets' | 'companies' | 'categories';
 
@@ -77,6 +78,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [showRetroBatchModal, setShowRetroBatchModal] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const selectedCompany = useMemo(() => companies.find(c=> c.id===selectedCompanyId) || null, [companies, selectedCompanyId]);
 
@@ -172,6 +174,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   return (
     <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans select-none ${isLight ? 'bg-[#f8fafc] text-[#0f172a]' : 'bg-[#09090b] text-white'}`} style={{ paddingTop: isElectron ? 36 : 0 }}>
       <TitleBar />
+      {showSplash && <DepreciationSplashScreen onFinish={() => setShowSplash(false)} />}
       {/* Top Bar Empresa Selecionada */}
       <div className={`h-[52px] border-b flex items-center px-4 justify-between shrink-0 ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
         <div className="flex items-center gap-3">

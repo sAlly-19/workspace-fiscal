@@ -37,22 +37,31 @@ export function createApp(): express.Express {
     })
   );
 
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: false, limit: '15mb' }));
+  // CORS para permitir requisições locais do frontend Electron
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
 
-  app.use(requestLogger);
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: 'nf-view-api' });
   });
 
-  // Rotas de leitura com limite alto; mutações com limite conservador.
+  // Rotas da API
   app.use('/api', readRateLimiter);
-  app.use('/api/import', mutationRateLimiter, importRoutes);
-  app.use('/api/workspace', mutationRateLimiter, workspaceRoutes);
+  app.use('/api/import', importRoutes);
+  app.use('/api/workspace', workspaceRoutes);
   app.use('/api/documents', documentsRoutes); // mix read/write — middleware interno
   app.use('/api/documents', eventsRoutes);
-  app.use('/api/analytics', readRateLimiter, analyticsRoutes);
+  app.use('/api/analytics', analyticsRoutes);
   app.use('/api/companies', mutationRateLimiter, companiesRoutes);
   app.use('/api/categories', mutationRateLimiter, categoriesRoutes);
   app.use('/api/assets', mutationRateLimiter, assetsRoutes);
