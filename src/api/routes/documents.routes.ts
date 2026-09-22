@@ -1403,6 +1403,8 @@ function generateDanfeBatchHtml(docsList: any[]): string {
       height: 36px;
       background: repeating-linear-gradient(90deg, #000 0, #000 2px, #fff 2px, #fff 4px, #000 4px, #000 7px, #fff 7px, #fff 8px);
       margin: 4px 0;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .top-toolbar {
       position: sticky;
@@ -1410,7 +1412,7 @@ function generateDanfeBatchHtml(docsList: any[]): string {
       z-index: 1000;
       background: #0f172a;
       color: #fff;
-      padding: 12px 20px;
+      padding: 10px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1434,6 +1436,64 @@ function generateDanfeBatchHtml(docsList: any[]): string {
     .top-toolbar-btn:hover {
       background: #1d4ed8;
       transform: translateY(-1px);
+    }
+    .zoom-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #1e293b;
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .zoom-btn {
+      background: #334155;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      width: 26px;
+      height: 26px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .zoom-btn:hover {
+      background: #475569;
+    }
+    .zoom-label {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: bold;
+      color: #38bdf8;
+      min-width: 44px;
+      text-align: center;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      user-select: none;
+    }
+    .zoom-label:hover {
+      background: #334155;
+    }
+    .zoom-btn-text {
+      background: #334155;
+      color: #e2e8f0;
+      border: none;
+      border-radius: 4px;
+      padding: 0 8px;
+      height: 26px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .zoom-btn-text:hover {
+      background: #475569;
     }
 
     /* === NFC-e (cupom fiscal verde) === */
@@ -1659,6 +1719,13 @@ function generateDanfeBatchHtml(docsList: any[]): string {
       .no-print {
         display: none !important;
       }
+      #danfe-pages-container {
+        zoom: 1 !important;
+        transform: none !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       .danfe-page {
         padding: 0 !important;
         background: #fff !important;
@@ -1703,6 +1770,13 @@ function generateDanfeBatchHtml(docsList: any[]): string {
     </div>
 
     <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="zoom-toolbar">
+        <button class="zoom-btn" id="btnZoomOut" title="Diminuir Zoom (Ctrl -)">−</button>
+        <span class="zoom-label" id="zoomLabel" title="Resetar para 100% (Ctrl 0)">100%</span>
+        <button class="zoom-btn" id="btnZoomIn" title="Aumentar Zoom (Ctrl +)">+</button>
+        <button class="zoom-btn-text" id="btnZoomFit" title="Ajustar à largura">↔ Ajustar</button>
+      </div>
+
       <button class="top-toolbar-btn" onclick="window.print()">
         🖨️ Imprimir / Salvar Todas em PDF
       </button>
@@ -1712,15 +1786,88 @@ function generateDanfeBatchHtml(docsList: any[]): string {
     </div>
   </div>
 
-  <div style="max-width: 860px; margin: 0 auto;">
+  <div id="danfe-pages-container" style="max-width: 860px; margin: 0 auto; transition: transform 0.05s ease-out; transform-origin: top center;">
     ${renderedPages}
   </div>
 
   <script>
-    // Auto trigger print prompt if requested via query param
-    if (new URLSearchParams(window.location.search).get('autoprint') === 'true') {
-      setTimeout(() => window.print(), 350);
-    }
+    (function() {
+      const PRESETS = [50, 65, 75, 85, 100, 115, 130, 150, 175, 200];
+      let zoom = 100;
+      const container = document.getElementById('danfe-pages-container');
+      const label = document.getElementById('zoomLabel');
+      const btnIn = document.getElementById('btnZoomIn');
+      const btnOut = document.getElementById('btnZoomOut');
+      const btnFit = document.getElementById('btnZoomFit');
+
+      function updateZoom(newZoom) {
+        zoom = Math.min(250, Math.max(50, newZoom));
+        if (container) {
+          container.style.zoom = (zoom / 100);
+        }
+        if (label) {
+          label.textContent = zoom + '%';
+        }
+      }
+
+      function zoomIn() {
+        const next = PRESETS.find(function(z) { return z > zoom; });
+        updateZoom(next !== undefined ? next : zoom + 15);
+      }
+
+      function zoomOut() {
+        const next = PRESETS.slice().reverse().find(function(z) { return z < zoom; });
+        updateZoom(next !== undefined ? next : zoom - 15);
+      }
+
+      function zoomReset() {
+        updateZoom(100);
+      }
+
+      function zoomFit() {
+        const available = window.innerWidth - 40;
+        const base = 860;
+        if (available > 0) {
+          const calculated = Math.round((available / base) * 100);
+          updateZoom(calculated);
+        }
+      }
+
+      if (btnIn) btnIn.addEventListener('click', zoomIn);
+      if (btnOut) btnOut.addEventListener('click', zoomOut);
+      if (label) label.addEventListener('click', zoomReset);
+      if (btnFit) btnFit.addEventListener('click', zoomFit);
+
+      // Keyboard shortcuts: Ctrl +, Ctrl -, Ctrl 0
+      window.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+            e.preventDefault();
+            zoomIn();
+          } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') {
+            e.preventDefault();
+            zoomOut();
+          } else if (e.key === '0' || e.code === 'Numpad0') {
+            e.preventDefault();
+            zoomReset();
+          }
+        }
+      });
+
+      // Mouse wheel zoom with Ctrl key
+      window.addEventListener('wheel', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (e.deltaY < 0) zoomIn();
+          else if (e.deltaY > 0) zoomOut();
+        }
+      }, { passive: false });
+
+      // Auto trigger print prompt if requested via query param
+      if (new URLSearchParams(window.location.search).get('autoprint') === 'true') {
+        setTimeout(function() { window.print(); }, 350);
+      }
+    })();
   </script>
 </body>
 </html>`;

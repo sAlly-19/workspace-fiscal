@@ -36,6 +36,30 @@ export interface DepreciationRow {
   status: 'exported' | 'current' | 'not_issued' | 'future';
 }
 
+export interface ColumnMappingItem {
+  id: string;
+  column: string;
+  label?: string;
+}
+
+export const DEFAULT_COLUMN_MAPPINGS: ColumnMappingItem[] = [
+  { id: 'date', column: 'A', label: 'Data' },
+  { id: 'description', column: 'B', label: 'Descrição' },
+  { id: 'category', column: 'D', label: 'Categoria' },
+  { id: 'documentNumber', column: 'F', label: 'Nº Doc' },
+  { id: 'depreciationValue', column: 'G', label: 'Valor' },
+];
+
+export function colLetterToIndex(col: string): number {
+  if (!col || col === 'NONE') return -1;
+  const upper = col.trim().toUpperCase();
+  let index = 0;
+  for (let i = 0; i < upper.length; i++) {
+    index = index * 26 + (upper.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
 export class DepreciationService {
   /**
    * Retorna linhas de depreciação para uma competência e empresa
@@ -258,7 +282,12 @@ export class DepreciationService {
   /**
    * Gera CSV e registra exportação para uma competência
    */
-  async generateCsv(companyId: string, competence: string, options?: { separator?: string; numericFormat?: 'BRL' | 'RAW' }): Promise<{
+  async generateCsv(companyId: string, competence: string, options?: {
+    separator?: string;
+    numericFormat?: 'BRL' | 'RAW';
+    dateFormat?: 'DD/MM/YYYY' | 'YYYY-MM-DD';
+    columns?: ColumnMappingItem[];
+  }): Promise<{
     csv: string;
     filename: string;
     total: number;
@@ -277,33 +306,73 @@ export class DepreciationService {
       // Não bloqueia, apenas informa; a rota decidirá se exige confirmação
     }
 
-    // Cabeçalho
-    const header = ['Data', 'Descrição', 'Tipo', 'Nº Doc', 'Valor a Depreciar'].join(sep);
+    // Escape separador e aspas duplas
+    const esc = (v: string) => {
+      if (v.includes(sep) || v.includes('"') || v.includes('\n') || v.includes('\r')) {
+        return `"${v.replace(/"/g, '""')}"`;
+      }
+      return v;
+    };
+
+    // Mapeamento de colunas solicitado pelo usuário (padrão: A: Data, B: Descrição, D: Categoria, F: Nº Doc, G: Valor)
+    const userCols = options?.columns && options.columns.length > 0
+      ? options.columns.filter(c => c.column && c.column !== 'NONE')
+      : DEFAULT_COLUMN_MAPPINGS;
+
+    const validCols = userCols
+      .map(c => ({ ...c, index: colLetterToIndex(c.column) }))
+      .filter(c => c.index >= 0);
+
+    const maxColIndex = validCols.length > 0 ? Math.max(...validCols.map(c => c.index)) : 0;
+
+    // Cabeçalho montado conforme as posições das colunas
+    const headerRow: string[] = new Array(maxColIndex + 1).fill('');
+    validCols.forEach(c => {
+      const defaultLabel = DEFAULT_COLUMN_MAPPINGS.find(d => d.id === c.id)?.label || c.id;
+      headerRow[c.index] = c.label || defaultLabel;
+    });
+    const header = headerRow.map(esc).join(sep);
 
     const lines = rows.map((r) => {
       // Data = último dia da competência
       const [y, m] = competence.split('-').map(Number);
       const lastDay = new Date(y, m, 0).getDate();
-      const dateStr = `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-      const desc = `Depreciação NF ${r.documentNumber}, ${String(m).padStart(2, '0')}/${y}`;
-      const tipo = r.categoryName || 'Outros';
-      const doc = `NF ${r.documentNumber}`;
-      // Valor: BRL com vírgula ou RAW sem R$ (config)
-      const valorRaw = (r.depreciationValue / 100).toFixed(2).replace('.', ',');
-      const valor = options?.numericFormat === 'RAW' ? valorRaw : `R$ ${valorRaw}`; // mas spec diz sem R$ se RAW, aqui mantemos com lógica
-      // Escape separador e aspas
-      const esc = (v: string) => {
-        if (v.includes(sep) || v.includes('"') || v.includes('\n')) {
-          return `"${v.replace(/"/g, '""')}"`;
-        }
-        return v;
+      const dateStr = options?.dateFormat === 'YYYY-MM-DD'
+        ? `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+        : `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+
+      const formatNum = (cents: number) => {
+        const raw = (cents / 100).toFixed(2).replace('.', ',');
+        return options?.numericFormat === 'BRL' ? `R$ ${raw}` : raw;
       };
-      // Se RAW, remove R$
-      const valorCell = options?.numericFormat === 'RAW' ? valorRaw : valor;
-      return [dateStr, esc(desc), esc(tipo), esc(doc), valorCell].join(sep);
+
+      const fieldValues: Record<string, string> = {
+        date: dateStr,
+        description: `Depreciação NF ${r.documentNumber}, ${String(m).padStart(2, '0')}/${y}`,
+        assetDescription: r.description || '',
+        category: r.categoryName || 'Outros',
+        documentNumber: `NF ${r.documentNumber}`,
+        supplier: r.supplier || '',
+        acquisitionDate: r.acquisitionDate ? new Date(r.acquisitionDate).toLocaleDateString('pt-BR') : '',
+        acquisitionValue: formatNum(r.acquisitionValue),
+        annualRate: `${r.annualRate}%`,
+        depreciationValue: formatNum(r.depreciationValue),
+        accumulatedValue: formatNum(r.accumulatedValue),
+        currentValue: formatNum(r.currentValue),
+        competence,
+        status: r.status === 'current' ? 'ATUAL' : r.status === 'exported' ? 'EXPORTADO' : (r.status || ''),
+      };
+
+      const rowCols: string[] = new Array(maxColIndex + 1).fill('');
+      validCols.forEach(c => {
+        rowCols[c.index] = esc(fieldValues[c.id] ?? '');
+      });
+
+      return rowCols.join(sep);
     });
 
-    const csv = '\uFEFF' + [header, ...lines].join('\n');
+    // UTF-8 BOM (\uFEFF) explícito e CRLF (\r\n) para evitar corrupção de acentuação no Excel do Windows
+    const csv = '\uFEFF' + [header, ...lines].join('\r\n');
 
     // Persiste entries + export
     // Cria/atualiza depreciation_entries para cada asset na competência

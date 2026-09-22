@@ -61,6 +61,12 @@ const api = {
     ipcRenderer.on('window:state', listener);
     return () => ipcRenderer.removeListener('window:state', listener);
   },
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  onUpdateAvailable: (cb: (info: any) => void) => {
+    const listener = (_e: unknown, info: any) => cb(info);
+    ipcRenderer.on('app:updateAvailable', listener);
+    return () => ipcRenderer.removeListener('app:updateAvailable', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

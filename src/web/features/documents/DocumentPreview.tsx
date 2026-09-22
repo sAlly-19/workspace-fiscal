@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FileText, Download, Copy, Check, Printer, Code2, Table, CreditCard, Receipt, CalendarClock, ChevronLeft } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { FileText, Download, Copy, Check, Printer, Code2, Table, CreditCard, Receipt, CalendarClock, ChevronLeft, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -50,10 +50,88 @@ export function DocumentPreview({
   const [copiedXml, setCopiedXml] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
 
+  const ZOOM_PRESETS = [50, 65, 75, 85, 100, 115, 130, 150, 175, 200];
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => {
+      const next = ZOOM_PRESETS.find((z) => z > prev);
+      return next !== undefined ? next : Math.min(250, prev + 15);
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => {
+      const next = [...ZOOM_PRESETS].reverse().find((z) => z < prev);
+      return next !== undefined ? next : Math.max(50, prev - 15);
+    });
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(100);
+  };
+
+  const handleFitWidth = () => {
+    if (scrollContainerRef.current) {
+      const availableWidth = scrollContainerRef.current.clientWidth - 48;
+      const docBaseWidth = 850;
+      if (availableWidth > 0) {
+        const calculated = Math.round((availableWidth / docBaseWidth) * 100);
+        const clamped = Math.min(200, Math.max(50, calculated));
+        setZoomLevel(clamped);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (mode !== 'visualizar') return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === '0' || e.code === 'Numpad0') {
+          e.preventDefault();
+          handleZoomReset();
+        }
+      }
+    };
+
+    const container = scrollContainerRef.current;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          handleZoomIn();
+        } else if (e.deltaY > 0) {
+          handleZoomOut();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    if (container) {
+      container.addEventListener('wheel', onWheel, { passive: false });
+    }
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      if (container) {
+        container.removeEventListener('wheel', onWheel);
+      }
+    };
+  }, [mode]);
+
   useEffect(() => {
     // Default to visualizar (DANFE / PDF) when document changes
     setMode('visualizar');
     setXml('');
+    setZoomLevel(100);
   }, [docDetails.id]);
 
   useEffect(() => {
@@ -214,6 +292,55 @@ export function DocumentPreview({
               );
             })}
           </div>
+
+          {/* Zoom Controls (Active in Visualizar mode) */}
+          {mode === 'visualizar' && (
+            <div className={`flex items-center gap-0.5 px-1 py-0.5 rounded-xl border select-none ${
+              currentTheme === 'light'
+                ? 'bg-[#f1f5f9] border-[#e2e8f0] text-[#334155]'
+                : 'bg-[#09090b] border-[#27272a] text-[#fafafa]'
+            }`}>
+              <button
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 50}
+                title="Diminuir Zoom (Ctrl -)"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  currentTheme === 'light' ? 'hover:bg-white text-[#475569]' : 'hover:bg-[#18181b] text-[#a1a1aa] hover:text-white'
+                }`}
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleZoomReset}
+                title="Resetar Zoom para 100% (Ctrl 0)"
+                className={`px-1.5 py-1 text-xs font-mono font-bold rounded-lg transition-colors cursor-pointer min-w-[48px] text-center ${
+                  currentTheme === 'light' ? 'hover:bg-white text-blue-600' : 'hover:bg-[#18181b] text-blue-400'
+                }`}
+              >
+                {zoomLevel}%
+              </button>
+              <button
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 250}
+                title="Aumentar Zoom (Ctrl +)"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                  currentTheme === 'light' ? 'hover:bg-white text-[#475569]' : 'hover:bg-[#18181b] text-[#a1a1aa] hover:text-white'
+                }`}
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <div className={`w-[1px] h-3.5 mx-0.5 ${currentTheme === 'light' ? 'bg-[#cbd5e1]' : 'bg-[#27272a]'}`} />
+              <button
+                onClick={handleFitWidth}
+                title="Ajustar à largura da janela"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  currentTheme === 'light' ? 'hover:bg-white text-[#475569]' : 'hover:bg-[#18181b] text-[#a1a1aa] hover:text-white'
+                }`}
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -272,7 +399,10 @@ export function DocumentPreview({
       </div>
 
       {/* Content Area with Fluid Transition */}
-      <div className="flex-1 overflow-y-auto relative print:overflow-visible">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto overflow-x-auto relative print:overflow-visible select-text danfe-selectable"
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={mode}
@@ -280,9 +410,16 @@ export function DocumentPreview({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="w-full h-full min-h-full"
+            className="w-full h-full min-h-full select-text danfe-selectable"
           >
-            {mode === 'visualizar' && <DanfeView doc={docDetails} theme={currentTheme} />}
+            {mode === 'visualizar' && (
+              <div 
+                className="danfe-zoom-content w-full min-h-full flex justify-center origin-top select-text danfe-selectable transition-transform duration-75"
+                style={{ zoom: zoomLevel / 100 }}
+              >
+                <DanfeView doc={docDetails} theme={currentTheme} />
+              </div>
+            )}
             {mode === 'dados' && <DadosView doc={docDetails} theme={currentTheme} />}
             {mode === 'xml' && (
               <div className="absolute inset-0 p-4">
@@ -790,7 +927,7 @@ function DanfeView({ doc, theme }: { doc: any; theme: string }) {
     <div className={`p-2 sm:p-4 md:p-8 min-h-full flex justify-center overflow-x-auto print:bg-white print:p-0 ${
       isLight ? 'bg-[#e2e8f0]' : 'bg-[#27272a]'
     }`}>
-      <div className="bg-white text-black w-full max-w-[850px] min-w-[700px] shadow-2xl p-4 sm:p-6 font-sans text-[9px] border border-black print:shadow-none print:border-none print:max-w-none print:w-full print:min-w-0 print:p-0">
+      <div className="bg-white text-black w-full max-w-[850px] min-w-[700px] shadow-2xl p-4 sm:p-6 font-sans text-[9px] border border-black select-text danfe-selectable cursor-text print:shadow-none print:border-none print:max-w-none print:w-full print:min-w-0 print:p-0">
 
         {/* Canhoto de Recebimento */}
         <div className="border border-black mb-1.5">
@@ -846,13 +983,13 @@ function DanfeView({ doc, theme }: { doc: any; theme: string }) {
             <div className="w-[35%] p-1.5 flex flex-col justify-between">
               <div>
                 {/* Barcode representation */}
-                <div className="h-9 w-full flex items-center justify-between px-1 bg-white mb-1 overflow-hidden">
+                <div className="h-9 w-full flex items-center justify-between px-1 bg-white mb-1 overflow-hidden select-none danfe-no-select">
                   {Array.from({ length: 55 }).map((_, i) => (
                     <div key={i} className={`h-full bg-black ${i % 4 === 0 ? 'w-1' : i % 7 === 0 ? 'w-1.5' : 'w-0.5'}`} />
                   ))}
                 </div>
                 <div className="text-[7px] text-gray-600 font-bold uppercase">CHAVE DE ACESSO</div>
-                <div className="font-mono text-[9px] font-black tracking-wide text-center">
+                <div className="font-mono text-[9px] font-black tracking-wide text-center select-text cursor-text">
                   {formattedKey}
                 </div>
               </div>

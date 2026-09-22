@@ -1401,11 +1401,12 @@ style={{ width: `${listWidth}px` }}
 
         {/* Column 3: DANFE / PDF Viewer & Converter Area */}
         <main
-className={`flex-1 flex flex-col overflow-hidden print:overflow-visible print:bg-white ${
-          currentTheme === 'light'
-            ? 'bg-[#e2e8f0]'
-            : 'bg-[#18181b]'
-        }`}>
+          className={`flex-1 flex flex-col overflow-hidden select-text print:overflow-visible print:bg-white ${
+            currentTheme === 'light'
+              ? 'bg-[#e2e8f0]'
+              : 'bg-[#18181b]'
+          }`}
+        >
           {docDetails ? (
             <DocumentPreview docDetails={docDetails} />
           ) : (

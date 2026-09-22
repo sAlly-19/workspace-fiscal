@@ -85,7 +85,7 @@ export function DanfeNFSe({ doc }: DanfeNFSeProps) {
   return (
     <div className="p-4 md:p-8 min-h-full flex justify-center bg-gray-100 print:bg-white print:p-0">
       <div 
-        className="bg-white text-black w-full max-w-[850px] min-w-[700px] border border-black shadow-lg print:shadow-none print:border print:max-w-none print:w-full print:min-w-0"
+        className="bg-white text-black w-full max-w-[850px] min-w-[700px] border border-black shadow-lg select-text danfe-selectable cursor-text print:shadow-none print:border print:max-w-none print:w-full print:min-w-0"
         style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '9px', lineHeight: 1.2 }}
       >
         {/* Cabeçalho Oficial */}

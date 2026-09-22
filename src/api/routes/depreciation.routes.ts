@@ -27,10 +27,10 @@ router.get('/asset/:id/history', async (req, res) => {
   }
 });
 
-// POST /api/depreciation/export  { companyId, competence, separator, numericFormat }
+// POST /api/depreciation/export  { companyId, competence, separator, numericFormat, dateFormat, columns, force }
 router.post('/export', async (req, res) => {
   try {
-    const { companyId, competence, separator, numericFormat, force } = req.body;
+    const { companyId, competence, separator, numericFormat, dateFormat, columns, force } = req.body;
     if (!companyId || !competence) return res.status(400).json({ error: 'companyId e competence obrigatórios' });
     // Verifica se já exportado
     const existing = await depreciationService.getMonthlyDepreciation(companyId, competence);
@@ -43,7 +43,7 @@ router.post('/export', async (req, res) => {
         count: existing.count,
       });
     }
-    const result = await depreciationService.generateCsv(companyId, competence, { separator, numericFormat });
+    const result = await depreciationService.generateCsv(companyId, competence, { separator, numericFormat, dateFormat, columns });
     res.json(result);
   } catch (e: any) {
     console.error('[Depreciation/export]', e);
@@ -54,11 +54,20 @@ router.post('/export', async (req, res) => {
 // GET /api/depreciation/export/csv?companyId=xxx&competence=2026-08  -> download direto
 router.get('/export/csv', async (req, res) => {
   try {
-    const { companyId, competence } = req.query;
+    const { companyId, competence, separator, numericFormat, dateFormat, columns } = req.query;
     if (!companyId || !competence) return res.status(400).json({ error: 'companyId e competence obrigatórios' });
-    const result = await depreciationService.generateCsv(companyId as string, competence as string, { separator: ';', numericFormat: 'RAW' });
+    let parsedColumns = undefined;
+    if (columns && typeof columns === 'string') {
+      try { parsedColumns = JSON.parse(columns); } catch {}
+    }
+    const result = await depreciationService.generateCsv(companyId as string, competence as string, {
+      separator: (separator as string) || ';',
+      numericFormat: (numericFormat as 'BRL' | 'RAW') || 'RAW',
+      dateFormat: (dateFormat as 'DD/MM/YYYY' | 'YYYY-MM-DD') || 'DD/MM/YYYY',
+      columns: parsedColumns,
+    });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=\"${result.filename}\"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
     res.send(result.csv);
   } catch (e: any) {
     res.status(500).json({ error: e.message });

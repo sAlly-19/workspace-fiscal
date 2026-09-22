@@ -13,6 +13,7 @@ import backupRoutes from './routes/backup.routes';
 import settingsRoutes from './routes/settings.routes';
 import eventsRoutes from './routes/events.routes';
 import assetImportRoutes from './routes/asset-import.routes';
+import updatesRoutes from './routes/updates.routes';
 import { mutationRateLimiter, readRateLimiter, requestLogger } from './middleware/rateLimit';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
@@ -70,6 +71,7 @@ export function createApp(): express.Express {
   app.use('/api/exports', mutationRateLimiter, exportsRoutes);
   app.use('/api/backup', mutationRateLimiter, backupRoutes);
   app.use('/api/settings', mutationRateLimiter, settingsRoutes);
+  app.use('/api/updates', updatesRoutes);
 
   // 404 JSON para rotas /api não encontradas
   app.all('/api/*', (req, res) => {

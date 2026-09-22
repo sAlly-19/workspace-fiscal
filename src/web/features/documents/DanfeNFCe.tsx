@@ -95,7 +95,7 @@ export function DanfeNFCe({ doc }: { doc: any }) {
   return (
     <div className="p-4 md:p-8 min-h-full flex justify-center print:bg-white print:p-0 bg-[#0d4f2e]/10">
       <div
-        className="bg-white text-black w-full max-w-[400px] font-mono text-[10px] leading-tight shadow-2xl p-4 border-2 border-emerald-700 print:shadow-none print:border-none print:max-w-none print:w-full print:p-2"
+        className="bg-white text-black w-full max-w-[400px] font-mono text-[10px] leading-tight shadow-2xl p-4 border-2 border-emerald-700 select-text danfe-selectable cursor-text print:shadow-none print:border-none print:max-w-none print:w-full print:p-2"
         style={{ borderRadius: '4px' }}
       >
         {/* Header */}
@@ -217,7 +217,7 @@ export function DanfeNFCe({ doc }: { doc: any }) {
         {doc.accessKey && (
           <div className="py-3 text-center border-b border-dashed border-emerald-700">
             <div className="text-[8px] font-bold text-emerald-800 mb-2 uppercase">Consulte pela chave via QR Code</div>
-            <div className="inline-block p-2 bg-white border-2 border-emerald-700">
+            <div className="inline-block p-2 bg-white border-2 border-emerald-700 select-none danfe-no-select">
               <QrCodePattern seed={doc.accessKey} size={120} />
             </div>
             <div className="font-mono text-[8px] font-bold text-center mt-2 break-all px-2">

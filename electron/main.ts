@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import { initDatabase } from '../src/db';
 import { createApp } from '../src/api/app';
 import { backupService } from '../src/api/services/backup.service';
+import { updateService } from '../src/api/services/update.service';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1';
 
@@ -68,6 +69,7 @@ async function startApiServer(): Promise<number> {
 function registerIpcHandlers(apiBaseUrl: string) {
   ipcMain.handle('api:baseUrl', () => apiBaseUrl);
   ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('app:checkForUpdates', async () => updateService.checkLatestRelease());
   ipcMain.handle('app:getPaths', () => ({
     userData: app.getPath('userData'),
     documents: app.getPath('documents'),
@@ -353,8 +355,18 @@ async function createWindow(apiBaseUrl: string) {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    mainWindow?.focus();
     broadcastState();
   });
+
+  // Garantia de que a janela abre em primeiro plano no Windows
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+      broadcastState();
+    }
+  }, 1000);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -370,8 +382,21 @@ async function createWindow(apiBaseUrl: string) {
     return { action: 'deny' };
   });
 
+  // Atalho F12 para abrir/fechar DevTools quando necessário
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      if (mainWindow?.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow?.webContents.openDevTools({ mode: 'detach' });
+      }
+    }
+  });
+
   await mainWindow.loadURL(apiBaseUrl);
-  if (isDev) {
+  mainWindow.show();
+  mainWindow.focus();
+  if (isDev && process.env.ELECTRON_DEVTOOLS === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 }
@@ -387,6 +412,17 @@ app.whenReady().then(async () => {
   backupService.maybeRunIfDue().catch((err) =>
     console.error('[backup] startup check failed:', err)
   );
+
+  // Verificação diária de atualizações via GitHub Releases (a cada 24h)
+  const checkDailyUpdate = () => {
+    updateService.checkLatestRelease().then((result) => {
+      if (result.hasUpdate && mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('app:updateAvailable', result);
+      }
+    }).catch(() => {});
+  };
+  setTimeout(checkDailyUpdate, 15000);
+  setInterval(checkDailyUpdate, 24 * 60 * 60 * 1000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

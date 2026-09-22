@@ -135,7 +135,7 @@ html, body {
   body.electron-app { padding-top: 0 !important; }
   #custom-titlebar { display: none !important; }
 
-  .danfe-sheet, .print-container {
+  .danfe-sheet, .print-container, .danfe-zoom-content, .danfe-box, .danfe-page {
     display: block !important;
     position: static !important;
     width: 100% !important;
@@ -147,10 +147,27 @@ html, body {
     background: #ffffff !important;
     color: #000000 !important;
     overflow: visible !important;
+    zoom: 1 !important;
+    transform: none !important;
   }
 
-  .danfe-sheet * {
+  .danfe-sheet *, .danfe-zoom-content * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+}
+
+/* =========================================================================
+   4. SELEÇÃO DE TEXTO NOS DOCUMENTOS FISCAIS
+   ========================================================================= */
+.danfe-selectable,
+.danfe-selectable * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.danfe-no-select,
+.danfe-no-select * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }

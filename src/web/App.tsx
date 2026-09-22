@@ -9,12 +9,16 @@ import { MainLayout } from './layouts/MainLayout';
 import { Home } from './features/home/Home';
 import { DepreciationApp } from './features/depreciation/DepreciationApp';
 import { ServerUnreachableOverlay, useServerUnreachable } from './components/ServerUnreachableOverlay';
+import { WhatsNewModal } from './components/WhatsNewModal';
+import { UpdatePromptModal } from './components/UpdatePromptModal';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
 
 type View = 'home' | 'nfview' | 'depreciation';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
   const serverUnreachable = useServerUnreachable();
+  const { updateInfo, dismissUpdate } = useAutoUpdate();
 
   return (
     <>
@@ -58,6 +62,8 @@ export default function App() {
         visible={serverUnreachable}
         onRetry={() => window.location.reload()}
       />
+      <WhatsNewModal />
+      <UpdatePromptModal updateInfo={updateInfo} onClose={dismissUpdate} />
     </>
   );
 }

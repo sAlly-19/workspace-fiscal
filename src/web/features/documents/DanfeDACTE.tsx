@@ -130,7 +130,7 @@ export function DanfeDACTE({ doc }: DanfeDACTEProps) {
   return (
     <div className="p-4 md:p-8 min-h-full flex justify-center bg-gray-100 print:bg-white print:p-0">
       <div 
-        className="bg-white text-black w-full max-w-[950px] min-w-[750px] border border-black shadow-lg print:shadow-none print:border print:max-w-none print:w-full print:min-w-0"
+        className="bg-white text-black w-full max-w-[950px] min-w-[750px] border border-black shadow-lg select-text danfe-selectable cursor-text print:shadow-none print:border print:max-w-none print:w-full print:min-w-0"
         style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px', lineHeight: 1.15 }}
       >
         {/* CABEÇALHO DACTE */}
@@ -168,7 +168,7 @@ export function DanfeDACTE({ doc }: DanfeDACTEProps) {
           {/* Código de Barras e Chave */}
           <div className="w-[38%] p-2 flex flex-col justify-between">
             {/* Barcode visual */}
-            <div className="h-9 w-full bg-black flex items-center justify-center p-0.5">
+            <div className="h-9 w-full bg-black flex items-center justify-center p-0.5 select-none danfe-no-select">
               <div className="w-full h-full bg-white flex items-center justify-center font-mono text-[7px] tracking-widest font-bold">
                 ||| | |||| || ||| ||||| ||| || |||| ||| |||| ||||
               </div>

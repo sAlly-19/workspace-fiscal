@@ -21,6 +21,7 @@ import { useWorkspaceStore } from '../stores/workspace.store';
 import { ConfirmModal } from './ConfirmModal';
 import { toast } from './Toast';
 import { apiFetch } from '../lib/api';
+import { WhatsNewModal } from './WhatsNewModal';
 
 interface BackupFile {
   filename: string;
@@ -73,6 +74,32 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
   // F3: Dedupe
   const [dedupePolicy, setDedupePolicy] = useState<DedupePolicy | null>(null);
   const [dedupeSaving, setDedupeSaving] = useState(false);
+
+  // Updates & What's new
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true);
+    try {
+      let res: any = null;
+      if (typeof window !== 'undefined' && window.api?.checkForUpdates) {
+        res = await window.api.checkForUpdates();
+      } else {
+        const r = await apiFetch('/api/updates/check');
+        if (r.ok) res = await r.json();
+      }
+      if (res?.hasUpdate) {
+        toast.info('Nova versão disponível', `Versão v${res.latestVersion} encontrada no GitHub!`);
+      } else {
+        toast.success('Você está atualizado', `O Workspace Fiscal já está na versão mais recente (v2.5.1).`);
+      }
+    } catch (e: any) {
+      toast.error('Erro na verificação', e.message);
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -645,9 +672,18 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
                   </div>
                 </div>
 
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Versão do Aplicativo:</span>
-                  <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>v2.5.0 (Workspace Fiscal Pro)</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>v2.5.1 (Workspace Fiscal Pro)</span>
+                    <button
+                      onClick={() => setShowWhatsNew(true)}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer transition-colors"
+                      title="Ver o que mudou na versão 2.5.1"
+                    >
+                      Ver Novidades
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span>Formatos Suportados:</span>
@@ -661,9 +697,35 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
                   <span>Desenvolvimento:</span>
                   <span className="font-bold text-blue-400">Café - Sistemas & Softwares</span>
                 </div>
+
+                {/* Ações de Atualização e Novidades */}
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                  <button
+                    onClick={handleCheckUpdates}
+                    disabled={checkingUpdates}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors ${
+                      isLight
+                        ? 'bg-white hover:bg-[#f1f5f9] border-[#cbd5e1] text-[#334155]'
+                        : 'bg-[#18181b] hover:bg-[#27272a] border-[#3f3f46] text-[#e4e4e7]'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdates ? 'animate-spin text-blue-500' : ''}`} />
+                    <span>{checkingUpdates ? 'Verificando...' : 'Verificar Atualizações'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowWhatsNew(true)}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Novidades da Versão</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+
+          <WhatsNewModal open={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
 
           {/* Footer */}
           <div

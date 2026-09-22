@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Building2, Package, TrendingDown, FileText, Download, Plus, Search, Edit2, Trash2, X, Check, AlertTriangle,
-  ChevronLeft, Calendar, ArrowRight, Eye, Layers, Settings2, BarChart3, Home, LogOut, Save, Tag, Sun, Moon, Archive, ArchiveRestore, Ban
+  ChevronLeft, Calendar, ArrowRight, Eye, Layers, Settings2, BarChart3, Home, LogOut, Save, Tag, Sun, Moon, Archive, ArchiveRestore, Ban, SlidersHorizontal
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/workspace.store';
 import { useDepreciationStore } from '../../stores/depreciation.store';
@@ -15,6 +15,7 @@ import { CompetencePicker } from '../../components/CompetencePicker';
 import { RetroactiveBatchModal } from './RetroactiveBatchModal';
 import { AssetXmlDropZone } from './AssetXmlDropZone';
 import { DepreciationSplashScreen } from './DepreciationSplashScreen';
+import { CsvLayoutModal, CsvExportOptions } from './CsvLayoutModal';
 
 type Tab = 'dashboard' | 'assets' | 'companies' | 'categories';
 
@@ -79,6 +80,8 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const [showRetroBatchModal, setShowRetroBatchModal] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [showCsvLayoutModal, setShowCsvLayoutModal] = useState(false);
+  const [pendingExportOptions, setPendingExportOptions] = useState<CsvExportOptions | null>(null);
 
   const selectedCompany = useMemo(() => companies.find(c=> c.id===selectedCompanyId) || null, [companies, selectedCompanyId]);
 
@@ -112,47 +115,74 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
       if (res.ok) setDashboard(await res.json());
     } catch {}
   }
-  async function handleGenerate(force=false) {
+
+  async function handleExportWithOptions(options: CsvExportOptions, force = false) {
     if (!selectedCompanyId) return;
     setIsGenerating(true);
     try {
       const res = await apiFetch('/api/depreciation/export', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ companyId: selectedCompanyId, competence, separator: ';', numericFormat: 'RAW', force })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: selectedCompanyId,
+          competence,
+          separator: options.separator,
+          numericFormat: options.numericFormat,
+          dateFormat: options.dateFormat,
+          columns: options.columns,
+          force,
+        }),
       });
-      if (res.status===409) {
+
+      if (res.status === 409) {
         const data = await res.json();
         setExportConflict(data);
+        setPendingExportOptions(options);
         setIsGenerating(false);
         return;
       }
+
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      // Download CSV
-      const csvRes = await apiFetch(`/api/depreciation/export/csv?companyId=${selectedCompanyId}&competence=${competence}`);
-      if (csvRes.ok) {
-        const blob = await csvRes.blob();
-        // Electron save dialog
-        if ((window as any).api?.saveFileDialog) {
-          const save = await (window as any).api.saveFileDialog({ defaultPath: data.filename, filters: [{ name:'CSV', extensions:['csv'] }] });
-          if (!save.canceled && save.filePath) {
-            const text = await blob.text();
-            await (window as any).api.writeFile(save.filePath, text);
-          }
-        } else {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url; a.download = data.filename; a.click();
-          URL.revokeObjectURL(url);
+
+      // Garante UTF-8 BOM (\uFEFF) para evitar que acentos fiquem corrompidos no Excel
+      const csvContent = data.csv.startsWith('\uFEFF') ? data.csv : '\uFEFF' + data.csv;
+
+      // Salva arquivo no Electron ou faz download no navegador
+      if ((window as any).api?.saveFileDialog) {
+        const save = await (window as any).api.saveFileDialog({
+          defaultPath: data.filename,
+          filters: [{ name: 'CSV', extensions: ['csv'] }],
+        });
+        if (!save.canceled && save.filePath) {
+          await (window as any).api.writeFile(save.filePath, csvContent);
+          toast.success('Arquivo exportado', `Salvo em ${save.filePath}`);
         }
+      } else {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = data.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Arquivo exportado', `Download de ${data.filename} concluído`);
       }
+
       setExportConflict(null);
+      setPendingExportOptions(null);
+      setShowCsvLayoutModal(false);
       fetchMonthly();
       fetchDashboard();
-    } catch (e:any) {
-      toast.error('Erro', e.message);
-    } finally { setIsGenerating(false); }
+    } catch (e: any) {
+      toast.error('Erro na exportação', e.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleGenerate(force = false) {
+    setShowCsvLayoutModal(true);
   }
 
   async function openAssetHistory(asset:any) {
@@ -315,13 +345,28 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                   <div className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
                     <div className={`px-4 py-3 border-b flex items-center justify-between ${isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#0d0d10] border-[#27272a]'}`}>
                       <span className={`text-xs font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Depreciação — {competenceLabel(competence)}</span>
-                      <button
-                        onClick={()=> handleGenerate(false)}
-                        disabled={isGenerating || !monthly || monthly.count===0}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" /> {isGenerating ? 'Gerando...' : 'Gerar CSV da competência'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowCsvLayoutModal(true)}
+                          disabled={!monthly || monthly.count === 0}
+                          title="Personalizar colunas e posições do CSV exportado"
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 ${
+                            isLight
+                              ? 'bg-white hover:bg-[#f1f5f9] border-[#cbd5e1] text-[#334155]'
+                              : 'bg-[#18181b] hover:bg-[#27272a] border-[#3f3f46] text-[#e4e4e7]'
+                          }`}
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Colunas do CSV</span>
+                        </button>
+                        <button
+                          onClick={() => setShowCsvLayoutModal(true)}
+                          disabled={isGenerating || !monthly || monthly.count === 0}
+                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                        >
+                          <Download className="w-3.5 h-3.5" /> {isGenerating ? 'Gerando...' : 'Exportar CSV'}
+                        </button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
@@ -568,7 +613,20 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
             </div>
             <div className={`p-3 border-t flex justify-end gap-2 ${isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
               <button onClick={()=> setExportConflict(null)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#27272a] border-[#3f3f46] text-white'}`}>Cancelar</button>
-              <button onClick={()=> { setExportConflict(null); handleGenerate(true); }} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer">Gerar novamente</button>
+              <button
+                onClick={() => {
+                  const opts = pendingExportOptions;
+                  setExportConflict(null);
+                  if (opts) {
+                    handleExportWithOptions(opts, true);
+                  } else {
+                    setShowCsvLayoutModal(true);
+                  }
+                }}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Gerar novamente
+              </button>
             </div>
           </div>
         </div>
@@ -622,14 +680,16 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                     const dlRes = await apiFetch(`/api/depreciation/retroactive/csv?companyId=${selectedCompanyId}&assetId=${retroactivePrompt.asset.id}`);
                     if (dlRes.ok) {
                       const blob = await dlRes.blob();
+                      const rawText = await blob.text();
+                      const csvText = rawText.startsWith('\uFEFF') ? rawText : '\uFEFF' + rawText;
                       if ((window as any).api?.saveFileDialog) {
                         const save = await (window as any).api.saveFileDialog({ defaultPath: data.filename, filters: [{ name:'CSV', extensions:['csv'] }] });
                         if (!save.canceled && save.filePath) {
-                          const text = await blob.text();
-                          await (window as any).api.writeFile(save.filePath, text);
+                          await (window as any).api.writeFile(save.filePath, csvText);
                         }
                       } else {
-                        const url = URL.createObjectURL(blob);
+                        const csvBlob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(csvBlob);
                         const a = document.createElement('a');
                         a.href = url; a.download = data.filename; a.click();
                         URL.revokeObjectURL(url);
@@ -778,6 +838,16 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
           }}
         />
       )}
+
+      <CsvLayoutModal
+        isOpen={showCsvLayoutModal}
+        onClose={() => setShowCsvLayoutModal(false)}
+        onExport={(opts) => handleExportWithOptions(opts, false)}
+        isGenerating={isGenerating}
+        competence={competence}
+        totalRows={monthly?.count || 0}
+        theme={currentTheme}
+      />
 
       <ToastHost />
       <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

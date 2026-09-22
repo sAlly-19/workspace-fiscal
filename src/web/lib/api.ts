@@ -44,6 +44,17 @@ declare global {
       windowControl: (action: WindowAction) => Promise<void>;
       getWindowState: () => Promise<WindowState>;
       onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
+      checkForUpdates: () => Promise<{
+        currentVersion: string;
+        latestVersion: string;
+        hasUpdate: boolean;
+        releaseName: string;
+        releaseNotes: string;
+        publishedAt: string;
+        releaseUrl: string;
+        downloadUrl: string | null;
+      }>;
+      onUpdateAvailable: (cb: (info: any) => void) => () => void;
     };
   }
 }
