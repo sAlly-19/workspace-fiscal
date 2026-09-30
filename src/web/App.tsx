@@ -18,7 +18,15 @@ type View = 'home' | 'nfview' | 'depreciation';
 export default function App() {
   const [view, setView] = useState<View>('home');
   const serverUnreachable = useServerUnreachable();
-  const { updateInfo, dismissUpdate } = useAutoUpdate();
+  const {
+    isOpen: isUpdateModalOpen,
+    updaterState,
+    dismissUpdate,
+    startDownload,
+    cancelDownload,
+    installAndRestart,
+    checkNow,
+  } = useAutoUpdate();
 
   return (
     <>
@@ -63,7 +71,15 @@ export default function App() {
         onRetry={() => window.location.reload()}
       />
       <WhatsNewModal />
-      <UpdatePromptModal updateInfo={updateInfo} onClose={dismissUpdate} />
+      <UpdatePromptModal
+        isOpen={isUpdateModalOpen}
+        updaterState={updaterState}
+        onClose={dismissUpdate}
+        onDownload={startDownload}
+        onCancel={cancelDownload}
+        onInstall={installAndRestart}
+        onCheckAgain={() => checkNow(true)}
+      />
     </>
   );
 }

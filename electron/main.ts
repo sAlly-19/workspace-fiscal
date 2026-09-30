@@ -8,6 +8,7 @@ import { initDatabase } from '../src/db';
 import { createApp } from '../src/api/app';
 import { backupService } from '../src/api/services/backup.service';
 import { updateService } from '../src/api/services/update.service';
+import { appUpdater } from './updater';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1';
 
@@ -406,6 +407,9 @@ app.whenReady().then(async () => {
   const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
   registerIpcHandlers(apiBaseUrl);
   await createWindow(apiBaseUrl);
+  if (mainWindow) {
+    appUpdater.init(mainWindow);
+  }
 
   // Inicia agendador de backup e tenta um check imediato
   backupService.startScheduler(6);
@@ -415,6 +419,7 @@ app.whenReady().then(async () => {
 
   // Verificação diária de atualizações via GitHub Releases (a cada 24h)
   const checkDailyUpdate = () => {
+    appUpdater.checkForUpdates().catch(() => {});
     updateService.checkLatestRelease().then((result) => {
       if (result.hasUpdate && mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('app:updateAvailable', result);
@@ -424,9 +429,12 @@ app.whenReady().then(async () => {
   setTimeout(checkDailyUpdate, 15000);
   setInterval(checkDailyUpdate, 24 * 60 * 60 * 1000);
 
-  app.on('activate', () => {
+  app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(apiBaseUrl);
+      await createWindow(apiBaseUrl);
+      if (mainWindow) {
+        appUpdater.setWindow(mainWindow);
+      }
     }
   });
 });

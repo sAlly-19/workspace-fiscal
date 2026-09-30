@@ -67,6 +67,25 @@ const api = {
     ipcRenderer.on('app:updateAvailable', listener);
     return () => ipcRenderer.removeListener('app:updateAvailable', listener);
   },
+
+  // Novo mecanismo de Auto-Update integrado (electron-updater)
+  updater: {
+    check: (): Promise<any> => ipcRenderer.invoke('updater:check'),
+    download: (): Promise<void> => ipcRenderer.invoke('updater:download'),
+    cancel: (): Promise<void> => ipcRenderer.invoke('updater:cancel'),
+    install: (): Promise<void> => ipcRenderer.invoke('updater:install'),
+    getState: (): Promise<any> => ipcRenderer.invoke('updater:getState'),
+    onStatusChange: (cb: (state: any) => void) => {
+      const listener = (_e: unknown, state: any) => cb(state);
+      ipcRenderer.on('updater:statusChange', listener);
+      return () => ipcRenderer.removeListener('updater:statusChange', listener);
+    },
+    onProgress: (cb: (progress: any) => void) => {
+      const listener = (_e: unknown, progress: any) => cb(progress);
+      ipcRenderer.on('updater:progress', listener);
+      return () => ipcRenderer.removeListener('updater:progress', listener);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

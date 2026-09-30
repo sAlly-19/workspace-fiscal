@@ -2,20 +2,29 @@ import { assets, companies, depreciationEntries, depreciationExports } from '../
 import { db } from '../../db';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
-import { generateSchedule, DepreciationRule, getLastClosedCompetence, getCompetencesBetween, competenceFromDate } from '../../core/depreciation/calculate';
-
-function getDisposedCompetence(asset: any): string | null {
-  if (!asset || asset.status !== 'DISPOSED' || !asset.disposedAt) return null;
-  const d = new Date(asset.disposedAt);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-}
-function isDisposedBefore(asset: any, competence: string): boolean {
-  const comp = getDisposedCompetence(asset);
-  if (!comp) return false;
-  return competence > comp;
-}
+import {
+  generateSchedule,
+  DepreciationRule,
+  getLastClosedCompetence,
+  getCompetencesBetween,
+} from '../../core/depreciation/calculate';
 import { assetsRepository } from '../repositories/assets.repository';
 import { companiesRepository } from '../repositories/companies.repository';
+
+// Re-exporta utilitários e tipos modularizados para manter 100% de compatibilidade com os consumidores
+export * from './depreciation/index';
+import {
+  ColumnMappingItem,
+  DEFAULT_COLUMN_MAPPINGS,
+  DepreciationCsvRow,
+  colLetterToIndex,
+  formatDepreciationRowsToCsv,
+  getDisposedCompetence,
+  isDisposedBefore,
+  executeRetroactiveBatch,
+  RetroactiveBatchParams,
+  RetroactiveBatchResult,
+} from './depreciation/index';
 
 export interface DepreciationRow {
   assetId: string;
@@ -34,128 +43,6 @@ export interface DepreciationRow {
   isLastResidual?: boolean;
   exported: boolean;
   status: 'exported' | 'current' | 'not_issued' | 'future';
-}
-
-export interface ColumnMappingItem {
-  id: string;
-  column: string;
-  label?: string;
-}
-
-export const DEFAULT_COLUMN_MAPPINGS: ColumnMappingItem[] = [
-  { id: 'date', column: 'A', label: 'Data' },
-  { id: 'description', column: 'B', label: 'Descrição' },
-  { id: 'category', column: 'D', label: 'Categoria' },
-  { id: 'documentNumber', column: 'F', label: 'Nº Doc' },
-  { id: 'depreciationValue', column: 'G', label: 'Valor' },
-];
-
-export interface DepreciationCsvRow {
-  competence: string;
-  documentNumber: string;
-  description?: string;
-  assetDescription?: string;
-  categoryName?: string | null;
-  supplier?: string;
-  acquisitionDate?: string | Date;
-  acquisitionValue: number;
-  annualRate: number;
-  depreciationValue: number;
-  accumulatedValue: number;
-  currentValue: number;
-  status?: string;
-}
-
-export function formatDepreciationRowsToCsv(
-  rows: DepreciationCsvRow[],
-  options?: {
-    separator?: string;
-    numericFormat?: 'BRL' | 'RAW';
-    dateFormat?: 'DD/MM/YYYY' | 'YYYY-MM-DD';
-    columns?: ColumnMappingItem[];
-  }
-): string {
-  const sep = options?.separator || ';';
-
-  // Escape separador e aspas duplas
-  const esc = (v: string) => {
-    if (v.includes(sep) || v.includes('"') || v.includes('\n') || v.includes('\r')) {
-      return `"${v.replace(/"/g, '""')}"`;
-    }
-    return v;
-  };
-
-  // Mapeamento de colunas solicitado pelo usuário (padrão: A: Data, B: Descrição, D: Categoria, F: Nº Doc, G: Valor)
-  const userCols = options?.columns && options.columns.length > 0
-    ? options.columns.filter(c => c.column && c.column !== 'NONE')
-    : DEFAULT_COLUMN_MAPPINGS;
-
-  const validCols = userCols
-    .map(c => ({ ...c, index: colLetterToIndex(c.column) }))
-    .filter(c => c.index >= 0);
-
-  const maxColIndex = validCols.length > 0 ? Math.max(...validCols.map(c => c.index)) : 0;
-
-  // Cabeçalho montado conforme as posições das colunas
-  const headerRow: string[] = new Array(maxColIndex + 1).fill('');
-  validCols.forEach(c => {
-    const defaultLabel = DEFAULT_COLUMN_MAPPINGS.find(d => d.id === c.id)?.label || c.id;
-    headerRow[c.index] = c.label || defaultLabel;
-  });
-  const header = headerRow.map(esc).join(sep);
-
-  const formatNum = (cents: number) => {
-    const raw = (cents / 100).toFixed(2).replace('.', ',');
-    return options?.numericFormat === 'BRL' ? `R$ ${raw}` : raw;
-  };
-
-  const lines = rows.map((r) => {
-    // Data = último dia da competência
-    const [y, m] = r.competence.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    const dateStr = options?.dateFormat === 'YYYY-MM-DD'
-      ? `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-      : `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-
-    const docNumFormatted = r.documentNumber.startsWith('NF ') ? r.documentNumber : `NF ${r.documentNumber}`;
-
-    const fieldValues: Record<string, string> = {
-      date: dateStr,
-      description: `Depreciação ${docNumFormatted}, ${String(m).padStart(2, '0')}/${y}`,
-      assetDescription: r.assetDescription || r.description || '',
-      category: r.categoryName || 'Outros',
-      documentNumber: docNumFormatted,
-      supplier: r.supplier || '',
-      acquisitionDate: r.acquisitionDate ? new Date(r.acquisitionDate).toLocaleDateString('pt-BR') : '',
-      acquisitionValue: formatNum(r.acquisitionValue),
-      annualRate: `${r.annualRate}%`,
-      depreciationValue: formatNum(r.depreciationValue),
-      accumulatedValue: formatNum(r.accumulatedValue),
-      currentValue: formatNum(r.currentValue),
-      competence: r.competence,
-      status: r.status === 'current' ? 'ATUAL' : r.status === 'exported' ? 'EXPORTADO' : (r.status || ''),
-    };
-
-    const rowCols: string[] = new Array(maxColIndex + 1).fill('');
-    validCols.forEach(c => {
-      rowCols[c.index] = esc(fieldValues[c.id] ?? '');
-    });
-
-    return rowCols.join(sep);
-  });
-
-  // UTF-8 BOM (\uFEFF) explícito e CRLF (\r\n) para evitar corrupção de acentuação no Excel do Windows
-  return '\uFEFF' + [header, ...lines].join('\r\n');
-}
-
-export function colLetterToIndex(col: string): number {
-  if (!col || col === 'NONE') return -1;
-  const upper = col.trim().toUpperCase();
-  let index = 0;
-  for (let i = 0; i < upper.length; i++) {
-    index = index * 26 + (upper.charCodeAt(i) - 64);
-  }
-  return index - 1;
 }
 
 export class DepreciationService {
@@ -214,7 +101,7 @@ export class DepreciationService {
 
       // Trunca se baixado antes do fim da vida (não deve depreciar após baixa)
       const disposedComp = getDisposedCompetence(asset);
-      if (disposedComp && schedule.length && schedule[schedule.length-1].competence > disposedComp) {
+      if (disposedComp && schedule.length && schedule[schedule.length - 1].competence > disposedComp) {
         // Remove meses após baixa (não afeta month already filtered, mas garante consistência)
       }
 
@@ -636,151 +523,8 @@ export class DepreciationService {
    * respeitando a regra da empresa, a data de aquisição de cada bem e a competência da baixa (se houver).
    * Substitui entries não-exportadas existentes; preserva exportadas.
    */
-  async generateRetroactiveBatch(params: {
-    companyId: string;
-    assetIds: string[];
-    startCompetence: string;
-    endCompetence: string;
-    options?: Parameters<typeof formatDepreciationRowsToCsv>[1];
-  }): Promise<{
-    processed: number;
-    skipped: number;
-    entriesCreated: number;
-    entriesPreserved: number;
-    details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }>;
-    csv: string;
-    filename: string;
-    count: number;
-    total: number;
-  }> {
-    const { companyId, assetIds, startCompetence, endCompetence, options } = params;
-    if (!companyId || !Array.isArray(assetIds) || assetIds.length === 0) {
-      throw new Error('companyId e assetIds são obrigatórios');
-    }
-    if (!/^\d{4}-\d{2}$/.test(startCompetence) || !/^\d{4}-\d{2}$/.test(endCompetence)) {
-      throw new Error('Competências inválidas (use YYYY-MM)');
-    }
-    if (startCompetence > endCompetence) {
-      throw new Error('Competência inicial deve ser anterior à final');
-    }
-
-    const company = await companiesRepository.findById(companyId);
-    if (!company) throw new Error('Empresa não encontrada');
-    const rule = (company.depreciationRule as DepreciationRule) || 'PROPORTIONAL';
-
-    const lastClosed = this.getLastClosedCompetence();
-    const effectiveEnd = endCompetence > lastClosed ? lastClosed : endCompetence;
-
-    let processed = 0;
-    let skipped = 0;
-    let totalCreated = 0;
-    let totalPreserved = 0;
-    const details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }> = [];
-    const rowsForCsv: DepreciationCsvRow[] = [];
-
-    for (const assetId of assetIds) {
-      const asset = await assetsRepository.findById(assetId);
-      if (!asset || asset.companyId !== companyId) {
-        skipped += 1;
-        continue;
-      }
-
-      const schedule = generateSchedule({
-        acquisitionValue: asset.acquisitionValue,
-        annualRate: asset.annualRate,
-        acquisitionDate: asset.acquisitionDate,
-        depreciationRule: rule,
-      });
-      const disposedComp = getDisposedCompetence(asset);
-
-      // Determina start efetivo baseado na aquisição
-      const acqComp = competenceFromDate(asset.acquisitionDate);
-      const effectiveStart = acqComp > startCompetence ? acqComp : startCompetence;
-      const finalEnd = disposedComp && disposedComp < effectiveEnd ? disposedComp : effectiveEnd;
-      if (effectiveStart > finalEnd) {
-        skipped += 1;
-        continue;
-      }
-
-      const competences = getCompetencesBetween(effectiveStart, finalEnd);
-      const scheduleByComp = new Map(schedule.map((m) => [m.competence, m]));
-
-      const existing = await db.query.depreciationEntries.findMany({
-        where: eq(depreciationEntries.assetId, assetId),
-      });
-      const exportedSet = new Set(existing.filter((e) => e.exported).map((e) => e.competence));
-      const existingByComp = new Map(existing.map((e) => [e.competence, e]));
-
-      let created = 0;
-      for (const comp of competences) {
-        const m = scheduleByComp.get(comp);
-        if (!m) continue;
-        const prior = existingByComp.get(comp);
-        const values = {
-          depreciationValue: m.depreciationValue,
-          accumulatedValue: m.accumulatedValue,
-          currentValue: m.currentValue,
-          exported: true,
-          exportedAt: new Date(),
-        };
-        if (prior) {
-          await db.update(depreciationEntries).set(values).where(eq(depreciationEntries.id, prior.id));
-        } else {
-          await db.insert(depreciationEntries).values({
-            id: crypto.randomUUID(),
-            assetId,
-            competence: comp,
-            ...values,
-          });
-        }
-        created += 1;
-
-        rowsForCsv.push({
-          competence: comp,
-          documentNumber: asset.documentNumber,
-          description: asset.description,
-          assetDescription: asset.description,
-          categoryName: asset.categoryName || undefined,
-          supplier: asset.supplier,
-          acquisitionDate: asset.acquisitionDate,
-          acquisitionValue: asset.acquisitionValue,
-          annualRate: asset.annualRate,
-          depreciationValue: m.depreciationValue,
-          accumulatedValue: m.accumulatedValue,
-          currentValue: m.currentValue,
-          status: 'EXPORTADO',
-        });
-      }
-
-      details.push({ assetId, entriesCreated: created, entriesPreserved: 0 });
-      processed += 1;
-      totalCreated += created;
-    }
-
-    // Ordenação consistente: por competência crescente e por documento
-    rowsForCsv.sort((a, b) => {
-      const cmpComp = a.competence.localeCompare(b.competence);
-      if (cmpComp !== 0) return cmpComp;
-      return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true });
-    });
-
-    const csv = formatDepreciationRowsToCsv(rowsForCsv, options);
-    const total = rowsForCsv.reduce((acc, r) => acc + r.depreciationValue, 0);
-    const filename = assetIds.length === 1 && rowsForCsv.length > 0
-      ? `retroativa_NF${rowsForCsv[0].documentNumber}_${startCompetence.replace('-', '')}_a_${effectiveEnd.replace('-', '')}.csv`
-      : `retroativa_lote_${startCompetence.replace('-', '')}_a_${effectiveEnd.replace('-', '')}.csv`;
-
-    return {
-      processed,
-      skipped,
-      entriesCreated: totalCreated,
-      entriesPreserved: totalPreserved,
-      details,
-      csv,
-      filename,
-      count: rowsForCsv.length,
-      total,
-    };
+  async generateRetroactiveBatch(params: RetroactiveBatchParams): Promise<RetroactiveBatchResult> {
+    return executeRetroactiveBatch(params);
   }
 
   async getDashboard(companyId: string) {
@@ -824,3 +568,4 @@ export class DepreciationService {
 }
 
 export const depreciationService = new DepreciationService();
+

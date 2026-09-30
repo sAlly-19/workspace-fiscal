@@ -9,12 +9,13 @@ import {
   RefreshCw,
   Check,
   Filter,
-  Tag
+  Tag,
+  Layers,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '2.5.2';
+export const CURRENT_APP_VERSION = '2.5.3';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
 interface WhatsNewModalProps {
@@ -27,7 +28,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState<'2.5.2' | '2.5.1'>('2.5.2');
+  const [activeVersion, setActiveVersion] = useState<'2.5.3' | '2.5.2' | '2.5.1'>('2.5.3');
 
   useEffect(() => {
     if (open !== undefined) {
@@ -149,6 +150,19 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                 Versão:
               </span>
               <button
+                onClick={() => setActiveVersion('2.5.3')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeVersion === '2.5.3'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : isLight
+                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                }`}
+              >
+                <span>v2.5.3 (Atual)</span>
+                {activeVersion === '2.5.3' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+              </button>
+              <button
                 onClick={() => setActiveVersion('2.5.2')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeVersion === '2.5.2'
@@ -158,8 +172,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                       : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
                 }`}
               >
-                <span>v2.5.2 (Atual)</span>
-                {activeVersion === '2.5.2' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                <span>v2.5.2</span>
               </button>
               <button
                 onClick={() => setActiveVersion('2.5.1')}
@@ -171,17 +184,105 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                       : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
                 }`}
               >
-                <span>v2.5.1 (Anterior)</span>
+                <span>v2.5.1</span>
               </button>
             </div>
             <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
-              {activeVersion === '2.5.2' ? 'Lançamento mais recente' : 'Versão anterior'}
+              {activeVersion === '2.5.3' ? 'Lançamento mais recente' : 'Versão anterior'}
             </span>
           </div>
 
           {/* Cards Body */}
           <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-            {activeVersion === '2.5.2' ? (
+            {activeVersion === '2.5.3' ? (
+              <>
+                {/* 1. Auto-atualização Integrada */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <RefreshCw className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Atualização Integrada no Próprio Aplicativo</span>
+                        <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Novo Recurso</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        O processo de atualização agora acontece de ponta a ponta dentro do próprio Workspace Fiscal, sem necessidade de abrir navegadores externos:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Download Interno:</b> O pacote é baixado e verificado automaticamente na pasta protegida do sistema.</li>
+                        <li><b>Barra de Progresso Real:</b> Acompanhe em tempo real a velocidade de download (MB/s), bytes transferidos e porcentagem calculada diretamente do evento do updater.</li>
+                        <li><b>Instalação com um Clique:</b> Ao concluir, basta clicar em "Instalar e reiniciar" para aplicar a atualização e reabrir o app na nova versão.</li>
+                        <li><b>Cancelamento e Flexibilidade:</b> Cancele o download a qualquer momento ou clique em "Depois" para manter o arquivo baixado e reiniciar mais tarde.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Exportação Direta de CSV */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Exportação Direta de CSV no Painel de Depreciação</span>
+                        <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Aprimoramento</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Ações dos botões da tabela de competência separadas com precisão:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Exportar CSV:</b> Executa a exportação imediatamente com base na sua última configuração salva, sem abrir modais intermediárias.</li>
+                        <li><b>Colunas do CSV:</b> Permite personalizar a ordem, visibilidade e nomes das colunas da planilha quando você desejar alterar o layout.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Arquitetura e Modularização */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Modularização e Estabilidade da Depreciação</span>
+                        <span className="text-[10px] font-semibold text-purple-500 uppercase tracking-wider">Desempenho</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Refatoração estrutural completa do módulo de depreciação contábil:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Módulos Especializados:</b> Separação em submódulos dedicados para cálculos, exportação CSV, gerenciamento de regras e componentes de visualização.</li>
+                        <li><b>Preservação Absoluta:</b> 100% das fórmulas, taxas fiscais e integridade de dados preservadas com todos os testes automatizados validados.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : activeVersion === '2.5.2' ? (
               <>
                 {/* 1. Filtros e Ordenação na Lista de Bens */}
                 <div

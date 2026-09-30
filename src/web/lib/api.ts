@@ -55,6 +55,15 @@ declare global {
         downloadUrl: string | null;
       }>;
       onUpdateAvailable: (cb: (info: any) => void) => () => void;
+      updater: {
+        check: () => Promise<any>;
+        download: () => Promise<void>;
+        cancel: () => Promise<void>;
+        install: () => Promise<void>;
+        getState: () => Promise<any>;
+        onStatusChange: (cb: (state: any) => void) => () => void;
+        onProgress: (cb: (progress: any) => void) => () => void;
+      };
     };
   }
 }
