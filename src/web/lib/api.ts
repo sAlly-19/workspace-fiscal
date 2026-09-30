@@ -35,6 +35,7 @@ declare global {
         canceled: boolean;
         results: Array<{ filePath: string; fileName: string; content: string; size: number }>;
       }>;
+      openBackupDialog: () => Promise<{ canceled: boolean; filePath: string | null }>;
       saveFileDialog: (options?: {
         defaultPath?: string;
         filters?: { name: string; extensions: string[] }[];

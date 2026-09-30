@@ -192,6 +192,25 @@ function registerIpcHandlers(apiBaseUrl: string) {
     return { canceled: false, results };
   });
 
+  ipcMain.handle('dialog:openBackup', async () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { canceled: true, filePath: null };
+    }
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Selecionar Arquivo de Backup',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Backup Workspace Fiscal (*.wfb, *.db)', extensions: ['wfb', 'db'] },
+        { name: 'Todos os arquivos (*.*)', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true, filePath: null };
+    }
+    trackReadFile(result.filePaths[0]);
+    return { canceled: false, filePath: result.filePaths[0] };
+  });
+
   ipcMain.handle(
     'dialog:saveFile',
     async (_e, options: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {

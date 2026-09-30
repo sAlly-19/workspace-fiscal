@@ -44,6 +44,8 @@ const api = {
     ipcRenderer.invoke('dialog:openDirectory', options || {}),
   openImportDialog: (): Promise<ImportResult> =>
     ipcRenderer.invoke('dialog:openImport'),
+  openBackupDialog: (): Promise<{ canceled: boolean; filePath: string | null }> =>
+    ipcRenderer.invoke('dialog:openBackup'),
   saveFileDialog: (options: {
     defaultPath?: string;
     filters?: { name: string; extensions: string[] }[];

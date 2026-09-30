@@ -1,45 +1,24 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Settings,
   X,
-  Database,
-  Info,
-  Download,
-  Check,
-  Moon,
-  Sun,
   Sparkles,
   LayoutTemplate,
-  Trash2,
-  AlertTriangle,
-  Keyboard,
+  TrendingDown,
   HardDrive,
-  Copy,
-  RefreshCw
+  Check,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { ConfirmModal } from './ConfirmModal';
 import { toast } from './Toast';
 import { apiFetch } from '../lib/api';
 import { WhatsNewModal, CURRENT_APP_VERSION } from './WhatsNewModal';
+import { GeneralSettingsTab } from './settings/GeneralSettingsTab';
+import { NfViewSettingsTab, DedupePolicy } from './settings/NfViewSettingsTab';
+import { DepreciationSettingsTab } from './settings/DepreciationSettingsTab';
+import { BackupSettingsTab } from './settings/BackupSettingsTab';
 
-interface BackupFile {
-  filename: string;
-  sizeBytes: number;
-  createdAt: string;
-}
-
-interface BackupConfig {
-  enabled: boolean;
-  intervalDays: number;
-  retentionCount: number;
-  destination: string;
-}
-
-interface DedupePolicy {
-  policy: 'IGNORE' | 'OVERWRITE' | 'CREATE_VERSION';
-  updatedAt: string | null;
-}
+export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'backup';
 
 export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () => void } = {}) {
   const {
@@ -49,10 +28,9 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
     updateSettings,
     documents,
     folders,
-    resetWorkspaceDatabase
+    resetWorkspaceDatabase,
   } = useWorkspaceStore();
 
-  // Suporta tanto o store global quanto props explícitas (DepreciationApp)
   const isOpen = open ?? storeIsSettingsOpen;
   const close = () => {
     if (onClose) onClose();
@@ -62,20 +40,17 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
   const currentTheme = settings.theme || 'dark';
   const isLight = currentTheme === 'light';
 
+  const [activeTab, setActiveTab] = useState<SettingsTabType>('general');
+
+  // Reset database state
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
-  // F17: Backup
-  const [backupConfig, setBackupConfig] = useState<BackupConfig | null>(null);
-  const [backupList, setBackupList] = useState<BackupFile[]>([]);
-  const [backupLoading, setBackupLoading] = useState(false);
-  const [backupRunning, setBackupRunning] = useState(false);
-
-  // F3: Dedupe
+  // Dedupe policy state
   const [dedupePolicy, setDedupePolicy] = useState<DedupePolicy | null>(null);
   const [dedupeSaving, setDedupeSaving] = useState(false);
 
-  // Updates & What's new
+  // Updates & What's new modal state
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
 
@@ -105,18 +80,6 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
     if (!isOpen) return;
     (async () => {
       try {
-        setBackupLoading(true);
-        const cfg = await apiFetch('/api/backup/settings').then((r) => (r.ok ? r.json() : null));
-        if (cfg) setBackupConfig(cfg);
-        const list = await apiFetch('/api/backup/list').then((r) => (r.ok ? r.json() : []));
-        if (Array.isArray(list)) setBackupList(list);
-      } catch (e) {
-        console.warn('Falha ao carregar config de backup:', e);
-      } finally {
-        setBackupLoading(false);
-      }
-
-      try {
         const dp = await apiFetch('/api/settings/dedupe-policy').then((r) => (r.ok ? r.json() : null));
         if (dp) setDedupePolicy(dp);
       } catch (e) {
@@ -126,44 +89,6 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const saveBackupConfig = async (partial: Partial<BackupConfig>) => {
-    try {
-      const res = await apiFetch('/api/backup/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(partial),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setBackupConfig(updated);
-        toast.success('Backup atualizado', 'Configurações salvas com sucesso.');
-      } else {
-        toast.error('Erro ao salvar backup', 'Tente novamente.');
-      }
-    } catch (e) {
-      toast.error('Erro ao salvar backup', (e as Error).message);
-    }
-  };
-
-  const runBackupNow = async () => {
-    try {
-      setBackupRunning(true);
-      const res = await apiFetch('/api/backup/run', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        toast.success('Backup criado', `${data.filename} (${(data.sizeBytes / 1024).toFixed(0)} KB)`);
-        const list = await apiFetch('/api/backup/list').then((r) => (r.ok ? r.json() : []));
-        if (Array.isArray(list)) setBackupList(list);
-      } else {
-        toast.error('Falha no backup', 'Verifique permissões da pasta de destino.');
-      }
-    } catch (e) {
-      toast.error('Erro no backup', (e as Error).message);
-    } finally {
-      setBackupRunning(false);
-    }
-  };
 
   const saveDedupePolicy = async (policy: DedupePolicy['policy']) => {
     try {
@@ -176,12 +101,12 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
       if (res.ok) {
         const updated = await res.json();
         setDedupePolicy(updated);
-        toast.success('Política de dedupe atualizada', `Agora usando ${policy}.`);
+        toast.success('Política atualizada', `Política de deduplicação configurada para ${policy}.`);
       } else {
         toast.error('Política inválida', 'Use IGNORE, OVERWRITE ou CREATE_VERSION.');
       }
-    } catch (e) {
-      toast.error('Erro ao salvar', (e as Error).message);
+    } catch (e: any) {
+      toast.error('Erro ao salvar', e.message);
     } finally {
       setDedupeSaving(false);
     }
@@ -190,7 +115,7 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
   const exportCsv = () => {
     if (documents.length === 0) return;
     const headers = ['ID', 'Tipo', 'Numero', 'Serie', 'Data Emissao', 'Emitente', 'Destinatario', 'Valor Total'];
-    const rows = documents.map(d => [
+    const rows = documents.map((d) => [
       d.id,
       d.type || 'NF-e',
       d.number || '',
@@ -198,9 +123,9 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
       d.issueDate ? new Date(d.issueDate).toLocaleDateString('pt-BR') : '',
       `"${(d.issuerName || '').replace(/"/g, '""')}"`,
       `"${(d.recipientName || '').replace(/"/g, '""')}"`,
-      d.totalAmount ? d.totalAmount.toFixed(2) : '0.00'
+      d.totalAmount ? d.totalAmount.toFixed(2) : '0.00',
     ]);
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -215,19 +140,28 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
     try {
       setIsResetting(true);
       await resetWorkspaceDatabase();
-      close();
+      setIsResetConfirmOpen(false);
+      toast.success('Notas fiscais limpas', 'O banco de documentos do NF View foi restaurado com sucesso.');
     } catch (error) {
       console.error('Erro ao resetar banco de dados:', error);
+      toast.error('Falha ao limpar notas', 'Ocorreu um erro.');
     } finally {
       setIsResetting(false);
     }
   };
 
+  const tabItems: Array<{ id: SettingsTabType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+    { id: 'general', label: 'Geral', icon: Sparkles },
+    { id: 'nfview', label: 'NF View', icon: LayoutTemplate },
+    { id: 'depreciation', label: 'Depreciação', icon: TrendingDown },
+    { id: 'backup', label: 'Backup & Restauração', icon: HardDrive },
+  ];
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs">
         <div
-          className={`w-full max-w-xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 ${
+          className={`w-full max-w-3xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 ${
             isLight
               ? 'bg-white border border-[#cbd5e1] text-[#0f172a] shadow-2xl'
               : 'bg-[#18181b] border border-[#3f3f46] text-white shadow-2xl'
@@ -236,7 +170,7 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
         >
           {/* Header */}
           <div
-            className={`px-5 py-4 border-b flex items-center justify-between shrink-0 ${
+            className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${
               isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'
             }`}
           >
@@ -245,8 +179,12 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
                 <Settings className="w-4 h-4" />
               </div>
               <div>
-                <h3 className={`text-sm font-bold tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Configurações do Sistema</h3>
-                <p className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>Temas, preferências de DANFE e banco de dados</p>
+                <h3 className={`text-sm font-bold tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                  Configurações do Sistema
+                </h3>
+                <p className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
+                  Gerencie preferências gerais, regras fiscais, depreciação e cópias de segurança
+                </p>
               </div>
             </div>
             <button
@@ -261,478 +199,89 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
             </button>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
-
-            {/* Section 1: Tema da Interface */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>Tema da Interface</span>
+          {/* Body: Sidebar + Tab Content */}
+          <div className="flex flex-1 overflow-hidden min-h-[480px]">
+            {/* Sidebar Navigation */}
+            <div
+              className={`w-52 border-r p-3 space-y-1 shrink-0 ${
+                isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
+              }`}
+            >
+              <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>
+                Módulos
               </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => updateSettings({ theme: 'light' })}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
-                    isLight
-                      ? 'border-blue-500 bg-blue-50 text-blue-950 shadow-md ring-2 ring-blue-500/20'
-                      : 'border-[#27272a] bg-[#111114] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white'
-                  }`}
-                >
-                  <div className="p-2 rounded-lg bg-amber-500/20 text-amber-500">
-                    <Sun className="w-5 h-5" />
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-xs">Light</div>
-                    <div className="text-[10px] opacity-70">Claro e Limpo</div>
-                  </div>
-                  {isLight && (
-                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Ativo
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => updateSettings({ theme: 'dark' })}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
-                    currentTheme === 'dark'
-                      ? 'border-blue-500 bg-blue-500/15 text-white shadow-md ring-2 ring-blue-500/20'
-                      : isLight
-                        ? 'border-[#cbd5e1] bg-white text-[#64748b] hover:border-[#94a3b8] hover:text-[#0f172a]'
-                        : 'border-[#27272a] bg-[#111114] text-[#a1a1aa] hover:border-[#3f3f46] hover:text-white'
-                  }`}
-                >
-                  <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
-                    <Moon className="w-5 h-5" />
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-xs">Dark</div>
-                    <div className="text-[10px] opacity-70">Escuro Padrão</div>
-                  </div>
-                  {currentTheme === 'dark' && (
-                    <span className="text-[10px] text-blue-400 font-bold flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Ativo
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Section 2: Preferências do DANFE */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <LayoutTemplate className="w-4 h-4 text-blue-400" />
-                <span>Layout e Emissão do DANFE</span>
-              </div>
-
-              <div
-                className={`space-y-3 rounded-xl p-4 border ${
-                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
-                }`}
-              >
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <div className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Exibir Canhoto de Recebimento</div>
-                    <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                      Inclui a seção de canhoto e assinatura no topo da página
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.showReceiptStub}
-                    onChange={(e) => updateSettings({ showReceiptStub: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                </label>
-
-                <div
-                  className={`pt-2.5 border-t flex items-center justify-between ${
-                    isLight ? 'border-[#e2e8f0]' : 'border-[#27272a]'
-                  }`}
-                >
-                  <div>
-                    <div className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Formato Padrão de Folha</div>
-                    <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Dimensão recomendada para emissão</div>
-                  </div>
-                  <select
-                    value={settings.defaultFormat}
-                    onChange={(e) => updateSettings({ defaultFormat: e.target.value as 'A4' | 'A5' })}
-                    className={`text-xs rounded-md px-2.5 py-1 focus:outline-none focus:border-blue-500 border cursor-pointer ${
-                      isLight
-                        ? 'bg-white border-[#cbd5e1] text-[#0f172a]'
-                        : 'bg-[#18181b] border-[#3f3f46] text-white'
-                    }`}
-                  >
-                    <option value="A4" className="bg-[#18181b] text-white">A4 Retrato (210 x 297 mm)</option>
-                    <option value="A5" className="bg-[#18181b] text-white">A5 Paisagem</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3: Dados e Exportação */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <Database className="w-4 h-4 text-green-400" />
-                <span>Armazenamento & Exportação</span>
-              </div>
-
-              <div
-                className={`rounded-xl p-4 space-y-3 border ${
-                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className={isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}>Estatísticas do Workspace:</span>
-                    <div className={`font-medium mt-0.5 ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                      <strong className="text-blue-400">{documents.length}</strong> documentos carregados em <strong className="text-blue-400">{folders.length}</strong> pastas
-                    </div>
-                  </div>
+              {tabItems.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
                   <button
-                    onClick={exportCsv}
-                    disabled={documents.length === 0}
-                    className={`px-3 py-1.5 border rounded-md font-medium text-xs flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer ${
-                      isLight
-                        ? 'bg-white hover:bg-[#e2e8f0] text-[#0f172a] border-[#cbd5e1]'
-                        : 'bg-[#18181b] hover:bg-[#27272a] text-white border-[#3f3f46]'
-                    }`}
-                  >
-                    <Download className="w-3.5 h-3.5 text-green-400" />
-                    Exportar CSV
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3.5: F3 - Política de Deduplicação */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <Copy className="w-4 h-4 text-amber-400" />
-                <span>Política de Deduplicação de Importação</span>
-              </div>
-
-              <div
-                className={`rounded-xl p-4 space-y-3 border ${
-                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
-                }`}
-              >
-                <p className={`text-[11px] leading-relaxed ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                  Define o comportamento ao tentar importar um XML cuja chave de acesso já existe no banco.
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['IGNORE', 'OVERWRITE', 'CREATE_VERSION'] as const).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => saveDedupePolicy(p)}
-                      disabled={dedupeSaving || dedupePolicy?.policy === p}
-                      className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer disabled:cursor-not-allowed ${
-                        dedupePolicy?.policy === p
-                          ? 'border-blue-500 bg-blue-500/15 text-blue-400 shadow-sm ring-1 ring-blue-500/30'
-                          : isLight
-                            ? 'border-[#cbd5e1] bg-white text-[#475569] hover:border-blue-400 hover:text-blue-700'
-                            : 'border-[#27272a] bg-[#18181b] text-[#a1a1aa] hover:border-blue-500/60 hover:text-white'
-                      }`}
-                    >
-                      {p === 'IGNORE' && 'Ignorar'}
-                      {p === 'OVERWRITE' && 'Sobrescrever'}
-                      {p === 'CREATE_VERSION' && 'Versionar'}
-                    </button>
-                  ))}
-                </div>
-                <p className={`text-[10px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                  Atual: <strong className="font-mono">{dedupePolicy?.policy ?? 'IGNORE'}</strong>
-                  {dedupePolicy?.updatedAt && (
-                    <> · salvo em {new Date(dedupePolicy.updatedAt).toLocaleString('pt-BR')}</>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            {/* Section 3.6: F17 - Backup Automático */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <HardDrive className="w-4 h-4 text-cyan-400" />
-                <span>Backup Automático do Banco</span>
-              </div>
-
-              <div
-                className={`rounded-xl p-4 space-y-3 border ${
-                  isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
-                }`}
-              >
-                <label className="flex items-center justify-between cursor-pointer">
-                  <div>
-                    <div className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Backup automático habilitado</div>
-                    <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                      Roda a cada abertura do app se o último for mais antigo que o intervalo.
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={!!backupConfig?.enabled}
-                    onChange={(e) => saveBackupConfig({ enabled: e.target.checked })}
-                    disabled={!backupConfig}
-                    className="w-4 h-4 rounded border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
-                  <div>
-                    <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                      Intervalo (dias)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={backupConfig?.intervalDays ?? 7}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (Number.isFinite(v) && v >= 1) setBackupConfig((c) => c ? { ...c, intervalDays: v } : c);
-                      }}
-                      onBlur={() => backupConfig && saveBackupConfig({ intervalDays: backupConfig.intervalDays })}
-                      className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none ${
-                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                      Retenção (backups)
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={backupConfig?.retentionCount ?? 30}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (Number.isFinite(v) && v >= 1) setBackupConfig((c) => c ? { ...c, retentionCount: v } : c);
-                      }}
-                      onBlur={() => backupConfig && saveBackupConfig({ retentionCount: backupConfig.retentionCount })}
-                      className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none ${
-                        isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-white/10">
-                  <label className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    Pasta de destino
-                  </label>
-                  <input
-                    type="text"
-                    value={backupConfig?.destination ?? ''}
-                    onChange={(e) => setBackupConfig((c) => c ? { ...c, destination: e.target.value } : c)}
-                    onBlur={() => backupConfig && saveBackupConfig({ destination: backupConfig.destination })}
-                    placeholder="/caminho/absoluto/para/backups"
-                    className={`w-full mt-1 px-2 py-1 text-xs rounded-md border outline-none font-mono ${
-                      isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a] focus:border-blue-500' : 'bg-[#18181b] border-[#3f3f46] text-white focus:border-blue-500'
-                    }`}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                  <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                    {backupList.length === 0 ? (
-                      'Nenhum backup salvo ainda.'
-                    ) : (
-                      <>
-                        <strong className="text-blue-400">{backupList.length}</strong> backup{backupList.length > 1 ? 's' : ''} ·
-                        último: <span className="font-mono">{new Date(backupList[0].createdAt).toLocaleString('pt-BR')}</span>
-                      </>
-                    )}
-                  </div>
-                  <button
+                    key={tab.id}
                     type="button"
-                    onClick={runBackupNow}
-                    disabled={backupRunning || backupLoading}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-md shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {backupRunning ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <HardDrive className="w-3.5 h-3.5" />
-                    )}
-                    Rodar Backup Agora
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 4: Atalhos de Teclado */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <Keyboard className="w-4 h-4 text-purple-400" />
-                <span>Atalhos de Teclado (Power User)</span>
-              </div>
-
-              <div
-                className={`rounded-xl p-4 text-xs space-y-2.5 border ${
-                  isLight
-                    ? 'bg-[#f8fafc] border-[#e2e8f0]'
-                    : 'bg-[#111114] border-[#27272a] text-[#d4d4d8]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}>Focar campo de busca:</span>
-                  <div className="flex items-center gap-1">
-                    <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>Ctrl + F</kbd>
-                    <span className="text-[11px] text-gray-500">ou</span>
-                    <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>/</kbd>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className={isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}>Navegar entre as notas na lista:</span>
-                  <div className="flex items-center gap-1">
-                    <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>↑</kbd>
-                    <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>↓</kbd>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className={isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}>Abrir modal de exclusão para notas selecionadas:</span>
-                  <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>Delete</kbd>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className={isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}>Imprimir DANFE atual:</span>
-                  <kbd className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${isLight ? 'bg-white border-[#cbd5e1] text-[#0f172a]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`}>Ctrl + P</kbd>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 5: Limpeza do Banco de Dados */}
-            <div>
-              <div className="flex items-center gap-2 mb-3 text-red-400 font-bold text-xs uppercase tracking-wider">
-                <AlertTriangle className="w-4 h-4" />
-                <span>Zona de Limpeza (Reset do BD)</span>
-              </div>
-
-              <div
-                className={`border rounded-xl p-4 flex items-center justify-between gap-4 ${
-                  isLight
-                    ? 'bg-red-50 border-red-200'
-                    : 'bg-red-500/10 border-red-500/30'
-                }`}
-              >
-                <div>
-                  <div className={`font-semibold ${isLight ? 'text-red-900' : 'text-red-200'}`}>Limpar Todo o Banco de Dados</div>
-                  <div className={`text-[11px] mt-0.5 ${isLight ? 'text-red-700' : 'text-red-200/80'}`}>
-                    Apaga todos os documentos fiscais (XML/PDF), histórico de importações e pastas criadas.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsResetConfirmOpen(true)}
-                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-semibold text-xs rounded-lg shadow-md flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Limpar BD
-                </button>
-              </div>
-            </div>
-
-            {/* Section 6: Sobre o Sistema */}
-            <div>
-              <div className={`flex items-center gap-2 mb-3 font-bold text-xs uppercase tracking-wider ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                <Info className="w-4 h-4 text-amber-400" />
-                <span>Sobre o Sistema</span>
-              </div>
-
-              <div
-                className={`rounded-xl p-4 text-[11px] space-y-3 border ${
-                  isLight
-                    ? 'bg-[#f8fafc] border-[#e2e8f0] text-[#64748b]'
-                    : 'bg-[#111114] border-[#27272a] text-[#a1a1aa]'
-                }`}
-              >
-                <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                  <img
-                    src="/icon.png"
-                    alt="Workspace Fiscal"
-                    className="w-12 h-12 rounded-xl object-cover shadow-md border border-blue-400/30"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div>
-                    <div className={`font-bold text-sm ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                      Workspace Fiscal
-                    </div>
-                    <div className="text-[10px] text-blue-400 font-medium">
-                      Hub Fiscal • NF View (DANFE) + Depreciação
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span>Versão do Aplicativo:</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>v{CURRENT_APP_VERSION} (Workspace Fiscal Pro)</span>
-                    <button
-                      onClick={() => setShowWhatsNew(true)}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer transition-colors"
-                      title={`Ver o que mudou na versão ${CURRENT_APP_VERSION}`}
-                    >
-                      Ver Novidades
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between">
-                  <span>Formatos Suportados:</span>
-                  <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>NF-e (Mod. 55), NFC-e (Mod. 65), CT-e (Mod. 57), NFS-e (Sefin & ABRASF)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Layout de Impressão:</span>
-                  <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Padrão Nacional SEFAZ (A4 / PDF)</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-white/10">
-                  <span>Desenvolvimento:</span>
-                  <span className="font-bold text-blue-400">Café - Sistemas & Softwares</span>
-                </div>
-
-                {/* Ações de Atualização e Novidades */}
-                <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
-                  <button
-                    onClick={handleCheckUpdates}
-                    disabled={checkingUpdates}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors ${
-                      isLight
-                        ? 'bg-white hover:bg-[#f1f5f9] border-[#cbd5e1] text-[#334155]'
-                        : 'bg-[#18181b] hover:bg-[#27272a] border-[#3f3f46] text-[#e4e4e7]'
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
+                      isActive
+                        ? isLight
+                          ? 'bg-white text-blue-600 shadow-xs border border-[#cbd5e1]'
+                          : 'bg-[#27272a] text-white shadow-xs border border-[#3f3f46]'
+                        : isLight
+                          ? 'text-[#64748b] hover:bg-[#e2e8f0] hover:text-[#0f172a]'
+                          : 'text-[#a1a1aa] hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdates ? 'animate-spin text-blue-500' : ''}`} />
-                    <span>{checkingUpdates ? 'Verificando...' : 'Verificar Atualizações'}</span>
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-blue-500' : 'opacity-70'}`} />
+                    <span>{tab.label}</span>
                   </button>
+                );
+              })}
+            </div>
 
-                  <button
-                    onClick={() => setShowWhatsNew(true)}
-                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Novidades da Versão</span>
-                  </button>
-                </div>
-              </div>
+            {/* Tab Panels */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {activeTab === 'general' && (
+                <GeneralSettingsTab
+                  isLight={isLight}
+                  settings={settings}
+                  updateSettings={updateSettings}
+                  onShowWhatsNew={() => setShowWhatsNew(true)}
+                  onCheckUpdates={handleCheckUpdates}
+                  checkingUpdates={checkingUpdates}
+                />
+              )}
+
+              {activeTab === 'nfview' && (
+                <NfViewSettingsTab
+                  isLight={isLight}
+                  settings={settings}
+                  updateSettings={updateSettings}
+                  dedupePolicy={dedupePolicy}
+                  saveDedupePolicy={saveDedupePolicy}
+                  dedupeSaving={dedupeSaving}
+                  documents={documents}
+                  folders={folders}
+                  exportCsv={exportCsv}
+                  onOpenResetConfirm={() => setIsResetConfirmOpen(true)}
+                />
+              )}
+
+              {activeTab === 'depreciation' && (
+                <DepreciationSettingsTab isLight={isLight} />
+              )}
+
+              {activeTab === 'backup' && (
+                <BackupSettingsTab isLight={isLight} />
+              )}
             </div>
           </div>
 
-          <WhatsNewModal open={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
-
           {/* Footer */}
           <div
-            className={`px-5 py-3.5 border-t flex items-center justify-end shrink-0 ${
+            className={`px-6 py-3.5 border-t flex items-center justify-between shrink-0 ${
               isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'
             }`}
           >
+            <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+              Workspace Fiscal v{CURRENT_APP_VERSION}
+            </div>
             <button
               onClick={close}
               className="px-5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-xs font-semibold text-white rounded-lg shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
@@ -744,11 +293,13 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
         </div>
       </div>
 
+      <WhatsNewModal open={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
+
       <ConfirmModal
         isOpen={isResetConfirmOpen}
-        title="Limpar Banco de Dados Completo?"
-        description="Esta ação é permanente e irreversível. Todos os documentos fiscais importados, pastas e vínculos serão apagados do sistema."
-        confirmLabel={isResetting ? "Limpando..." : "Sim, Limpar Tudo"}
+        title="Limpar Documentos do NF View?"
+        description="Esta ação apagará permanentemente todos os documentos fiscais importados, histórico e pastas do módulo NF View. Os dados da Depreciação continuarão preservados."
+        confirmLabel={isResetting ? 'Limpando...' : 'Sim, Limpar Notas'}
         confirmVariant="danger"
         isLoading={isResetting}
         onConfirm={handleResetDatabase}
@@ -757,3 +308,4 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
     </>
   );
 }
+

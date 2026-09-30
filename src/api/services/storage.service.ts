@@ -70,18 +70,34 @@ export class LocalStorageService implements IStorageService {
   }
 
   async readXml(filepath: string): Promise<string> {
-    this.assertInsideBase(filepath);
-    // Valida existência e que não é diretório
-    const stat = await fs.stat(filepath).catch(() => null);
-    if (!stat || !stat.isFile()) throw new Error('Arquivo XML não encontrado');
-    return fs.readFile(filepath, 'utf-8');
+    try {
+      this.assertInsideBase(filepath);
+      const stat = await fs.stat(filepath).catch(() => null);
+      if (stat && stat.isFile()) {
+        return await fs.readFile(filepath, 'utf-8');
+      }
+    } catch {}
+
+    // Fallback: se o caminho original pertencia a outro usuário/máquina, busca pelo basename no storage local
+    const fallbackPath = this.getDocumentPath('xml', path.basename(filepath));
+    const statFallback = await fs.stat(fallbackPath).catch(() => null);
+    if (statFallback && statFallback.isFile()) {
+      return await fs.readFile(fallbackPath, 'utf-8');
+    }
+
+    throw new Error('Arquivo XML não encontrado');
   }
 
   async deleteXml(filepath: string): Promise<void> {
-    this.assertInsideBase(filepath);
-    await fs.unlink(filepath).catch((err: any) => {
-      if (err?.code !== 'ENOENT') throw err;
-    });
+    try {
+      this.assertInsideBase(filepath);
+      await fs.unlink(filepath).catch((err: any) => {
+        if (err?.code !== 'ENOENT') throw err;
+      });
+    } catch {
+      const fallbackPath = this.getDocumentPath('xml', path.basename(filepath));
+      await fs.unlink(fallbackPath).catch(() => {});
+    }
   }
 
   async savePdf(filename: string, content: Buffer): Promise<string> {
