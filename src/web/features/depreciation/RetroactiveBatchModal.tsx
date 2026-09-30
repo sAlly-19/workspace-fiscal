@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { X, Calendar, Loader2, FileText } from 'lucide-react';
 import { CompetencePicker } from '../../components/CompetencePicker';
+import { generateSchedule, DepreciationRule } from '../../../core/depreciation/calculate';
 
 interface Asset {
   id: string;
@@ -10,12 +11,14 @@ interface Asset {
   description?: string;
   acquisitionDate: string;
   acquisitionValue: number;
+  annualRate?: number;
 }
 
 interface Props {
   isLight: boolean;
   assets: Asset[];
   lastClosed: string;
+  depreciationRule?: string;
   onClose: () => void;
   onConfirm: (startCompetence: string, endCompetence: string) => Promise<void> | void;
 }
@@ -52,20 +55,46 @@ function defaultStartForAsset(asset: Asset): string {
   return formatComp(d.getFullYear(), d.getMonth() + 1);
 }
 
-export function RetroactiveBatchModal({ isLight, assets, lastClosed, onClose, onConfirm }: Props) {
+export function RetroactiveBatchModal({ isLight, assets, lastClosed, depreciationRule, onClose, onConfirm }: Props) {
   // Sugere o range baseado nos bens selecionados
   const suggestedStart = useMemo(() => {
     if (assets.length === 0) return lastClosed;
     const starts = assets.map((a) => defaultStartForAsset(a));
     return starts.sort()[0]; // menor competência entre os bens
-  }, [assets]);
+  }, [assets, lastClosed]);
 
   const [startComp, setStartComp] = useState(suggestedStart);
   const [endComp, setEndComp] = useState(lastClosed);
   const [saving, setSaving] = useState(false);
 
   const competences = useMemo(() => getCompetenceRange(startComp, endComp), [startComp, endComp]);
-  const totalEstimate = assets.reduce((sum, a) => sum + (a.acquisitionValue || 0), 0);
+
+  // Calcula o somatório exato da depreciação retroativa esperada para o período selecionado
+  const totalDepreciationCents = useMemo(() => {
+    let totalCents = 0;
+    const rule = (depreciationRule as DepreciationRule) || 'PROPORTIONAL';
+    const compSet = new Set(competences);
+
+    for (const a of assets) {
+      try {
+        if (!a.acquisitionValue || !a.acquisitionDate) continue;
+        const schedule = generateSchedule({
+          acquisitionValue: a.acquisitionValue,
+          annualRate: a.annualRate || 10,
+          acquisitionDate: new Date(a.acquisitionDate),
+          depreciationRule: rule,
+        });
+        for (const m of schedule) {
+          if (compSet.has(m.competence)) {
+            totalCents += m.depreciationValue;
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao calcular depreciação retroativa do bem', a.id, err);
+      }
+    }
+    return totalCents;
+  }, [assets, competences, depreciationRule]);
 
   const handleConfirm = async () => {
     if (assets.length === 0) return;
@@ -206,10 +235,10 @@ export function RetroactiveBatchModal({ isLight, assets, lastClosed, onClose, on
             </div>
             <div>
               <p className={`text-[10px] uppercase font-bold tracking-wider ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                Valor total
+                Total a depreciar
               </p>
-              <p className={`text-sm font-bold mt-1 ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>
-                {totalEstimate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
+              <p className={`text-base font-black mt-0.5 ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>
+                {(totalDepreciationCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </p>
             </div>
           </div>

@@ -21,7 +21,7 @@ import { useWorkspaceStore } from '../stores/workspace.store';
 import { ConfirmModal } from './ConfirmModal';
 import { toast } from './Toast';
 import { apiFetch } from '../lib/api';
-import { WhatsNewModal } from './WhatsNewModal';
+import { WhatsNewModal, CURRENT_APP_VERSION } from './WhatsNewModal';
 
 interface BackupFile {
   filename: string;
@@ -92,7 +92,7 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
       if (res?.hasUpdate) {
         toast.info('Nova versão disponível', `Versão v${res.latestVersion} encontrada no GitHub!`);
       } else {
-        toast.success('Você está atualizado', `O Workspace Fiscal já está na versão mais recente (v2.5.1).`);
+        toast.success('Você está atualizado', `O Workspace Fiscal já está na versão mais recente (v${CURRENT_APP_VERSION}).`);
       }
     } catch (e: any) {
       toast.error('Erro na verificação', e.message);
@@ -675,11 +675,11 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
                 <div className="flex justify-between items-center">
                   <span>Versão do Aplicativo:</span>
                   <div className="flex items-center gap-2">
-                    <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>v2.5.1 (Workspace Fiscal Pro)</span>
+                    <span className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>v{CURRENT_APP_VERSION} (Workspace Fiscal Pro)</span>
                     <button
                       onClick={() => setShowWhatsNew(true)}
                       className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer transition-colors"
-                      title="Ver o que mudou na versão 2.5.1"
+                      title={`Ver o que mudou na versão ${CURRENT_APP_VERSION}`}
                     >
                       Ver Novidades
                     </button>

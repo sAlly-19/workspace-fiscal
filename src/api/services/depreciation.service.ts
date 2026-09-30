@@ -50,6 +50,104 @@ export const DEFAULT_COLUMN_MAPPINGS: ColumnMappingItem[] = [
   { id: 'depreciationValue', column: 'G', label: 'Valor' },
 ];
 
+export interface DepreciationCsvRow {
+  competence: string;
+  documentNumber: string;
+  description?: string;
+  assetDescription?: string;
+  categoryName?: string | null;
+  supplier?: string;
+  acquisitionDate?: string | Date;
+  acquisitionValue: number;
+  annualRate: number;
+  depreciationValue: number;
+  accumulatedValue: number;
+  currentValue: number;
+  status?: string;
+}
+
+export function formatDepreciationRowsToCsv(
+  rows: DepreciationCsvRow[],
+  options?: {
+    separator?: string;
+    numericFormat?: 'BRL' | 'RAW';
+    dateFormat?: 'DD/MM/YYYY' | 'YYYY-MM-DD';
+    columns?: ColumnMappingItem[];
+  }
+): string {
+  const sep = options?.separator || ';';
+
+  // Escape separador e aspas duplas
+  const esc = (v: string) => {
+    if (v.includes(sep) || v.includes('"') || v.includes('\n') || v.includes('\r')) {
+      return `"${v.replace(/"/g, '""')}"`;
+    }
+    return v;
+  };
+
+  // Mapeamento de colunas solicitado pelo usuário (padrão: A: Data, B: Descrição, D: Categoria, F: Nº Doc, G: Valor)
+  const userCols = options?.columns && options.columns.length > 0
+    ? options.columns.filter(c => c.column && c.column !== 'NONE')
+    : DEFAULT_COLUMN_MAPPINGS;
+
+  const validCols = userCols
+    .map(c => ({ ...c, index: colLetterToIndex(c.column) }))
+    .filter(c => c.index >= 0);
+
+  const maxColIndex = validCols.length > 0 ? Math.max(...validCols.map(c => c.index)) : 0;
+
+  // Cabeçalho montado conforme as posições das colunas
+  const headerRow: string[] = new Array(maxColIndex + 1).fill('');
+  validCols.forEach(c => {
+    const defaultLabel = DEFAULT_COLUMN_MAPPINGS.find(d => d.id === c.id)?.label || c.id;
+    headerRow[c.index] = c.label || defaultLabel;
+  });
+  const header = headerRow.map(esc).join(sep);
+
+  const formatNum = (cents: number) => {
+    const raw = (cents / 100).toFixed(2).replace('.', ',');
+    return options?.numericFormat === 'BRL' ? `R$ ${raw}` : raw;
+  };
+
+  const lines = rows.map((r) => {
+    // Data = último dia da competência
+    const [y, m] = r.competence.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const dateStr = options?.dateFormat === 'YYYY-MM-DD'
+      ? `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+      : `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+
+    const docNumFormatted = r.documentNumber.startsWith('NF ') ? r.documentNumber : `NF ${r.documentNumber}`;
+
+    const fieldValues: Record<string, string> = {
+      date: dateStr,
+      description: `Depreciação ${docNumFormatted}, ${String(m).padStart(2, '0')}/${y}`,
+      assetDescription: r.assetDescription || r.description || '',
+      category: r.categoryName || 'Outros',
+      documentNumber: docNumFormatted,
+      supplier: r.supplier || '',
+      acquisitionDate: r.acquisitionDate ? new Date(r.acquisitionDate).toLocaleDateString('pt-BR') : '',
+      acquisitionValue: formatNum(r.acquisitionValue),
+      annualRate: `${r.annualRate}%`,
+      depreciationValue: formatNum(r.depreciationValue),
+      accumulatedValue: formatNum(r.accumulatedValue),
+      currentValue: formatNum(r.currentValue),
+      competence: r.competence,
+      status: r.status === 'current' ? 'ATUAL' : r.status === 'exported' ? 'EXPORTADO' : (r.status || ''),
+    };
+
+    const rowCols: string[] = new Array(maxColIndex + 1).fill('');
+    validCols.forEach(c => {
+      rowCols[c.index] = esc(fieldValues[c.id] ?? '');
+    });
+
+    return rowCols.join(sep);
+  });
+
+  // UTF-8 BOM (\uFEFF) explícito e CRLF (\r\n) para evitar corrupção de acentuação no Excel do Windows
+  return '\uFEFF' + [header, ...lines].join('\r\n');
+}
+
 export function colLetterToIndex(col: string): number {
   if (!col || col === 'NONE') return -1;
   const upper = col.trim().toUpperCase();
@@ -306,73 +404,11 @@ export class DepreciationService {
       // Não bloqueia, apenas informa; a rota decidirá se exige confirmação
     }
 
-    // Escape separador e aspas duplas
-    const esc = (v: string) => {
-      if (v.includes(sep) || v.includes('"') || v.includes('\n') || v.includes('\r')) {
-        return `"${v.replace(/"/g, '""')}"`;
-      }
-      return v;
-    };
-
-    // Mapeamento de colunas solicitado pelo usuário (padrão: A: Data, B: Descrição, D: Categoria, F: Nº Doc, G: Valor)
-    const userCols = options?.columns && options.columns.length > 0
-      ? options.columns.filter(c => c.column && c.column !== 'NONE')
-      : DEFAULT_COLUMN_MAPPINGS;
-
-    const validCols = userCols
-      .map(c => ({ ...c, index: colLetterToIndex(c.column) }))
-      .filter(c => c.index >= 0);
-
-    const maxColIndex = validCols.length > 0 ? Math.max(...validCols.map(c => c.index)) : 0;
-
-    // Cabeçalho montado conforme as posições das colunas
-    const headerRow: string[] = new Array(maxColIndex + 1).fill('');
-    validCols.forEach(c => {
-      const defaultLabel = DEFAULT_COLUMN_MAPPINGS.find(d => d.id === c.id)?.label || c.id;
-      headerRow[c.index] = c.label || defaultLabel;
-    });
-    const header = headerRow.map(esc).join(sep);
-
-    const lines = rows.map((r) => {
-      // Data = último dia da competência
-      const [y, m] = competence.split('-').map(Number);
-      const lastDay = new Date(y, m, 0).getDate();
-      const dateStr = options?.dateFormat === 'YYYY-MM-DD'
-        ? `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-        : `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-
-      const formatNum = (cents: number) => {
-        const raw = (cents / 100).toFixed(2).replace('.', ',');
-        return options?.numericFormat === 'BRL' ? `R$ ${raw}` : raw;
-      };
-
-      const fieldValues: Record<string, string> = {
-        date: dateStr,
-        description: `Depreciação NF ${r.documentNumber}, ${String(m).padStart(2, '0')}/${y}`,
-        assetDescription: r.description || '',
-        category: r.categoryName || 'Outros',
-        documentNumber: `NF ${r.documentNumber}`,
-        supplier: r.supplier || '',
-        acquisitionDate: r.acquisitionDate ? new Date(r.acquisitionDate).toLocaleDateString('pt-BR') : '',
-        acquisitionValue: formatNum(r.acquisitionValue),
-        annualRate: `${r.annualRate}%`,
-        depreciationValue: formatNum(r.depreciationValue),
-        accumulatedValue: formatNum(r.accumulatedValue),
-        currentValue: formatNum(r.currentValue),
-        competence,
-        status: r.status === 'current' ? 'ATUAL' : r.status === 'exported' ? 'EXPORTADO' : (r.status || ''),
-      };
-
-      const rowCols: string[] = new Array(maxColIndex + 1).fill('');
-      validCols.forEach(c => {
-        rowCols[c.index] = esc(fieldValues[c.id] ?? '');
-      });
-
-      return rowCols.join(sep);
-    });
-
-    // UTF-8 BOM (\uFEFF) explícito e CRLF (\r\n) para evitar corrupção de acentuação no Excel do Windows
-    const csv = '\uFEFF' + [header, ...lines].join('\r\n');
+    const csvRows: DepreciationCsvRow[] = rows.map((r) => ({
+      ...r,
+      assetDescription: r.description,
+    }));
+    const csv = formatDepreciationRowsToCsv(csvRows, options);
 
     // Persiste entries + export
     // Cria/atualiza depreciation_entries para cada asset na competência
@@ -469,20 +505,22 @@ export class DepreciationService {
 
     // Monta linhas
     const rows = retroComps.map((comp) => schedule.find((m) => m.competence === comp)!);
-    const sep = ';';
-    const header = ['Data', 'Descrição', 'Tipo', 'Nº Doc', 'Valor a Depreciar'].join(sep);
-    const lines = rows.map((r) => {
-      const [y, m] = r.competence.split('-').map(Number);
-      const lastDay = new Date(y, m, 0).getDate();
-      const dateStr = `${String(lastDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
-      const desc = `Depreciação NF ${asset.documentNumber}, ${String(m).padStart(2, '0')}/${y}`;
-      const tipo = asset.categoryName || 'Outros';
-      const doc = `NF ${asset.documentNumber}`;
-      const valorRaw = (r.depreciationValue / 100).toFixed(2).replace('.', ',');
-      const esc = (v: string) => (v.includes(sep) || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v);
-      return [dateStr, esc(desc), esc(tipo), esc(doc), valorRaw].join(sep);
-    });
-    const csv = '\uFEFF' + [header, ...lines].join('\n');
+    const rowsForCsv: DepreciationCsvRow[] = rows.map((r) => ({
+      competence: r.competence,
+      documentNumber: asset.documentNumber,
+      description: asset.description,
+      assetDescription: asset.description,
+      categoryName: asset.categoryName || undefined,
+      supplier: asset.supplier,
+      acquisitionDate: asset.acquisitionDate,
+      acquisitionValue: asset.acquisitionValue,
+      annualRate: asset.annualRate,
+      depreciationValue: r.depreciationValue,
+      accumulatedValue: r.accumulatedValue,
+      currentValue: r.currentValue,
+      status: 'EXPORTADO',
+    }));
+    const csv = formatDepreciationRowsToCsv(rowsForCsv);
     const total = rows.reduce((acc, r) => acc + r.depreciationValue, 0);
     const filename = `retroativa_NF${asset.documentNumber}_${startComp.replace('-','')}_a_${lastClosed.replace('-','')}.csv`;
 
@@ -603,14 +641,19 @@ export class DepreciationService {
     assetIds: string[];
     startCompetence: string;
     endCompetence: string;
+    options?: Parameters<typeof formatDepreciationRowsToCsv>[1];
   }): Promise<{
     processed: number;
     skipped: number;
     entriesCreated: number;
     entriesPreserved: number;
     details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }>;
+    csv: string;
+    filename: string;
+    count: number;
+    total: number;
   }> {
-    const { companyId, assetIds, startCompetence, endCompetence } = params;
+    const { companyId, assetIds, startCompetence, endCompetence, options } = params;
     if (!companyId || !Array.isArray(assetIds) || assetIds.length === 0) {
       throw new Error('companyId e assetIds são obrigatórios');
     }
@@ -633,6 +676,7 @@ export class DepreciationService {
     let totalCreated = 0;
     let totalPreserved = 0;
     const details: Array<{ assetId: string; entriesCreated: number; entriesPreserved: number }> = [];
+    const rowsForCsv: DepreciationCsvRow[] = [];
 
     for (const assetId of assetIds) {
       const asset = await assetsRepository.findById(assetId);
@@ -668,12 +712,7 @@ export class DepreciationService {
       const existingByComp = new Map(existing.map((e) => [e.competence, e]));
 
       let created = 0;
-      let preserved = 0;
       for (const comp of competences) {
-        if (exportedSet.has(comp)) {
-          preserved += 1;
-          continue;
-        }
         const m = scheduleByComp.get(comp);
         if (!m) continue;
         const prior = existingByComp.get(comp);
@@ -681,6 +720,8 @@ export class DepreciationService {
           depreciationValue: m.depreciationValue,
           accumulatedValue: m.accumulatedValue,
           currentValue: m.currentValue,
+          exported: true,
+          exportedAt: new Date(),
         };
         if (prior) {
           await db.update(depreciationEntries).set(values).where(eq(depreciationEntries.id, prior.id));
@@ -690,17 +731,44 @@ export class DepreciationService {
             assetId,
             competence: comp,
             ...values,
-            exported: false,
           });
         }
         created += 1;
+
+        rowsForCsv.push({
+          competence: comp,
+          documentNumber: asset.documentNumber,
+          description: asset.description,
+          assetDescription: asset.description,
+          categoryName: asset.categoryName || undefined,
+          supplier: asset.supplier,
+          acquisitionDate: asset.acquisitionDate,
+          acquisitionValue: asset.acquisitionValue,
+          annualRate: asset.annualRate,
+          depreciationValue: m.depreciationValue,
+          accumulatedValue: m.accumulatedValue,
+          currentValue: m.currentValue,
+          status: 'EXPORTADO',
+        });
       }
 
-      details.push({ assetId, entriesCreated: created, entriesPreserved: preserved });
+      details.push({ assetId, entriesCreated: created, entriesPreserved: 0 });
       processed += 1;
       totalCreated += created;
-      totalPreserved += preserved;
     }
+
+    // Ordenação consistente: por competência crescente e por documento
+    rowsForCsv.sort((a, b) => {
+      const cmpComp = a.competence.localeCompare(b.competence);
+      if (cmpComp !== 0) return cmpComp;
+      return a.documentNumber.localeCompare(b.documentNumber, undefined, { numeric: true });
+    });
+
+    const csv = formatDepreciationRowsToCsv(rowsForCsv, options);
+    const total = rowsForCsv.reduce((acc, r) => acc + r.depreciationValue, 0);
+    const filename = assetIds.length === 1 && rowsForCsv.length > 0
+      ? `retroativa_NF${rowsForCsv[0].documentNumber}_${startCompetence.replace('-', '')}_a_${effectiveEnd.replace('-', '')}.csv`
+      : `retroativa_lote_${startCompetence.replace('-', '')}_a_${effectiveEnd.replace('-', '')}.csv`;
 
     return {
       processed,
@@ -708,6 +776,10 @@ export class DepreciationService {
       entriesCreated: totalCreated,
       entriesPreserved: totalPreserved,
       details,
+      csv,
+      filename,
+      count: rowsForCsv.length,
+      total,
     };
   }
 

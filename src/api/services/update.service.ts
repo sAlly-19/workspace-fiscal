@@ -42,7 +42,7 @@ export function isNewerVersion(latest: string, current: string): boolean {
 }
 
 export class UpdateService {
-  private currentVersion = '2.5.1';
+  private currentVersion = '2.5.2';
   private repo = 'sAlly-19/workspace-fiscal';
 
   constructor() {
@@ -58,7 +58,7 @@ export class UpdateService {
         this.currentVersion = pkg.version;
       }
     } catch {
-      this.currentVersion = '2.5.1';
+      this.currentVersion = '2.5.2';
     }
   }
 

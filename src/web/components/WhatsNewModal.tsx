@@ -8,11 +8,13 @@ import {
   ZoomIn,
   RefreshCw,
   Check,
-  ChevronRight
+  Filter,
+  Tag
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
+import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '2.5.1';
+export const CURRENT_APP_VERSION = '2.5.2';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
 interface WhatsNewModalProps {
@@ -25,6 +27,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
+  const [activeVersion, setActiveVersion] = useState<'2.5.2' | '2.5.1'>('2.5.2');
 
   useEffect(() => {
     if (open !== undefined) {
@@ -32,20 +35,48 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
       return;
     }
 
-    try {
-      const seen = localStorage.getItem(SEEN_VERSION_KEY);
-      if (seen !== CURRENT_APP_VERSION) {
-        // Exibe automaticamente uma única vez nesta versão
-        setInternalOpen(true);
-      }
-    } catch {
-      setInternalOpen(false);
-    }
+    let isMounted = true;
+    const checkSeen = async () => {
+      // 1. Tenta verificar primeiro no SQLite (persistente mesmo com porta randômica no Electron)
+      try {
+        const res = await apiFetch('/api/settings/seen-version');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.version === CURRENT_APP_VERSION) {
+            if (isMounted) setInternalOpen(false);
+            return;
+          }
+        }
+      } catch {}
+
+      // 2. Fallback via localStorage
+      try {
+        const seen = localStorage.getItem(SEEN_VERSION_KEY);
+        if (seen === CURRENT_APP_VERSION) {
+          if (isMounted) setInternalOpen(false);
+          return;
+        }
+      } catch {}
+
+      if (isMounted) setInternalOpen(true);
+    };
+
+    checkSeen();
+    return () => {
+      isMounted = false;
+    };
   }, [open]);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     try {
       localStorage.setItem(SEEN_VERSION_KEY, CURRENT_APP_VERSION);
+    } catch {}
+    try {
+      await apiFetch('/api/settings/seen-version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: CURRENT_APP_VERSION }),
+      });
     } catch {}
     setInternalOpen(false);
     if (onClose) onClose();
@@ -107,130 +138,210 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
             </button>
           </div>
 
+          {/* Abas de Navegação entre Versões */}
+          <div
+            className={`px-6 py-2.5 border-b flex items-center justify-between ${
+              isLight ? 'bg-slate-50 border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-bold mr-1 uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
+                Versão:
+              </span>
+              <button
+                onClick={() => setActiveVersion('2.5.2')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeVersion === '2.5.2'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : isLight
+                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                }`}
+              >
+                <span>v2.5.2 (Atual)</span>
+                {activeVersion === '2.5.2' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+              </button>
+              <button
+                onClick={() => setActiveVersion('2.5.1')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeVersion === '2.5.1'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : isLight
+                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                }`}
+              >
+                <span>v2.5.1 (Anterior)</span>
+              </button>
+            </div>
+            <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
+              {activeVersion === '2.5.2' ? 'Lançamento mais recente' : 'Versão anterior'}
+            </span>
+          </div>
+
           {/* Cards Body */}
           <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-            {/* 1. Seleção de Colunas do CSV */}
-            <div
-              className={`p-4 rounded-xl border transition-all ${
-                isLight
-                  ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
-                  : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </div>
-                <div className="space-y-1.5 flex-1">
-                  <h3 className="font-bold text-sm flex items-center justify-between">
-                    <span>Módulo Depreciação: Layout Customizável de Colunas no CSV</span>
-                    <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Novo Recurso</span>
-                  </h3>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    Agora você pode escolher exatamente quais colunas (letras <b>A, B, C, D, E, F, G...</b>) cada campo gerado ocupará no arquivo CSV exportado.
-                  </p>
-                  <div
-                    className={`p-2.5 rounded-lg border text-[11px] space-y-1 font-mono ${
-                      isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#18181b] border-[#3f3f46]'
-                    }`}
-                  >
-                    <div className="font-semibold font-sans text-blue-600 dark:text-blue-400">Layout Padrão Definido:</div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-                      <div>• <b>Coluna A</b>: Data</div>
-                      <div>• <b>Coluna B</b>: Descrição</div>
-                      <div>• <b>Coluna C</b>: <i>(Vazia delimitada)</i></div>
-                      <div>• <b>Coluna D</b>: Categoria</div>
-                      <div>• <b>Coluna E</b>: <i>(Vazia delimitada)</i></div>
-                      <div>• <b>Coluna F</b>: Nº Doc</div>
-                      <div>• <b>Coluna G</b>: Valor</div>
+            {activeVersion === '2.5.2' ? (
+              <>
+                {/* 1. Filtros e Ordenação na Lista de Bens */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <Filter className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Filtros Avançados e Ordenação na Lista de Bens</span>
+                        <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Novo Recurso</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Localize e organize o patrimônio da empresa com rapidez e precisão:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Filtros Rápidos:</b> Filtre simultaneamente por <b>Categoria</b>, <b>Status</b> (Ativos / Baixados) e <b>Ano de Aquisição</b>.</li>
+                        <li><b>Busca Instantânea:</b> Pesquise em tempo real por razão do fornecedor, número de nota fiscal ou descrição com botão de limpeza rápida.</li>
+                        <li><b>Ordenação Interativa:</b> Clique diretamente nos cabeçalhos das colunas (<i>Fornecedor, NF, Aquisição, Categoria, Valor, Taxa</i>) com setas indicativas de direção.</li>
+                        <li><b>Resumo em Tempo Real:</b> Indicadores automáticos com a contagem de bens filtrados e o somatório patrimonial em reais.</li>
+                      </ul>
                     </div>
                   </div>
-                  <p className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                    Inclui modal com <b>pré-visualização da planilha em tempo real</b>, alteração de separador e persistência automática das suas preferências.
-                  </p>
                 </div>
-              </div>
-            </div>
 
-            {/* 2. Correção de Acentos no Excel */}
-            <div
-              className={`p-4 rounded-xl border transition-all ${
-                isLight
-                  ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-emerald-300'
-                  : 'bg-[#111114] border-[#27272a] hover:border-emerald-500/30'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                  <FileSpreadsheet className="w-4 h-4" />
+                {/* 2. Depreciação Retroativa com Seleção de Arquivo */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-emerald-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-emerald-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Depreciação Retroativa em Lote com Gravação de Arquivo</span>
+                        <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Aprimoramento</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Ao clicar em <b>"Gerar Lançamentos"</b> no modal de depreciação retroativa em lote:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Cálculo Exato:</b> O modal exibe com precisão o somatório real da depreciação retroativa para o intervalo selecionado.</li>
+                        <li><b>Diálogo Nativo:</b> O sistema solicita diretamente onde você deseja salvar a planilha CSV no seu computador via diálogo de gravação.</li>
+                        <li><b>Geração Completa:</b> Todas as competências do intervalo selecionado são recalculadas e exportadas para o Excel, mesmo se já haviam sido processadas anteriormente.</li>
+                        <li><b>Compatibilidade Excel:</b> Arquivo exportado com <b>UTF-8 BOM (\uFEFF)</b> e quebras de linha Windows CRLF para evitar qualquer problema de acentuação.</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1 flex-1">
-                  <h3 className="font-bold text-sm flex items-center justify-between">
-                    <span>Compatibilidade com Excel e Acentuação Perfeita</span>
-                    <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Correção</span>
-                  </h3>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    Fim dos caracteres estranhos (como <code className="bg-red-500/10 text-red-500 px-1 py-0.5 rounded">Ã§</code>, <code className="bg-red-500/10 text-red-500 px-1 py-0.5 rounded">Ã£</code>, <code className="bg-red-500/10 text-red-500 px-1 py-0.5 rounded">Âº</code>) ao abrir os arquivos no Microsoft Excel e no Windows.
-                  </p>
-                  <p className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                    Os relatórios agora são gerados com assinatura <b>BOM UTF-8 (\uFEFF)</b> e quebra de linha padrão Windows CRLF (\r\n), preservando perfeitamente todas as palavras acentuadas e cedilhas.
-                  </p>
-                </div>
-              </div>
-            </div>
 
-            {/* 3. Zoom e Seleção de Texto nos Documentos */}
-            <div
-              className={`p-4 rounded-xl border transition-all ${
-                isLight
-                  ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
-                  : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <ZoomIn className="w-4 h-4" />
+                {/* 3. Edição de Categorias */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <Tag className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Edição e Gerenciamento de Categorias</span>
+                        <span className="text-[10px] font-semibold text-purple-500 uppercase tracking-wider">Novo Recurso</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Agora é possível editar categorias já existentes (nome e taxa anual padrão) diretamente na listagem de categorias, atualizando automaticamente os bens vinculados.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1 flex-1">
-                  <h3 className="font-bold text-sm flex items-center justify-between">
-                    <span>Visualizador de DANFE: Zoom Interativo e Cópia de Dados</span>
-                    <span className="text-[10px] font-semibold text-purple-500 uppercase tracking-wider">Produtividade</span>
-                  </h3>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    Adicionado controle de visualização em todos os modelos de notas fiscais (NF-e, NFC-e, CT-e e NFS-e):
-                  </p>
-                  <ul className={`list-disc list-inside text-[11px] space-y-0.5 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    <li>Botões de Zoom: <b>Diminuir (−)</b>, <b>Aumentar (+)</b>, <b>100%</b> e <b>Ajustar à Tela</b>.</li>
-                    <li>Atalhos de teclado: <kbd className="px-1 py-0.5 bg-black/10 rounded">Ctrl + '+'</kbd>, <kbd className="px-1 py-0.5 bg-black/10 rounded">Ctrl + '-'</kbd>, <kbd className="px-1 py-0.5 bg-black/10 rounded">Ctrl + '0'</kbd> e <kbd className="px-1 py-0.5 bg-black/10 rounded">Ctrl + Scroll</kbd>.</li>
-                    <li>Seleção de texto com mouse liberada para copiar CNPJs, descrições e valores diretamente para a área de transferência.</li>
-                  </ul>
+              </>
+            ) : (
+              <>
+                {/* 1. Seleção de Colunas do CSV */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <SlidersHorizontal className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Layout Customizável de Colunas no CSV</span>
+                        <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Produtividade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Escolha livremente as colunas (A, B, C, D, E, F, G...) de cada campo contábil, pré-visualize a planilha em tempo real e altere delimitadores.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            {/* 4. Verificação Diária de Atualizações */}
-            <div
-              className={`p-4 rounded-xl border transition-all ${
-                isLight
-                  ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
-                  : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-                  <RefreshCw className="w-4 h-4" />
+                {/* 2. Zoom e Seleção de Texto nos Documentos */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <ZoomIn className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Visualizador de DANFE: Zoom Interativo e Cópia de Dados</span>
+                        <span className="text-[10px] font-semibold text-purple-500 uppercase tracking-wider">Visualização</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Controles de zoom (botões e atalhos Ctrl + Scroll / +, -, 0) e seleção de texto liberada para copiar CNPJs e descrições com rapidez.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1 flex-1">
-                  <h3 className="font-bold text-sm flex items-center justify-between">
-                    <span>Auto-Update e Verificação Diária via GitHub</span>
-                    <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wider">Sistema</span>
-                  </h3>
-                  <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                    O sistema agora verifica diariamente se uma nova release foi publicada no repositório GitHub, avisando você assim que houver novidades prontas para download.
-                  </p>
+
+                {/* 3. Verificação de Atualizações */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <RefreshCw className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Atualizações Automáticas via GitHub</span>
+                        <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Sistema</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Verificação diária e integrada com os releases do GitHub para download e instalação automática das versões mais recentes do aplicativo.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Footer */}
@@ -254,4 +365,3 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
     </AnimatePresence>
   );
 }
-

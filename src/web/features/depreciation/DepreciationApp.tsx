@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Building2, Package, TrendingDown, FileText, Download, Plus, Search, Edit2, Trash2, X, Check, AlertTriangle,
-  ChevronLeft, Calendar, ArrowRight, Eye, Layers, Settings2, BarChart3, Home, LogOut, Save, Tag, Sun, Moon, Archive, ArchiveRestore, Ban, SlidersHorizontal
+  ChevronLeft, Calendar, ArrowRight, Eye, Layers, Settings2, BarChart3, Home, LogOut, Save, Tag, Sun, Moon, Archive, ArchiveRestore, Ban, SlidersHorizontal,
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, RotateCcw
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/workspace.store';
 import { useDepreciationStore } from '../../stores/depreciation.store';
@@ -49,7 +50,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const {
     companies, selectedCompanyId, categories, assets, competence,
     fetchCompanies, selectCompany, createCompany, updateCompany, deleteCompany,
-    fetchCategories, createCategory, deleteCategory,
+    fetchCategories, createCategory, updateCategory, deleteCategory,
     fetchAssets, createAsset, updateAsset, deleteAsset, disposeAsset, reactivateAsset, setCompetence
   } = useDepreciationStore();
 
@@ -59,7 +60,15 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState<any>(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
   const [searchAssets, setSearchAssets] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DISPOSED'>('ALL');
+  const [yearFilter, setYearFilter] = useState('ALL');
+  type AssetSortField = 'supplier' | 'documentNumber' | 'category' | 'acquisitionValue' | 'annualRate' | 'acquisitionDate';
+  type SortDirection = 'asc' | 'desc';
+  const [sortField, setSortField] = useState<AssetSortField>('acquisitionDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [assetHistory, setAssetHistory] = useState<any>(null);
   const [monthly, setMonthly] = useState<any>(null);
@@ -193,11 +202,105 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
     } catch {}
   }
 
-  const filteredAssets = assets.filter(a => {
-    if (!searchAssets) return true;
-    const q = searchAssets.toLowerCase();
-    return a.supplier.toLowerCase().includes(q) || a.description.toLowerCase().includes(q) || a.documentNumber.toLowerCase().includes(q);
-  });
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    assets.forEach((a: any) => {
+      if (a.acquisitionDate) {
+        const y = a.acquisitionDate.slice(0, 4);
+        if (y && !isNaN(Number(y))) years.add(y);
+      }
+    });
+    return Array.from(years).sort().reverse();
+  }, [assets]);
+
+  const filteredAssets = useMemo(() => {
+    const list = assets.filter((a: any) => {
+      if (searchAssets.trim()) {
+        const q = searchAssets.toLowerCase().trim();
+        const matchSupplier = a.supplier?.toLowerCase().includes(q);
+        const matchDesc = a.description?.toLowerCase().includes(q);
+        const matchDoc = a.documentNumber?.toLowerCase().includes(q);
+        if (!matchSupplier && !matchDesc && !matchDoc) return false;
+      }
+      if (categoryFilter !== 'ALL') {
+        if (categoryFilter === 'NONE') {
+          if (a.categoryId) return false;
+        } else if (a.categoryId !== categoryFilter) {
+          return false;
+        }
+      }
+      if (statusFilter !== 'ALL') {
+        const assetStatus = a.status === 'DISPOSED' ? 'DISPOSED' : 'ACTIVE';
+        if (assetStatus !== statusFilter) return false;
+      }
+      if (yearFilter !== 'ALL') {
+        if (!a.acquisitionDate || !a.acquisitionDate.startsWith(yearFilter)) return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a: any, b: any) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'supplier':
+          comparison = (a.supplier || '').localeCompare(b.supplier || '', 'pt-BR', { sensitivity: 'base' });
+          break;
+        case 'documentNumber':
+          comparison = (a.documentNumber || '').localeCompare(b.documentNumber || '', undefined, { numeric: true });
+          break;
+        case 'category':
+          comparison = (a.categoryName || '').localeCompare(b.categoryName || '', 'pt-BR', { sensitivity: 'base' });
+          break;
+        case 'acquisitionValue':
+          comparison = (a.acquisitionValue || 0) - (b.acquisitionValue || 0);
+          break;
+        case 'annualRate':
+          comparison = (a.annualRate || 0) - (b.annualRate || 0);
+          break;
+        case 'acquisitionDate':
+          comparison = (a.acquisitionDate || '').localeCompare(b.acquisitionDate || '');
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [assets, searchAssets, categoryFilter, statusFilter, yearFilter, sortField, sortDirection]);
+
+  const filteredTotalValue = useMemo(() => {
+    return filteredAssets.reduce((acc: number, a: any) => acc + (a.acquisitionValue || 0), 0);
+  }, [filteredAssets]);
+
+  const hasActiveFilters = Boolean(
+    searchAssets.trim() || categoryFilter !== 'ALL' || statusFilter !== 'ALL' || yearFilter !== 'ALL'
+  );
+
+  function handleResetFilters() {
+    setSearchAssets('');
+    setCategoryFilter('ALL');
+    setStatusFilter('ALL');
+    setYearFilter('ALL');
+  }
+
+  function handleToggleSort(field: AssetSortField) {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }
+
+  function renderSortIndicator(field: AssetSortField) {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 opacity-40 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3 h-3 text-blue-500 ml-1 inline-block" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-blue-500 ml-1 inline-block" />
+    );
+  }
 
   const isElectron = typeof window !== 'undefined' && (window as any).api;
 
@@ -411,27 +514,110 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
 
               {tab==='assets' && (
                 <div className="p-6 max-w-6xl mx-auto space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className={`text-sm font-black ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Bens / Notas Fiscais</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className={`text-sm font-black ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Bens / Notas Fiscais</h2>
+                      <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${isLight ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                        {filteredAssets.length} de {assets.length} {assets.length === 1 ? 'bem' : 'bens'}
+                      </span>
+                      <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-mono font-semibold border ${isLight ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                        Total: {formatCentsBRL(filteredTotalValue)}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <Search className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`} />
-                        <input value={searchAssets} onChange={(e)=> setSearchAssets(e.target.value)} placeholder="Buscar..." className={`pl-8 pr-3 py-1.5 rounded-lg border text-xs w-56 ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#18181b] border-[#3f3f46] text-white'}`} />
-                      </div>
                       {selectedAssetIds.size > 0 && (
-                        <button onClick={()=> setShowRetroBatchModal(true)} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95">
+                        <button onClick={()=> setShowRetroBatchModal(true)} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs">
                           <Calendar className="w-3.5 h-3.5" /> Depreciar Retroativa ({selectedAssetIds.size})
                         </button>
                       )}
-                      <button onClick={()=> { setEditingAsset(null); setShowAssetModal(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Plus className="w-3.5 h-3.5" /> Novo bem</button>
+                      <button onClick={()=> { setEditingAsset(null); setShowAssetModal(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"><Plus className="w-3.5 h-3.5" /> Novo bem</button>
                     </div>
+                  </div>
+
+                  {/* Barra de Filtros e Ordenação */}
+                  <div className={`p-3 rounded-xl border flex flex-wrap items-center gap-2.5 ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'}`}>
+                    {/* Campo de Busca com botão de limpar */}
+                    <div className="relative min-w-[220px] flex-1">
+                      <Search className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`} />
+                      <input
+                        value={searchAssets}
+                        onChange={(e)=> setSearchAssets(e.target.value)}
+                        placeholder="Buscar por fornecedor, NF, descrição..."
+                        className={`w-full pl-8 pr-7 py-1.5 rounded-lg border text-xs ${isLight ? 'bg-[#f8fafc] border-[#cbd5e1] text-[#0f172a]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`}
+                      />
+                      {searchAssets && (
+                        <button
+                          onClick={() => setSearchAssets('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filtro de Categoria */}
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={categoryFilter}
+                        onChange={(e)=> setCategoryFilter(e.target.value)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer ${isLight ? 'bg-white border-[#cbd5e1] text-[#334155]' : 'bg-[#09090b] border-[#3f3f46] text-[#d4d4d8]'}`}
+                      >
+                        <option value="ALL">Todas as categorias</option>
+                        {categories.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                        <option value="NONE">Sem categoria</option>
+                      </select>
+                    </div>
+
+                    {/* Filtro de Status */}
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={statusFilter}
+                        onChange={(e)=> setStatusFilter(e.target.value as any)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer ${isLight ? 'bg-white border-[#cbd5e1] text-[#334155]' : 'bg-[#09090b] border-[#3f3f46] text-[#d4d4d8]'}`}
+                      >
+                        <option value="ALL">Todos os status</option>
+                        <option value="ACTIVE">Ativos</option>
+                        <option value="DISPOSED">Baixados</option>
+                      </select>
+                    </div>
+
+                    {/* Filtro de Ano de Aquisição */}
+                    {availableYears.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={yearFilter}
+                          onChange={(e)=> setYearFilter(e.target.value)}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer ${isLight ? 'bg-white border-[#cbd5e1] text-[#334155]' : 'bg-[#09090b] border-[#3f3f46] text-[#d4d4d8]'}`}
+                        >
+                          <option value="ALL">Todos os anos</option>
+                          {availableYears.map((y) => (
+                            <option key={y} value={y}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Botão Limpar Filtros */}
+                    {hasActiveFilters && (
+                      <button
+                        onClick={handleResetFilters}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          isLight ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300'
+                        }`}
+                        title="Limpar todos os filtros"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Limpar filtros
+                      </button>
+                    )}
                   </div>
 
                   <div className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
                     <table className="w-full text-xs">
                       <thead className={`${isLight ? 'bg-[#f1f5f9] text-[#475569]' : 'bg-[#18181b] text-[#a1a1aa]'}`}>
                         <tr>
-                          <th className="px-3 py-2 w-8">
+                          <th className="px-3 py-2.5 w-8">
                             <input
                               type="checkbox"
                               checked={filteredAssets.length > 0 && filteredAssets.every((a:any) => selectedAssetIds.has(a.id))}
@@ -445,12 +631,49 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                               className="w-3.5 h-3.5 cursor-pointer"
                             />
                           </th>
-                          <th className="text-left px-3 py-2">Fornecedor</th>
-                          <th className="text-left px-3 py-2">NF / Descrição</th>
-                          <th className="text-left px-3 py-2">Categoria</th>
-                          <th className="text-right px-3 py-2">Valor</th>
-                          <th className="text-center px-3 py-2">Taxa</th>
-                          <th className="text-right px-3 py-2">Ações</th>
+                          <th
+                            onClick={() => handleToggleSort('supplier')}
+                            className="text-left px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por Fornecedor"
+                          >
+                            <span className="inline-flex items-center gap-1">Fornecedor {renderSortIndicator('supplier')}</span>
+                          </th>
+                          <th
+                            onClick={() => handleToggleSort('documentNumber')}
+                            className="text-left px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por NF / Descrição"
+                          >
+                            <span className="inline-flex items-center gap-1">NF / Descrição {renderSortIndicator('documentNumber')}</span>
+                          </th>
+                          <th
+                            onClick={() => handleToggleSort('acquisitionDate')}
+                            className="text-left px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por Data de Aquisição"
+                          >
+                            <span className="inline-flex items-center gap-1">Aquisição {renderSortIndicator('acquisitionDate')}</span>
+                          </th>
+                          <th
+                            onClick={() => handleToggleSort('category')}
+                            className="text-left px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por Categoria"
+                          >
+                            <span className="inline-flex items-center gap-1">Categoria {renderSortIndicator('category')}</span>
+                          </th>
+                          <th
+                            onClick={() => handleToggleSort('acquisitionValue')}
+                            className="text-right px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por Valor"
+                          >
+                            <span className="inline-flex items-center justify-end gap-1">Valor {renderSortIndicator('acquisitionValue')}</span>
+                          </th>
+                          <th
+                            onClick={() => handleToggleSort('annualRate')}
+                            className="text-center px-3 py-2.5 cursor-pointer hover:text-blue-500 transition-colors select-none font-bold"
+                            title="Ordenar por Taxa Anual"
+                          >
+                            <span className="inline-flex items-center justify-center gap-1">Taxa {renderSortIndicator('annualRate')}</span>
+                          </th>
+                          <th className="text-right px-3 py-2.5 font-bold">Ações</th>
                         </tr>
                       </thead>
                       <tbody className={`divide-y ${isLight ? 'divide-[#e2e8f0]' : 'divide-[#27272a]'}`}>
@@ -470,9 +693,15 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                               />
                             </td>
                             <td className="px-3 py-2 font-medium">{a.supplier}</td>
-                            <td className="px-3 py-2"><div className="font-mono font-bold">NF {a.documentNumber}</div><div className={`text-[11px] truncate max-w-[260px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>{a.description}</div></td>
+                            <td className="px-3 py-2">
+                              <div className="font-mono font-bold">NF {a.documentNumber}</div>
+                              <div className={`text-[11px] truncate max-w-[240px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>{a.description}</div>
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-[11px] font-mono opacity-80">
+                              {a.acquisitionDate ? formatDateBR(a.acquisitionDate) : '—'}
+                            </td>
                             <td className="px-3 py-2">{a.categoryName || '—'}</td>
-                            <td className="px-3 py-2 text-right font-bold">{formatCentsBRL(a.acquisitionValue)}</td>
+                            <td className="px-3 py-2 text-right font-bold font-mono">{formatCentsBRL(a.acquisitionValue)}</td>
                             <td className="px-3 py-2 text-center">{a.annualRate}%</td>
                             <td className="px-3 py-2 text-right flex justify-end gap-1" onClick={(e)=> e.stopPropagation()}>
                               {a.status === 'DISPOSED' ? (
@@ -483,13 +712,28 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                               ) : (
                                 <button onClick={()=> { setDisposeTarget(a); setDisposeDate(new Date().toISOString().slice(0,10)); setDisposeReason(''); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-amber-50' : 'bg-[#18181b] border-[#3f3f46] hover:bg-amber-500/10'} text-amber-600`} title="Dar Baixa"><Archive className="w-3 h-3" /></button>
                               )}
-                              <button onClick={()=> { setEditingAsset(a); setShowAssetModal(true); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]'}`}><Edit2 className="w-3 h-3" /></button>
-                              <button onClick={()=> setConfirmDelete({type:'asset', id:a.id, name: a.description})} className="p-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 cursor-pointer"><Trash2 className="w-3 h-3" /></button>
-                              <button onClick={()=> openAssetHistory(a)} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#18181b] border-[#3f3f46]'}`}><Eye className="w-3 h-3" /></button>
+                              <button onClick={()=> { setEditingAsset(a); setShowAssetModal(true); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]'}`} title="Editar bem"><Edit2 className="w-3 h-3" /></button>
+                              <button onClick={()=> setConfirmDelete({type:'asset', id:a.id, name: a.description})} className="p-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 cursor-pointer" title="Excluir"><Trash2 className="w-3 h-3" /></button>
+                              <button onClick={()=> openAssetHistory(a)} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#18181b] border-[#3f3f46]'}`} title="Ver histórico"><Eye className="w-3 h-3" /></button>
                             </td>
                           </tr>
                         ))}
-                        {filteredAssets.length===0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[#71717a]">Nenhum bem cadastrado</td></tr>}
+                        {filteredAssets.length===0 && (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-8 text-center text-[#71717a]">
+                              {hasActiveFilters ? (
+                                <span>
+                                  Nenhum bem encontrado para os filtros selecionados.{' '}
+                                  <button onClick={handleResetFilters} className="text-blue-500 underline ml-1 cursor-pointer font-semibold">
+                                    Limpar filtros
+                                  </button>
+                                </span>
+                              ) : (
+                                'Nenhum bem cadastrado'
+                              )}
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -508,7 +752,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                         <div>
                           <div className={`text-sm font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{c.name}</div>
                           <div className={`text-xs font-mono ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>CNPJ: {c.cnpj ? cnpjMask(c.cnpj) : c.document || '—'} {c.tradeName ? `• ${c.tradeName}` : ''}</div>
-                          <div className={`text-[11px] mt-1 ${isLight ? 'text-[#94a3b8]' : 'text-[#52525b]'}`}>Regra: {c.depreciationRule || 'PROPORTIONAL'} {c.city ? `• ${c.city}/${c.state}` : ''}</div>
+                          {c.city && <div className={`text-[11px] mt-1 ${isLight ? 'text-[#94a3b8]' : 'text-[#52525b]'}`}>{c.city}{c.state ? `/${c.state}` : ''}</div>}
                         </div>
                         <div className="flex items-center gap-1.5">
                           {selectedCompanyId===c.id && <span className="text-[11px] font-bold text-blue-500 flex items-center gap-1"><Check className="w-3 h-3" /> Selecionada</span>}
@@ -527,7 +771,7 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                 <div className="p-6 max-w-3xl mx-auto space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className={`text-sm font-black ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Categorias</h2>
-                    <button onClick={()=> setShowCategoryModal(true)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold cursor-pointer">+ Nova categoria</button>
+                    <button onClick={()=> { setEditingCategory(null); setShowCategoryModal(true); }} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold cursor-pointer">+ Nova categoria</button>
                   </div>
                   <div className={`rounded-xl border overflow-hidden ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
                     <table className="w-full text-xs">
@@ -537,8 +781,9 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
                           <tr key={cat.id}>
                             <td className="px-3 py-2 font-medium">{cat.name}</td>
                             <td className="px-3 py-2 text-center font-bold">{cat.defaultRate}%</td>
-                            <td className="px-3 py-2 text-right">
-                              <button onClick={()=> setConfirmDelete({type:'category', id:cat.id, name:cat.name})} className="p-1.5 rounded text-red-500 hover:bg-red-500/10 cursor-pointer"><Trash2 className="w-3 h-3" /></button>
+                            <td className="px-3 py-2 text-right flex justify-end gap-1">
+                              <button onClick={()=> { setEditingCategory(cat); setShowCategoryModal(true); }} className={`p-1.5 rounded border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]'}`} title="Editar categoria"><Edit2 className="w-3 h-3" /></button>
+                              <button onClick={()=> setConfirmDelete({type:'category', id:cat.id, name:cat.name})} className="p-1.5 rounded text-red-500 hover:bg-red-500/10 cursor-pointer" title="Excluir categoria"><Trash2 className="w-3 h-3" /></button>
                             </td>
                           </tr>
                         ))}
@@ -590,7 +835,20 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
           }} />
         )}
         {showCategoryModal && (
-          <CategoryModal isLight={isLight} onClose={()=> setShowCategoryModal(false)} onSave={async (data)=>{ await createCategory(data); setShowCategoryModal(false); }} />
+          <CategoryModal
+            isLight={isLight}
+            editing={editingCategory}
+            onClose={() => { setShowCategoryModal(false); setEditingCategory(null); }}
+            onSave={async (data: any) => {
+              if (editingCategory) {
+                await updateCategory(editingCategory.id, data);
+              } else {
+                await createCategory(data);
+              }
+              setShowCategoryModal(false);
+              setEditingCategory(null);
+            }}
+          />
         )}
         {selectedAsset && (
           <AssetHistoryModal isLight={isLight} assetHistory={assetHistory} asset={selectedAsset} onClose={()=> { setSelectedAsset(null); setAssetHistory(null); }} />
@@ -806,31 +1064,83 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
           isLight={isLight}
           assets={assets.filter((a:any) => selectedAssetIds.has(a.id))}
           lastClosed={getLastClosedCompetence()}
+          depreciationRule={selectedCompany?.depreciationRule || 'PROPORTIONAL'}
           onClose={() => setShowRetroBatchModal(false)}
           onConfirm={async (startComp: string, endComp: string) => {
             try {
               setIsRetroGenerating(true);
               const ids = Array.from(selectedAssetIds);
+
+              let exportOptions: any = {};
+              try {
+                const savedOptions = localStorage.getItem('depreciation_csv_column_mapping_v1');
+                if (savedOptions) {
+                  exportOptions = JSON.parse(savedOptions);
+                }
+              } catch (e) {
+                console.warn('Erro ao carregar mapeamento salvo', e);
+              }
+
               const res = await apiFetch('/api/depreciation/retroactive/batch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ companyId: selectedCompanyId, assetIds: ids, startCompetence: startComp, endCompetence: endComp }),
+                body: JSON.stringify({
+                  companyId: selectedCompanyId,
+                  assetIds: ids,
+                  startCompetence: startComp,
+                  endCompetence: endComp,
+                  ...exportOptions,
+                }),
               });
               if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
+                const err = await res.json().catch(() => ({ error: 'Erro ao gerar retroativa em lote' }));
                 toast.error('Erro na retroativa', err.error || 'Falha ao processar');
                 return;
               }
               const data = await res.json();
-              toast.success(
-                'Retroativa concluída',
-                `${data.processed} bens processados, ${data.entriesCreated} entries geradas.`
-              );
+
+              if (data.csv) {
+                const rawText = data.csv;
+                const csvText = rawText.startsWith('\uFEFF') ? rawText : '\uFEFF' + rawText;
+                if ((window as any).api?.saveFileDialog) {
+                  const save = await (window as any).api.saveFileDialog({
+                    defaultPath: data.filename || `retroativa_lote_${startComp}_a_${endComp}.csv`,
+                    filters: [{ name: 'CSV (Valores separados por vírgula/ponto e vírgula)', extensions: ['csv'] }],
+                  });
+                  if (!save.canceled && save.filePath) {
+                    await (window as any).api.writeFile(save.filePath, csvText);
+                    toast.success(
+                      'Arquivo CSV salvo com sucesso!',
+                      `${data.entriesCreated} lançamentos exportados em ${save.filePath}`
+                    );
+                  } else {
+                    toast.info('Lançamentos gravados', 'O salvamento do arquivo CSV foi cancelado pelo usuário.');
+                  }
+                } else {
+                  const csvBlob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(csvBlob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = data.filename || `retroativa_lote_${startComp}_a_${endComp}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success(
+                    'Retroativa concluída',
+                    `${data.processed} bens processados, ${data.entriesCreated} lançamentos gerados.`
+                  );
+                }
+              } else {
+                toast.success(
+                  'Retroativa concluída',
+                  `${data.processed} bens processados, ${data.entriesCreated} lançamentos gerados.`
+                );
+              }
+
               setShowRetroBatchModal(false);
               setSelectedAssetIds(new Set());
               fetchMonthly();
               fetchDashboard();
-            } catch (e:any) {
+            } catch (e: any) {
               toast.error('Erro', e.message);
             } finally {
               setIsRetroGenerating(false);
@@ -1000,23 +1310,29 @@ function AssetModal({ isLight, editing, categories, selectedCompanyId, onClose, 
   );
 }
 
-function CategoryModal({ isLight, onClose, onSave }: any) {
-  const [name, setName] = useState('');
-  const [rate, setRate] = useState('');
+function CategoryModal({ isLight, editing, onClose, onSave }: any) {
+  const [name, setName] = useState(editing?.name || '');
+  const [rate, setRate] = useState(editing?.defaultRate !== undefined ? String(editing.defaultRate) : '');
   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className={`w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl ${isLight ? 'bg-white border border-[#e2e8f0]' : 'bg-[#18181b] border border-[#3f3f46]'}`}>
         <div className={`px-4 py-3 border-b flex justify-between items-center ${isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
-          <h3 className={`text-sm font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Nova categoria</h3>
+          <h3 className={`text-sm font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{editing ? 'Editar categoria' : 'Nova categoria'}</h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/5 cursor-pointer"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4 space-y-3">
-          <input value={name} onChange={(e)=> setName(e.target.value)} placeholder="Nome da categoria" className={`w-full px-3 py-2 rounded-lg border text-sm ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`} />
-          <input value={rate} onChange={(e)=> setRate(e.target.value)} placeholder="Taxa padrão % (ex: 10)" type="number" className={`w-full px-3 py-2 rounded-lg border text-sm ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`} />
+          <div>
+            <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Nome da categoria *</label>
+            <input value={name} onChange={(e)=> setName(e.target.value)} placeholder="Ex: Móveis e Utensílios" className={`w-full px-3 py-2 rounded-lg border text-sm ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`} />
+          </div>
+          <div>
+            <label className={`text-[11px] font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>Taxa anual padrão (%) *</label>
+            <input value={rate} onChange={(e)=> setRate(e.target.value)} placeholder="Ex: 10" type="number" step="0.01" className={`w-full px-3 py-2 rounded-lg border text-sm ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`} />
+          </div>
         </div>
         <div className={`px-4 py-3 border-t flex justify-end gap-2 ${isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
           <button onClick={onClose} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#27272a] border-[#3f3f46] text-white'}`}>Cancelar</button>
-          <button onClick={()=> onSave({ name, defaultRate: Number(rate) })} disabled={!name || !rate} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold disabled:opacity-50 cursor-pointer">Criar</button>
+          <button onClick={()=> onSave({ name, defaultRate: Number(rate) })} disabled={!name || !rate} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold disabled:opacity-50 cursor-pointer">{editing ? 'Salvar' : 'Criar'}</button>
         </div>
       </div>
     </motion.div>

@@ -55,6 +55,7 @@ interface DepreciationState {
 
   fetchCategories: () => Promise<void>;
   createCategory: (data: any) => Promise<void>;
+  updateCategory: (id: string, data: any) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 
   fetchAssets: () => Promise<void>;
@@ -151,6 +152,13 @@ export const useDepreciationStore = create<DepreciationState>((set, get) => ({
     const res = await apiFetch('/api/categories', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(data) });
     if (!res.ok) throw new Error('Erro ao criar categoria');
     await get().fetchCategories();
+  },
+
+  updateCategory: async (id, data) => {
+    const res = await apiFetch(`/api/categories/${id}`, { method: 'PATCH', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(data) });
+    if (!res.ok) throw new Error((await res.json()).error || 'Erro ao atualizar categoria');
+    await get().fetchCategories();
+    await get().fetchAssets();
   },
 
   deleteCategory: async (id) => {

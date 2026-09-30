@@ -108,10 +108,10 @@ router.get('/retroactive/csv', async (req, res) => {
   }
 });
 
-// POST /api/depreciation/retroactive/batch  { companyId, assetIds, startCompetence, endCompetence }
+// POST /api/depreciation/retroactive/batch  { companyId, assetIds, startCompetence, endCompetence, separator, numericFormat, dateFormat, columns }
 router.post('/retroactive/batch', async (req, res) => {
   try {
-    const { companyId, assetIds, startCompetence, endCompetence } = req.body;
+    const { companyId, assetIds, startCompetence, endCompetence, separator, numericFormat, dateFormat, columns } = req.body;
     if (!companyId || !Array.isArray(assetIds) || assetIds.length === 0) {
       return res.status(400).json({ error: 'companyId e assetIds são obrigatórios' });
     }
@@ -123,10 +123,11 @@ router.post('/retroactive/batch', async (req, res) => {
       assetIds,
       startCompetence,
       endCompetence,
+      options: { separator, numericFormat, dateFormat, columns },
     });
     res.json(result);
   } catch (e: any) {
-    if (e.message?.includes('devem ser')) {
+    if (e.message?.includes('devem ser') || e.message?.includes('inválidas') || e.message?.includes('anterior')) {
       return res.status(400).json({ error: e.message });
     }
     res.status(500).json({ error: e.message });

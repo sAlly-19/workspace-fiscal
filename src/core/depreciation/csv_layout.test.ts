@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { colLetterToIndex, DEFAULT_COLUMN_MAPPINGS } from '../../api/services/depreciation.service';
+import { colLetterToIndex, DEFAULT_COLUMN_MAPPINGS, formatDepreciationRowsToCsv } from '../../api/services/depreciation.service';
 
 describe('CSV Column Layout and Formatting', () => {
   it('correctly maps column letters to 0-based indexes', () => {
@@ -70,6 +70,30 @@ describe('CSV Column Layout and Formatting', () => {
     const csv = '\uFEFF' + [header, line].join('\r\n');
     expect(csv.startsWith('\uFEFF')).toBe(true);
     expect(csv.charCodeAt(0)).toBe(0xFEFF);
+  });
+
+  it('formatDepreciationRowsToCsv formats rows with BOM, CRLF, and custom options', () => {
+    const csv = formatDepreciationRowsToCsv([
+      {
+        competence: '2026-08',
+        documentNumber: '9988',
+        description: 'Notebook Dell XPS',
+        categoryName: 'Informática',
+        supplier: 'Dell Brasil',
+        acquisitionDate: '2025-01-10',
+        acquisitionValue: 500000,
+        annualRate: 20,
+        depreciationValue: 8333,
+        accumulatedValue: 166660,
+        currentValue: 333340,
+        status: 'RETROATIVO',
+      },
+    ]);
+
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    expect(csv).toContain('Data;Descrição;;Categoria;;Nº Doc;Valor');
+    expect(csv).toContain('31/08/2026;Depreciação NF 9988, 08/2026;;Informática;;NF 9988;83,33');
+    expect(csv.includes('\r\n')).toBe(true);
   });
 });
 

@@ -55,4 +55,40 @@ router.put('/dedupe-policy', async (req, res) => {
   }
 });
 
+router.get('/seen-version', async (_req, res) => {
+  try {
+    const row = await db.query.applicationSettings.findFirst({
+      where: eq(applicationSettings.key, 'seen_app_version'),
+    });
+    res.json({ version: row?.value || null });
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao buscar versão visualizada' });
+  }
+});
+
+router.post('/seen-version', async (req, res) => {
+  try {
+    const { version } = req.body as { version?: string };
+    if (!version) return res.status(400).json({ error: 'Versão obrigatória' });
+    const existing = await db.query.applicationSettings.findFirst({
+      where: eq(applicationSettings.key, 'seen_app_version'),
+    });
+    if (existing) {
+      await db
+        .update(applicationSettings)
+        .set({ value: version, updatedAt: new Date() })
+        .where(eq(applicationSettings.key, 'seen_app_version'));
+    } else {
+      await db.insert(applicationSettings).values({
+        key: 'seen_app_version',
+        value: version,
+        updatedAt: new Date(),
+      });
+    }
+    res.json({ success: true, version });
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao salvar versão visualizada' });
+  }
+});
+
 export default router;
