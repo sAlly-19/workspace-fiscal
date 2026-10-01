@@ -3,22 +3,27 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: 2.5.0
+Versão: **2.5.4**
 
 ---
 
-## Sumário
+## 📌 Sumário
 
 - [Visão Geral](#visão-geral)
+- [Galeria de Telas](#galeria-de-telas)
 - [Principais Módulos](#principais-módulos)
-  - [1. NF View (Documentos Fiscais)](#1-nf-view-documentos-fiscais)
-  - [2. Depreciação Fiscal & Ativo Imobilizado](#2-depreciação-fiscal--ativo-imobilizado)
-- [Formatos e Padrões Suportados](#formatos-e-padrões-suportados)
+  - [1. Hub Principal Unificado](#1-hub-principal-unificado)
+  - [2. NF View (Documentos Fiscais Eletrônicos)](#2-nf-view-documentos-fiscais-eletrônicos)
+  - [3. Depreciação Fiscal & Ativo Imobilizado](#3-depreciação-fiscal--ativo-imobilizado)
+  - [4. Central de Configurações Modular](#4-central-de-configurações-modular)
+  - [5. Sistema de Backup Estruturado e Restauração Segura (.wfb)](#5-sistema-de-backup-estruturado-e-restauração-segura-wfb)
+  - [6. Sistema de Atualização Integrada](#6-sistema-de-atualização-integrada)
+- [Formatos e Modelos Suportados](#formatos-e-modelos-suportados)
 - [Arquitetura e Tecnologias](#arquitetura-e-tecnologias)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Instalação e Execução](#instalação-e-execução)
   - [Pré-requisitos](#pré-requisitos)
-  - [Instalação das Dependências](#instalação-das-dependências)
+  - [Instalação](#instalação)
   - [Modo de Desenvolvimento](#modo-de-desenvolvimento)
   - [Build e Empacotamento](#build-e-empacotamento)
   - [Testes Automatizados](#testes-automatizados)
@@ -34,85 +39,190 @@ O **Workspace Fiscal** é uma aplicação desktop de alta performance construíd
 
 ---
 
+## Galeria de Telas
+
+### Hub Principal do Sistema
+Acesso centralizado aos módulos do sistema, contadores em tempo real de documentos e ativos patrimoniais, e atalhos rápidos.
+
+![Hub Principal](docs/screenshots/01-hub-principal.png)
+
+---
+
+### NF View — Gestão de Documentos Fiscais & Visualização DANFE
+Árvore de pastas do workspace, busca instantânea, badges por modelo fiscal (NF-e, NFC-e, CT-e, NFS-e) e visualização fiel aos padrões SEFAZ.
+
+![NF View Documentos](docs/screenshots/02-nfview-documentos.png)
+
+---
+
+### NF View — Quadro Analítico de Dados da Nota
+Detalhamento de dados cadastrais de emitente e destinatário, chave de acesso, duplicatas com vencimento e partição de tributos (ICMS, PIS, COFINS).
+
+![Dados Analíticos da Nota](docs/screenshots/03-danfe-nfe.png)
+
+---
+
+### NF View — Visualização Oficial de NFS-e (DANFSE)
+Layout padrão nacional/ABRASF para serviços tomados e prestados com discriminação e retenções na fonte (PIS, COFINS, INSS, IRRF, CSLL e ISS).
+
+![DANFSE NFS-e](docs/screenshots/04-danfse-nfse.png)
+
+---
+
+### NF View — Visualização Oficial de CT-e (DACTE)
+Layout rodoviário completo para conhecimentos de transporte de carga com dados do frete (peso, valor, pedágio, GRIS), motorista, placa e RNTRC.
+
+![DACTE CT-e](docs/screenshots/05-dacte-cte.png)
+
+---
+
+### NF View — Visualizador Técnico de Código XML
+Exibição do código-fonte XML original com destaque de sintaxe, formatação automática, identificação de tags e ações para cópia e download.
+
+![Visualizador XML](docs/screenshots/06-visualizador-xml.png)
+
+---
+
+### Depreciação — Painel Geral de Ativos e Competência
+Painel contábil com acompanhamento de bens cadastrados, depreciação do mês, valor contábil líquido acumulado e seletor rápido de competência.
+
+![Painel de Depreciação](docs/screenshots/07-depreciacao-dashboard.png)
+
+---
+
+### Depreciação — Detalhamento do Bem e Cronograma Mensal
+Quotas de depreciação calculadas mês a mês em centavos, ajuste proporcional (*pro-rata die*) no 1º mês, valor residual e status de lançamento.
+
+![Cronograma de Depreciação](docs/screenshots/08-depreciacao-cronograma.png)
+
+---
+
+### Depreciação — Configurador Avançado de Layout de Colunas CSV
+Personalização visual das colunas, delimitadores de campo (ponto e vírgula ou vírgula), formatos numéricos e máscaras de data para integração contábil.
+
+![Configurador de Layout CSV](docs/screenshots/09-configurador-colunas-csv.png)
+
+---
+
+### Central de Configurações — Backup Estruturado e Restauração Segura (.wfb)
+Seleção modular de dados para backup, inspeção prévia com contadores reais de notas e bens, e restauração atômica com backup prévio de segurança.
+
+![Backup e Restauração](docs/screenshots/10-configuracoes-backup.png)
+
+---
+
 ## Principais Módulos
 
-### 1. NF View (Documentos Fiscais)
+### 1. Hub Principal Unificado
+- Interface inicial com alternância rápida entre os módulos **NF View** e **Depreciação Fiscal**.
+- Contadores em tempo real da quantidade de documentos armazenados, pastas ativas, bens imobilizados e empresas cadastradas.
+- Atalhos universais pelo teclado (`Ctrl+K` para busca e navegação global).
 
-O módulo **NF View** centraliza a recepção, organização e visualização de arquivos XML de documentos fiscais brasileiros:
+---
 
+### 2. NF View (Documentos Fiscais Eletrônicos)
 - **Visualizadores e Impressão Fiéis aos Padrões Oficiais:**
-  - **DANFE (NF-e - Modelo 55):** Layout completo monocromático SEFAZ, código de barras, chave de acesso de 44 dígitos, impostos (ICMS, IPI, PIS, COFINS, ST), transportadora, volumes, duplicatas/faturas, dados dos produtos com NCM, CFOP, CST e alíquotas.
+  - **DANFE (NF-e - Modelo 55):** Layout monocromático oficial SEFAZ com código de barras Code 128, chave de acesso de 44 dígitos, quadro de impostos (ICMS, IPI, PIS, COFINS, ST), transportadora, volumes, duplicatas/faturas e produtos com NCM, CFOP, CST e alíquotas.
   - **DANFE NFC-e (Modelo 65):** Layout de cupom fiscal para consumidor com detalhamento de itens e totais.
-  - **DANFSE (NFS-e - Padrão Nacional / ABRASF):** Layout oficial para serviços com discriminação detalhada dos impostos retidos na fonte (PIS, COFINS, INSS, IRRF, CSLL, ISS Retido e Outras Retenções) e dados cadastrais do prestador e tomador.
-  - **DACTE (CT-e - Modelo 57):** Layout oficial para conhecimento de transporte rodoviário, contendo identificação de todas as partes (Emitente, Remetente, Destinatário, Expedidor, Recebedor e Tomador), discriminação de componentes do frete (Frete Peso, Frete Valor, Pedágio, GRIS, Outros), tributação do ICMS, características e peso da carga, documentos originários (NF-e vinculadas) e dados do modal rodoviário (RNTRC, placa, UF e motorista).
-- **Importação Flexível e Recursiva:**
-  - Upload por seleção ou arrastar e soltar (drag & drop).
-  - Importação de arquivos XML individuais.
-  - Importação de pastas inteiras com leitura recursiva de subdiretórios.
-  - Importação e descompactação automática de pacotes compactados em formato `.zip`.
-- **Organização em Árvore de Pastas (Workspace):**
-  - Criação, renomeação e exclusão de pastas hierárquicas.
-  - Movimentação de documentos individualmente ou em lote.
-  - Seleção múltipla com contadores e ações em lote (impressão, movimentação, exclusão).
-- **Filtros e Busca em Tempo Real:**
-  - Pesquisa instantânea por número do documento, razão social, CNPJ/CPF ou chave de acesso.
+  - **DANFSE (NFS-e - Padrão Nacional / ABRASF):** Layout para prestação de serviços com destaque aos tributos retidos na fonte (PIS, COFINS, INSS, IRRF, CSLL, ISS Retido e Outras Retenções) e dados cadastrais das partes.
+  - **DACTE (CT-e - Modelo 57):** Layout para transporte rodoviário de cargas contendo tomador, componentes tarifários do frete (Frete Peso, Frete Valor, Pedágio, GRIS), tributação do ICMS, características da carga, documentos originários vinculados e identificação do veículo/motorista.
+- **Importação Flexível e em Lote:**
+  - Importação de arquivos XML individuais via seleção ou arrastar e soltar (drag & drop).
+  - Importação de diretórios completos com varredura recursiva de subpastas.
+  - Descompactação automática de arquivos compactados em formato `.zip`.
+- **Organização Hierárquica em Árvore (Workspaces):**
+  - Criação, renomeação e exclusão de pastas estruturadas.
+  - Movimentação de documentos individualmente ou em lote entre pastas.
+  - Seleção múltipla para ações em massa (impressão unificada em A4, exportação ou exclusão).
+- **Pesquisa e Filtros:**
+  - Busca instantânea por número do documento, razão social, CNPJ/CPF ou chave de acesso.
 - **Visualizador Técnico de XML:**
-  - Aba com visualização do código-fonte XML original com destaque de sintaxe, formatação e botão de cópia.
-- **Impressão e Exportação em Lote:**
-  - Geração de HTML/PDF padronizado para impressão de múltiplos documentos simultaneamente com quebra de página automática.
+  - Aba técnica com realce de sintaxe colorido, numeração de linhas e ações rápidas para copiar o código ou baixar o arquivo.
 
 ---
 
-### 2. Depreciação Fiscal & Ativo Imobilizado
-
-O módulo de **Depreciação Fiscal** gerencia a vida útil e as quotas de depreciação mensal dos bens patrimoniais da empresa:
-
+### 3. Depreciação Fiscal & Ativo Imobilizado
 - **Gestão Multiempresa:**
-  - Cadastro de múltiplas empresas por Razão Social e CNPJ.
-  - Alternância rápida de contexto entre filiais e clientes.
-- **Cadastro e Importação de Bens:**
-  - Cadastro manual com data de aquisição, valor de custo, valor residual e categoria.
-  - Importação inteligente de bens diretamente a partir dos itens de arquivos XML de NF-e de entrada.
+  - Cadastro de múltiplas empresas por Razão Social, Nome Fantasia e CNPJ.
+  - Regras de depreciação contábil configuráveis por empresa ativa (*Proporcional aos dias*, *Mês cheio de aquisição* ou *Mês subsequente*).
 - **Categorização Contábil:**
-  - Cadastro de categorias com definição de taxa de depreciação anual (%) e anos de vida útil (ex.: Máquinas e Equipamentos, Veículos, Móveis e Utensílios, Edificações, Equipamentos de Informática).
-- **Motor de Cálculo Linear Automatizado:**
-  - Cálculo de quota de depreciação mensal por competência (AAAA-MM).
-  - Cálculo proporcional (pro-rata die) no 1º mês com base nos dias restantes a partir da data de aquisição.
-  - Ajuste residual de centavos na última parcela para zerar a diferença em relação ao valor depreciável.
-  - Acompanhamento do valor contábil líquido e da depreciação acumulada mês a mês.
-- **Depreciação Retroativa (Individual e em Lote):**
-  - Geração em lote do histórico de competências passadas para ativos cadastrados com data de aquisição anterior à competência atual.
+  - Grupos de ativos com taxas de depreciação anual (%) e vida útil pré-definida (Máquinas e Equipamentos, Veículos, Equipamentos de Informática, Móveis e Utensílios, Edificações).
+- **Motor Linear em Centavos:**
+  - Cálculo estritamente em números inteiros (centavos), eliminando imprecisões e desvios de arredondamento de ponto flutuante (*float*).
+  - Cálculo proporcional (*pro-rata die*) no primeiro mês considerando os dias restantes a partir da data de aquisição.
+  - Ajuste residual automático de centavos na última competência para zerar a diferença em relação ao valor depreciável total.
+- **Histórico e Quotas Retroativas:**
+  - Geração automática e em lote do histórico de competências passadas para bens com data de aquisição anterior à competência ativa.
 - **Controle de Baixa e Reativação:**
-  - Registro de baixa patrimonial (venda, sucata, descarte ou perda) com data de cessação e motivo.
-  - Possibilidade de reativação de ativos baixados.
-- **Exportação Contábil e Relatórios:**
-  - Exportação de dados formatados para integração contábil (compatível com layout Domínio Sistemas).
-  - Demonstração visual do cronograma de competências com status de lançamento (Exportado, Atual, Não Lançado, Futuro).
+  - Registro de baixa patrimonial por motivo de venda, perda, descarte ou sucata com data de cessação de quotas.
+  - Opção para reativação imediata de bens baixados.
+- **Configuração e Exportação CSV Personalizada:**
+  - Mapeamento dinâmico de colunas para adequação a qualquer software contábil (ex.: Domínio Sistemas).
+  - Customização de separadores (`;` ou `,`), padrões monetários (brasileiro `1.234,56` ou internacional `1234.56`) e formatação de datas.
 
 ---
 
-## Formatos e Padrões Suportados
+### 4. Central de Configurações Modular
+Organizada em 4 abas especializadas:
+- **Geral:** Gestão de tema visual (Claro, Escuro e Sistema), mapa de atalhos de teclado e informações de versão.
+- **NF View:** Preferências visuais da DANFE, políticas de desduplicação de arquivos repetidos na importação, e manutenção da base de documentos fiscais.
+- **Depreciação:** Regra padrão de início de depreciação da empresa ativa, padrões de formatação numérica e monetária para exportações CSV e atalho ao configurador de colunas.
+- **Backup & Restauração:** Criação de cópias sob demanda, restauração assistida com inspeção prévia e agendamento periódico com regras de retenção.
 
-| Documento | Modelo | Padrão / Layout | Parser |
-| :--- | :--- | :--- | :--- |
-| **NF-e** | 55 | SEFAZ Nacional (ProcNFe / NFe) | `NFeParser` |
-| **NFC-e** | 65 | SEFAZ Estadual | `NFeParser` |
-| **NFS-e** | - | ABRASF / Sefin Nacional (CompNfse / Nfse) | `NFSeParser` |
-| **CT-e** | 57 | SEFAZ DACTE Rodoviário (CteProc / CTe) | `CTeParser` |
-| **ZIP** | - | Arquivos compactados contendo múltiplos XMLs | `adm-zip` |
+---
+
+### 5. Sistema de Backup Estruturado e Restauração Segura (.wfb)
+- **Pacote Autocontido `.wfb`:**
+  - Arquivo compactado contendo metadados completos (`manifest.json`), base de dados SQLite consistente e todos os arquivos XML físicos do NF View.
+- **Inspeção Prévia com Contadores Reais:**
+  - Antes de executar a restauração, o sistema inspeciona o arquivo e apresenta ao usuário os totais exatos de notas, eventos fiscais, empresas, bens e competências contidas no backup.
+- **Restauração Seletiva:**
+  - Permite restaurar seletivamente os módulos desejados (**NF View**, **Depreciação** e/ou **Configurações Gerais**).
+- **Proteção por Backup de Emergência Automático:**
+  - Antes de qualquer escrita durante a restauração, o sistema gera compulsoriamente um snapshot de segurança do estado atual do banco.
+- **Transação Atômica com Rollback:**
+  - Operação sob transação única do SQLite. Qualquer falha técnica provoca a reversão atômica sem corromper o banco de dados.
+- **Portabilidade de Caminhos de XMLs:**
+  - Os caminhos originais dos documentos são resolvidos dinamicamente por nome base de arquivo (*basename*), permitindo migração de backups entre computadores e perfis distintos sem perda de vínculos.
+- **Compatibilidade Retroativa:**
+  - Suporte total para inspeção e importação de bases de dados legadas no formato `.db`.
+
+---
+
+### 6. Sistema de Atualização Integrada
+- **Download Interno no Aplicativo:** O instalador é transferido diretamente dentro do Workspace Fiscal, sem necessidade de download manual pelo navegador.
+- **Barra de Progresso Real:** Monitoramento em tempo real do percentual e velocidade do download.
+- **Instalação e Reinício:** Notificação quando o pacote estiver pronto, aplicando o update e reiniciando a aplicação com um clique.
+- **Detecção de Distribuição:** Tratamento adequado para instalações convencionais (NSIS) e executáveis portáteis (*Portable*).
+
+---
+
+## Formatos e Modelos Suportados
+
+| Modelo | Documento | Padrão / Layout | Parser Embutido |
+| :---: | :--- | :--- | :--- |
+| **55** | **NF-e** (Nota Fiscal Eletrônica de Mercadorias) | SEFAZ Nacional (ProcNFe / NFe v4.00) | `NFeParser` |
+| **65** | **NFC-e** (Nota Fiscal de Consumidor Eletrônica) | SEFAZ Estadual | `NFeParser` |
+| **57** | **CT-e** (Conhecimento de Transporte Eletrônico) | SEFAZ DACTE Rodoviário v3.00/v4.00 | `CTeParser` |
+| **-** | **NFS-e** (Nota Fiscal de Serviços Eletrônica) | Padrão Nacional / ABRASF (CompNfse / Nfse) | `NFSeParser` |
+| **-** | **CC-e** (Carta de Correção Eletrônica) | Evento SEFAZ 110110 | `CCeParser` |
+| **-** | **ZIP** (Lote Compactado) | Arquivos `.zip` com múltiplos XMLs em pastas | `adm-zip` |
+| **-** | **WFB** (Workspace Fiscal Backup) | Pacote estruturado com banco, manifesto e XMLs | `adm-zip` |
 
 ---
 
 ## Arquitetura e Tecnologias
 
-A aplicação adota uma arquitetura desacoplada que permite execução desktop nativa via Electron com um servidor local Express embutido e interface moderna em React:
+A aplicação opera localmente no computador do usuário, desacoplando a interface visual em React do processo de dados e API local em Node.js/Express:
 
 ```
 [ Electron 33 (Desktop Runtime) ]
-   ├── [ Webview / Renderer ] ── React 19 + Tailwind CSS + Lucide
+   ├── [ Webview / Renderer ] ── React 19 + Tailwind CSS 4 + Lucide Icons + Motion
    └── [ Node Main Process ]  ── IPC Seguro + Servidor Local Express
-                                    ├── Parsers Fiscais (fast-xml-parser)
-                                    └── Banco Local (SQLite + Drizzle ORM)
+                                    ├── Parsers Fiscais XML (fast-xml-parser)
+                                    ├── Motor de Depreciação Linear em Centavos
+                                    ├── Motor de Backup Portável (.wfb)
+                                    └── Banco Local SQLite (Modo WAL) + Drizzle ORM
 ```
 
 ### Tecnologias Utilizadas
@@ -122,28 +232,29 @@ A aplicação adota uma arquitetura desacoplada que permite execução desktop n
   - TypeScript 5.8
   - Tailwind CSS 4
   - Motion (Framer Motion)
-  - Lucide React (Iconografia)
+  - Lucide React (Iconografia vetorial)
   - Zustand (Gerenciamento de Estado Global)
+  - React Syntax Highlighter (Realce de sintaxe Prism)
   - React Resizable Panels
-  - React Syntax Highlighter
 - **Backend & Processamento:**
   - Node.js & Express 4
-  - Fast-XML-Parser (Parser XML de alta performance com preservação de chaves)
-  - Adm-Zip (Descompactação de lotes em memória)
-  - Multer (Recepção de payloads multipart/form-data)
-  - Pino / Pino-Pretty (Logging estruturado)
-  - Helmet & Rate Limiting (Segurança de rotas)
-  - Zod (Validação de schemas)
+  - Fast-XML-Parser (Parser XML performático com preservação de estrutura)
+  - Adm-Zip (Compactação e extração de pacotes `.zip` e `.wfb`)
+  - Multer (Recepção de payloads de arquivos)
+  - Pino & Pino-Pretty (Logging estruturado)
+  - Helmet & Rate Limiting (Segurança de rotas internas)
+  - Zod (Validação de esquemas e tipagens de entrada)
 - **Persistência de Dados:**
-  - SQLite (Banco local offline)
+  - SQLite (Banco de dados relacional local offline com modo WAL)
   - Drizzle ORM & Drizzle Kit (Mapeamento relacional e migrações tipadas)
   - LibSQL Client
-- **Runtime Desktop:**
+- **Runtime Desktop & Empacotamento:**
   - Electron 33
-  - Electron Builder (Geração de instaladores NSIS e executáveis portáteis)
-  - ESBuild (Compilação ultra-rápida do processo principal e preload)
+  - Electron Builder (Instaladores NSIS e executáveis portáteis)
+  - Electron Updater (Atualizações automáticas via GitHub Releases)
+  - ESBuild (Compilação do processo principal e preload)
 - **Qualidade e Testes:**
-  - Vitest (Suite de testes unitários dos parsers e regras de negócio)
+  - Vitest (Suíte de testes unitários para cálculo contábil, parsers fiscais e rotinas de backup)
   - TypeScript Compiler (`tsc --noEmit`)
 
 ---
@@ -152,37 +263,41 @@ A aplicação adota uma arquitetura desacoplada que permite execução desktop n
 
 ```
 workspace-fiscal/
-├── electron/                   # Código do processo principal Electron
-│   ├── main.ts                 # Ciclo de vida da janela, inicialização do Express e IPC
+├── docs/                       # Documentação técnica e capturas de tela do sistema
+│   └── screenshots/            # Imagens em alta resolução utilizadas no repositório
+├── electron/                   # Processo principal do Electron
+│   ├── main.ts                 # Inicialização da janela, servidor Express e handlers de IPC
 │   ├── preload.ts              # Script de contexto seguro exposto ao frontend
-│   └── tsconfig.json           # Configuração TypeScript para o Electron
+│   └── tsconfig.json           # Configuração de compilação do Electron
 ├── src/
-│   ├── api/                    # Servidor de API REST local (Express)
-│   │   ├── routes/             # Rotas de documentos, workspace, importação e depreciação
-│   │   ├── services/           # Regras de negócio de importação, cálculo e exportação
+│   ├── api/                    # Servidor local Express
+│   │   ├── routes/             # Rotas de documentos, workspace, importação, depreciação e backup
+│   │   ├── services/           # Serviços de negócio (importação, cálculo, exportação, backup)
 │   │   └── app.ts              # Configuração dos middlewares e rotas Express
-│   ├── core/                   # Núcleo de domínio e parsers fiscais
+│   ├── core/                   # Domínio e regras de negócio
 │   │   ├── parsers/            # Extratores de NF-e, NFC-e, NFS-e e CT-e
-│   │   ├── danfe/              # Formatadores de CNPJ/CPF, datas, CEP, moedas e chaves
-│   │   └── fiscal.types.ts     # Tipagem canônica de documentos e impostos
-│   ├── db/                     # Camada de banco de dados
+│   │   ├── danfe/              # Formatadores de moeda, CNPJ/CPF, chaves e datas
+│   │   ├── depreciation/       # Motor linear de cálculo de depreciação em centavos
+│   │   └── updater/            # Serviço de integração de atualizações
+│   ├── db/                     # Banco de dados local
 │   │   ├── schema.ts           # Definição das tabelas em Drizzle ORM
-│   │   └── index.ts            # Inicialização e conexão com o SQLite
+│   │   └── index.ts            # Inicialização, pragmas do SQLite e migrações automáticas
 │   └── web/                    # Interface gráfica do usuário (React)
-│       ├── components/         # Componentes compartilhados (TitleBar, Modais, Splash, Toasts)
-│       ├── features/           # Módulos principais
-│       │   ├── documents/      # Visualizadores DANFE, DANFSE, DACTE e lista de notas
-│       │   ├── depreciation/   # Gestão de bens, competências, cronograma e relatórios
-│       │   └── workspace/      # Gerenciamento da árvore de pastas fiscais
-│       ├── layouts/            # Layout principal e navegação do sistema
+│       ├── components/         # Componentes compartilhados e modais do sistema
+│       │   └── settings/       # Abas modulares da Central de Configurações
+│       ├── features/           # Módulos funcionais da aplicação
+│       │   ├── documents/      # Visualizadores DANFE, DANFSE, DACTE e lista de documentos
+│       │   ├── depreciation/   # Gestão de bens, cronograma, categorias e exportador CSV
+│       │   ├── home/           # Hub inicial do sistema
+│       │   └── workspace/      # Gerenciador da árvore de pastas fiscais
+│       ├── layouts/            # Layout principal e barras de navegação
 │       ├── stores/             # Stores Zustand (workspace e depreciação)
-│       ├── styles/             # Estilos globais e Tailwind CSS
-│       └── main.tsx            # Ponto de entrada do React
-├── public/                     # Ícones e ativos estáticos da aplicação
-├── scripts/                    # Scripts auxiliares para execução e inicialização
-├── package.json                # Dependências, scripts e configurações de build
-├── vite.config.ts              # Configuração do Vite e plugins
-└── tsconfig.json               # Configuração TypeScript do projeto
+│       └── main.tsx            # Ponto de entrada da aplicação React
+├── storage/                    # Diretório local para armazenamento físico de XMLs importados
+├── scripts/                    # Scripts utilitários de execução e inicialização
+├── package.json                # Metadados do projeto, scripts e dependências
+├── vite.config.ts              # Configuração do Vite
+└── tsconfig.json               # Configuração do TypeScript
 ```
 
 ---
@@ -194,9 +309,9 @@ workspace-fiscal/
 - **Node.js:** Versão 20.x ou superior recomendada.
 - **npm:** Versão 10.x ou superior.
 
-### Instalação das Dependências
+### Instalação
 
-Clone o repositório e instale os pacotes necessários:
+Clone o repositório e instale as dependências:
 
 ```bash
 git clone https://github.com/sAlly-19/workspace-fiscal.git
@@ -226,26 +341,20 @@ Para compilar o frontend e os scripts do Electron:
 npm run build
 ```
 
-Para gerar os instaladores de produção para Windows (`.exe` instalador NSIS e versão portátil):
+Para gerar os pacotes executáveis de produção para Windows (instalador NSIS e executável portátil):
 
 ```bash
 npm run package
 ```
 
-Os instaladores gerados serão disponibilizados no diretório `release/`.
+Os arquivos compilados estarão disponíveis no diretório `release/`.
 
 ### Testes Automatizados
 
-Para executar a suite de testes unitários:
+Para executar toda a suíte de testes automatizados:
 
 ```bash
 npm test
-```
-
-Para executar os testes em modo interativo de monitoramento:
-
-```bash
-npm run test:watch
 ```
 
 ### Validação de Tipos
@@ -260,9 +369,10 @@ npm run lint
 
 ## Segurança e Privacidade
 
-- **Processamento 100% Local:** Os arquivos XML importados, dados cadastrais e cálculos de depreciação são gravados exclusivamente no banco de dados SQLite local da máquina do usuário.
-- **Isolamento de Contexto:** A aplicação Electron opera com `contextIsolation: true` e `nodeIntegration: false`, restringindo o acesso do renderer exclusivamente às interfaces seguras declaradas no preload script.
-- **Zero Telemetria ou Envio Externo:** Nenhum dado fiscal confidencial é transmitido para servidores de terceiros.
+- **Processamento 100% Offline e Local:** Os arquivos XML, cadastros de empresas e ativos patrimoniais são processados e armazenados exclusivamente no banco de dados SQLite local da máquina do usuário.
+- **Isolamento de Contexto:** A execução do Electron adota `contextIsolation: true`, `nodeIntegration: false` e sandbox, restringindo o acesso do frontend exclusivamente aos métodos seguros declarados no script de *preload*.
+- **Integridade Transacional:** As operações críticas sobre o banco de dados operam com modo WAL (*Write-Ahead Logging*) e transações imediatas para prevenir corrupção em casos de encerramento abrupto do sistema operacional.
+- **Sem Telemetria ou Envio Externo:** A aplicação não envia dados fiscais ou contábeis para servidores externos de terceiros.
 
 ---
 

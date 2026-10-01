@@ -75,7 +75,7 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
 
     expect(fs.existsSync(backupRes.path)).toBe(true);
     expect(backupRes.manifest.format).toBe('workspace-fiscal-backup');
-    expect(backupRes.manifest.appVersion).toBe('2.5.3');
+    expect(backupRes.manifest.appVersion).toBe('2.5.4');
     expect(backupRes.manifest.modules).toEqual(['NF_VIEW', 'DEPRECIATION', 'SETTINGS']);
     expect(backupRes.manifest.stats.companies).toBeGreaterThanOrEqual(1);
     expect(backupRes.manifest.stats.assets).toBeGreaterThanOrEqual(1);
@@ -85,7 +85,7 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
     expect(inspection.valid).toBe(true);
     expect(inspection.isLegacy).toBe(false);
     expect(inspection.format).toBe('wfb');
-    expect(inspection.appVersion).toBe('2.5.3');
+    expect(inspection.appVersion).toBe('2.5.4');
     expect(inspection.modules).toContain('DEPRECIATION');
     expect(inspection.modules).toContain('NF_VIEW');
     expect(inspection.modules).toContain('SETTINGS');

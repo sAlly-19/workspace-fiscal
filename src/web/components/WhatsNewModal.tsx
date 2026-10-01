@@ -11,13 +11,11 @@ import {
   Filter,
   Tag,
   Layers,
-  HardDrive,
-  Settings,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '2.5.3';
+export const CURRENT_APP_VERSION = '2.5.4';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
 interface WhatsNewModalProps {
@@ -279,66 +277,6 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                       <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
                         <li><b>Módulos Especializados:</b> Separação em submódulos dedicados para cálculos, exportação CSV, gerenciamento de regras e componentes de visualização.</li>
                         <li><b>Preservação Absoluta:</b> 100% das fórmulas, taxas fiscais e integridade de dados preservadas com todos os testes automatizados validados.</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Backup Estruturado e Restauração Segura */}
-                <div
-                  className={`p-4 rounded-xl border transition-all ${
-                    isLight
-                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-cyan-300'
-                      : 'bg-[#111114] border-[#27272a] hover:border-cyan-500/30'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0 mt-0.5">
-                      <HardDrive className="w-4 h-4" />
-                    </div>
-                    <div className="space-y-1.5 flex-1">
-                      <h3 className="font-bold text-sm flex items-center justify-between">
-                        <span>Backup Estruturado (.wfb) e Restauração Segura</span>
-                        <span className="text-[10px] font-semibold text-cyan-500 uppercase tracking-wider">Novo Recurso</span>
-                      </h3>
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        Sistema de cópias de segurança portátil, seletivo e com recuperação à prova de falhas:
-                      </p>
-                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        <li><b>Formato Portátil (.wfb):</b> Pacote autônomo contendo banco de dados, manifesto com metadados e os arquivos XML físicos do NF View para portabilidade completa entre computadores.</li>
-                        <li><b>Seleção de Módulos:</b> Escolha exatamente o que salvar ou restaurar (NF View, Depreciação ou Configurações).</li>
-                        <li><b>Backup de Segurança Automático:</b> Criação mandatória de uma cópia de segurança antes de qualquer restauração para garantir recuperação em caso de imprevistos.</li>
-                        <li><b>Compatibilidade Legada:</b> Suporte direto para inspecionar e restaurar bancos brutos (.db) de versões anteriores.</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Novo Modal de Configurações Modular */}
-                <div
-                  className={`p-4 rounded-xl border transition-all ${
-                    isLight
-                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-amber-300'
-                      : 'bg-[#111114] border-[#27272a] hover:border-amber-500/30'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-                      <Settings className="w-4 h-4" />
-                    </div>
-                    <div className="space-y-1.5 flex-1">
-                      <h3 className="font-bold text-sm flex items-center justify-between">
-                        <span>Central de Configurações Reorganizada em Abas</span>
-                        <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wider">Usabilidade</span>
-                      </h3>
-                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        Interface reestruturada com navegação lateral clara dividida em escopos:
-                      </p>
-                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        <li><b>Geral:</b> Controle de tema claro/escuro, informações do sistema e atalhos rápidos de teclado.</li>
-                        <li><b>NF View:</b> Preferências de layout e impressão de DANFE, política de deduplicação e limpeza seletiva de notas.</li>
-                        <li><b>Depreciação:</b> Definição da regra de início da depreciação por empresa (Pró-rata, Mês da compra ou Subsequente) e preferências de formato CSV.</li>
-                        <li><b>Backup:</b> Criação seletiva, restauração inspecionada e agendamento de rotinas automáticas em um só local.</li>
                       </ul>
                     </div>
                   </div>

@@ -381,7 +381,7 @@ export class BackupService {
     const manifest: BackupManifest = {
       format: 'workspace-fiscal-backup',
       formatVersion: '1.0',
-      appVersion: '2.5.3',
+      appVersion: '2.5.4',
       createdAt: new Date().toISOString(),
       modules,
       stats: manifestStats,

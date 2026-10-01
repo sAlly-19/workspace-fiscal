@@ -4,7 +4,7 @@
   "description": "Hub desktop para visualização e gestão de documentos fiscais e depreciação patrimonial.",
   "author": "Workspace Fiscal",
   "private": true,
-  "version": "2.5.3",
+  "version": "2.5.4",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
