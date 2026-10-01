@@ -28,6 +28,8 @@ sqlite.db-journal
 *.db
 *.db-shm
 *.db-wal
+*.bak
+backups/
 storage/
 # Electron userData (quando empacotado)
 # O SQLite em produção vai para AppData/Roaming/Electron/workspace-fiscal.sqlite

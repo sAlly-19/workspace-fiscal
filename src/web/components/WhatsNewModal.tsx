@@ -15,7 +15,7 @@ import {
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '2.5.4';
+export const CURRENT_APP_VERSION = '2.5.3';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
 interface WhatsNewModalProps {
