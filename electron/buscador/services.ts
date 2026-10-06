@@ -16,6 +16,15 @@ import { SefazDistributionProvider } from '../../src/core/buscador/fiscal/provid
 import { IFiscalDistributionProvider } from '../../src/core/buscador/fiscal/providers/IFiscalDistributionProvider';
 import { DistributionEngine } from '../../src/core/buscador/fiscal/services/DistributionEngine';
 import { ZipService } from '../../src/core/buscador/downloads/ZipService';
+import { NfseEventRepository } from '../../src/core/buscador/database/repositories/NfseEventRepository';
+import { NfseWireContract } from '../../src/core/buscador/nfse/clients/NfseWireContract';
+import { UnavailableNfseWireContract } from '../../src/core/buscador/nfse/clients/UnavailableNfseWireContract';
+import { NfseAdnClient } from '../../src/core/buscador/nfse/clients/NfseAdnClient';
+import { NfseSefinClient } from '../../src/core/buscador/nfse/clients/NfseSefinClient';
+import { NfseGateway } from '../../src/core/buscador/nfse/clients/NfseGateway';
+import { NfsePersistenceService } from '../../src/core/buscador/nfse/services/NfsePersistenceService';
+import { NfseSynchronizer } from '../../src/core/buscador/nfse/services/NfseSynchronizer';
+import { NfseDirectQueryService } from '../../src/core/buscador/nfse/services/NfseDirectQueryService';
 
 export interface ApplicationContext {
   db: Awaited<ReturnType<typeof getDatabase>>;
@@ -30,6 +39,14 @@ export interface ApplicationContext {
   fiscalProvider: IFiscalDistributionProvider;
   distributionEngine: DistributionEngine;
   zipService: ZipService;
+  nfseEventRepo: NfseEventRepository;
+  nfseWireContract: NfseWireContract;
+  nfseAdnClient: NfseAdnClient;
+  nfseSefinClient: NfseSefinClient;
+  nfseGateway: NfseGateway;
+  nfsePersistence: NfsePersistenceService;
+  nfseSynchronizer: NfseSynchronizer;
+  nfseDirectQuery: NfseDirectQueryService;
 }
 
 export async function initializeServices(userDataPath: string): Promise<ApplicationContext> {
@@ -70,6 +87,39 @@ export async function initializeServices(userDataPath: string): Promise<Applicat
     fiscalProvider
   );
 
+  const nfseEventRepo = new NfseEventRepository(db);
+  const nfseWireContract = new UnavailableNfseWireContract();
+  const nfseAdnClient = new NfseAdnClient(certProvider, nfseWireContract);
+  const nfseSefinClient = new NfseSefinClient(certProvider, nfseWireContract);
+  const nfseGateway: NfseGateway = {
+    distribute: (input) => nfseAdnClient.distribute(input),
+    consultByKey: (input) => nfseSefinClient.consultByKey(input),
+    consultEvents: (input) => nfseAdnClient.consultEvents(input),
+  };
+  const nfsePersistence = new NfsePersistenceService(
+    db,
+    docRepo,
+    nfseEventRepo,
+    distStateRepo,
+    storageService
+  );
+  const nfseSynchronizer = new NfseSynchronizer(
+    companyRepo,
+    certRepo,
+    distStateRepo,
+    settingsRepo,
+    nfsePersistence,
+    nfseGateway
+  );
+  const nfseDirectQuery = new NfseDirectQueryService(
+    companyRepo,
+    certRepo,
+    docRepo,
+    settingsRepo,
+    nfsePersistence,
+    nfseGateway
+  );
+
   return {
     db,
     companyService,
@@ -83,5 +133,13 @@ export async function initializeServices(userDataPath: string): Promise<Applicat
     fiscalProvider,
     distributionEngine,
     zipService,
+    nfseEventRepo,
+    nfseWireContract,
+    nfseAdnClient,
+    nfseSefinClient,
+    nfseGateway,
+    nfsePersistence,
+    nfseSynchronizer,
+    nfseDirectQuery,
   };
 }

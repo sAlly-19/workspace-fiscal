@@ -126,6 +126,36 @@ const fiscalApi = {
       };
     },
   },
+  nfse: {
+    sync: (companyId: number, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:sync', companyId, environment),
+    getStatus: (companyId: number, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:getStatus', companyId, environment),
+    cancelSync: (companyId: number, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:cancelSync', companyId, environment),
+    resetNSU: (companyId: number, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:resetNSU', companyId, environment),
+    consultByKey: (companyId: number, accessKey: string, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:consultByKey', companyId, accessKey, environment),
+    getEvents: (companyId: number, accessKey: string, environment?: 'homologation' | 'production') =>
+      ipcRenderer.invoke('nfse:getEvents', companyId, accessKey, environment),
+    onProgress: (
+      callback: (data: {
+        companyId: number;
+        message: string;
+        currentNsu?: string;
+        maxNsu?: string;
+        documentsCount?: number;
+        eventsCount?: number;
+      }) => void
+    ) => {
+      const subscription = (_event: any, data: any) => callback(data);
+      ipcRenderer.on('nfse:progress', subscription);
+      return () => {
+        ipcRenderer.removeListener('nfse:progress', subscription);
+      };
+    },
+  },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     update: (settings: any) => ipcRenderer.invoke('settings:update', settings),

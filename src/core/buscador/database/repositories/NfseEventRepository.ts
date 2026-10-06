@@ -77,6 +77,26 @@ export class NfseEventRepository {
     ).map(toDomainEvent);
   }
 
+  public findByAccessKey(
+    companyId: number,
+    accessKey: string,
+    environment?: NfseEvent['environment']
+  ): NfseEvent[] {
+    const cleanKey = normalizeNfseAccessKey(accessKey);
+    if (environment) {
+      return this.db.queryAll<NfseEventRow>(
+        `SELECT * FROM nfse_events WHERE company_id = ? AND environment = ? AND access_key = ?
+         ORDER BY event_date, event_sequence, id;`,
+        [companyId, environment, cleanKey]
+      ).map(toDomainEvent);
+    }
+    return this.db.queryAll<NfseEventRow>(
+      `SELECT * FROM nfse_events WHERE company_id = ? AND access_key = ?
+       ORDER BY event_date, event_sequence, id;`,
+      [companyId, cleanKey]
+    ).map(toDomainEvent);
+  }
+
   private findById(id: number): NfseEvent | null {
     const row = this.db.queryOne<NfseEventRow>('SELECT * FROM nfse_events WHERE id = ?;', [id]);
     return row ? toDomainEvent(row) : null;

@@ -14,6 +14,9 @@ import type {
   DownloadBatchOptions,
   DownloadBatchResult
 } from '../core/buscador/domain/types';
+import type { NfseEnvironment, NfseEvent } from '../core/buscador/nfse/domain/types';
+import type { NfseSyncResult, NfseSyncStatus } from '../core/buscador/nfse/services/NfseSynchronizer';
+import type { NfseDirectQueryResult } from '../core/buscador/nfse/services/NfseDirectQueryService';
 
 export interface FiscalDesktopAPI {
   companies: {
@@ -43,6 +46,15 @@ export interface FiscalDesktopAPI {
     cancelQuery: (companyId: number, docType?: 'NFE' | 'CTE') => Promise<boolean>;
     resetNSU: (companyId: number, docType: 'NFE' | 'CTE') => Promise<boolean>;
     onProgress: (callback: (data: { companyId: number; documentType: 'NFE' | 'CTE'; message: string; currentNSU?: string; count?: number }) => void) => () => void;
+  };
+  nfse: {
+    sync: (companyId: number, environment?: NfseEnvironment) => Promise<NfseSyncResult>;
+    getStatus: (companyId: number, environment?: NfseEnvironment) => Promise<NfseSyncStatus>;
+    cancelSync: (companyId: number, environment?: NfseEnvironment) => Promise<boolean>;
+    resetNSU: (companyId: number, environment?: NfseEnvironment) => Promise<boolean>;
+    consultByKey: (companyId: number, accessKey: string, environment?: NfseEnvironment) => Promise<NfseDirectQueryResult>;
+    getEvents: (companyId: number, accessKey: string, environment?: NfseEnvironment) => Promise<NfseEvent[]>;
+    onProgress: (callback: (data: { companyId: number; message: string; currentNsu?: string; maxNsu?: string; documentsCount?: number; eventsCount?: number }) => void) => () => void;
   };
   settings: {
     get: () => Promise<AppSettings>;
