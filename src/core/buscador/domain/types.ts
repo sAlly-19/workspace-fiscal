@@ -1,4 +1,4 @@
-export type DocumentType = 'NFE' | 'CTE';
+export type DocumentType = 'NFE' | 'CTE' | 'NFSE';
 
 export type SefazEnvironment = 'homologation' | 'production';
 

@@ -2,10 +2,11 @@ import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { sanitizeFilename } from '../storage/path-sanitizer';
+import type { DocumentType } from '../domain/types';
 
 export interface ZipFileInput {
   sourcePath: string;
-  docType: 'NFE' | 'CTE';
+  docType: DocumentType;
   accessKey: string;
   format: 'XML' | 'PDF';
 }
