@@ -60,7 +60,7 @@ describe('getNfseEndpoints', () => {
   it('returns the official restricted-production bases for homologation', () => {
     expect(getNfseEndpoints('homologation')).toEqual({
       adnBaseUrl: 'https://adn.producaorestrita.nfse.gov.br/contribuintes',
-      sefinBaseUrl: 'https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional',
+      sefinBaseUrl: 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional',
     });
   });
 });

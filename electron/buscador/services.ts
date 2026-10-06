@@ -18,7 +18,7 @@ import { DistributionEngine } from '../../src/core/buscador/fiscal/services/Dist
 import { ZipService } from '../../src/core/buscador/downloads/ZipService';
 import { NfseEventRepository } from '../../src/core/buscador/database/repositories/NfseEventRepository';
 import { NfseWireContract } from '../../src/core/buscador/nfse/clients/NfseWireContract';
-import { UnavailableNfseWireContract } from '../../src/core/buscador/nfse/clients/UnavailableNfseWireContract';
+import { OfficialNfseWireContract } from '../../src/core/buscador/nfse/clients/OfficialNfseWireContract';
 import { NfseAdnClient } from '../../src/core/buscador/nfse/clients/NfseAdnClient';
 import { NfseSefinClient } from '../../src/core/buscador/nfse/clients/NfseSefinClient';
 import { NfseGateway } from '../../src/core/buscador/nfse/clients/NfseGateway';
@@ -88,7 +88,7 @@ export async function initializeServices(userDataPath: string): Promise<Applicat
   );
 
   const nfseEventRepo = new NfseEventRepository(db);
-  const nfseWireContract = new UnavailableNfseWireContract();
+  const nfseWireContract = new OfficialNfseWireContract();
   const nfseAdnClient = new NfseAdnClient(certProvider, nfseWireContract);
   const nfseSefinClient = new NfseSefinClient(certProvider, nfseWireContract);
   const nfseGateway: NfseGateway = {

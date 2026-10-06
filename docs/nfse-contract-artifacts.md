@@ -15,35 +15,31 @@ A integração da NFS-e Nacional no Buscador NF foi construída de forma complet
 - Camada IPC segura exposta ao frontend Desktop;
 - Workspace dedicado no Buscador NF com filtros, exibição de eventos e sem dependência de PDF/DANFSE.
 
-Por segurança e conformidade, a camada de comunicação HTTP oficial está protegida por um **gate deliberado** (`UnavailableNfseWireContract`). Esse gate impede qualquer tentativa de adivinhar parâmetros de consulta, cabeçalhos proprietários ou formatos de envelope não documentados nos manuais públicos, lançando `NfseContractError` antes da emissão de requisições de rede.
+Por segurança e conformidade, a camada de comunicação HTTP oficial esteve anteriormente protegida por um gate deliberado (`UnavailableNfseWireContract`). Com o fornecimento das especificações oficiais OpenAPI / Swagger da NFS-e Nacional (ADN e SEFIN), o contrato oficial foi implementado via `OfficialNfseWireContract` e ativado na inicialização dos serviços do Buscador NF.
 
 ---
 
 ## 2. Como fornecer os artefatos para homologação
 
-Para ativar a comunicação de rede oficial sem necessidade de refatorar repositórios, serviços, IPC ou telas, devem ser fornecidos:
+Para ativar a comunicação de rede oficial sem necessidade de refatorar repositórios, serviços, IPC ou telas, foram fornecidos:
 
-1. **Especificação OpenAPI / Swagger Oficial**:
-   - Fornecida pelo portal da NFS-e Nacional (Receita Federal / Serpro) para os endpoints:
-     - `GET /DFe/{NSU}` (Distribuição de DF-e pelo ADN);
-     - `GET /NFSe/{ChaveAcesso}/Eventos` (Consulta de eventos pelo ADN);
-     - `GET /nfse/{chaveAcesso}` (Consulta de NFS-e direta pela SEFIN).
+1. **Especificação OpenAPI / Swagger Oficial** (localizada em `NFSe JSONs/`):
+   - `swagger(ADN Prod).json` e `swagger(ADN Prod Estrita).json` para distribuição e eventos (`/DFe/{NSU}` e `/NFSe/{ChaveAcesso}/Eventos`).
+   - `Sefin prod.json` e `Sefin prod estr.json` para consulta direta de NFS-e (`/nfse/{chaveAcesso}`).
 2. **Payloads reais ou de sandbox anonimizados**:
    - Exemplos de respostas HTTP (cabeçalhos e corpos XML/JSON) gerados no ambiente de **Produção Restrita**.
    - **Regra de Segurança Estrita**: Todos os dados sensíveis (CNPJs, nomes de empresas, valores e assinaturas) devem ser anonimizados antes de serem incorporados como fixtures de teste. **Nunca comitar chaves privadas, certificados ou dados fiscais reais.**
 
 ---
 
-## 3. Passos para homologação do contrato oficial
+## 3. Status de Homologação do Contrato Oficial
 
-Quando os artefatos forem disponibilizados:
-
-1. Criar `OfficialNfseWireContract` implementando a interface `NfseWireContract` (`src/core/buscador/nfse/clients/NfseWireContract.ts`).
-2. Adicionar as fixtures anonimizadas em `src/core/buscador/nfse/parsers/fixtures/`.
-3. Ativar o teste de conformidade de XML nacional v1.01 em `src/core/buscador/nfse/parsers/nfse-parsers.test.ts`.
-4. Substituir a injeção em `electron/buscador/services.ts` de `UnavailableNfseWireContract` para `OfficialNfseWireContract`.
-5. Executar a suíte de testes de regressão (`npm test`).
-6. Realizar teste de fumaça em ambiente de Produção Restrita com certificado digital A1 válido instalado.
+- [x] Criar `OfficialNfseWireContract` implementando a interface `NfseWireContract` (`src/core/buscador/nfse/clients/NfseWireContract.ts`).
+- [x] Cobrir `OfficialNfseWireContract` com testes unitários TDD (`src/core/buscador/nfse/clients/OfficialNfseWireContract.test.ts`).
+- [x] Substituir a injeção em `electron/buscador/services.ts` de `UnavailableNfseWireContract` para `OfficialNfseWireContract` (ativo).
+- [x] Ajustar URL base de homologação da SEFIN em `src/core/buscador/nfse/config/endpoints.ts` para conformidade com o Swagger oficial (`https://sefin.producaorestrita.nfse.gov.br/SefinNacional`).
+- [x] Executar a suíte de testes de regressão (`npm test`).
+- [ ] Realizar teste de fumaça em ambiente de Produção Restrita com certificado digital A1 válido instalado em runtime.
 
 ---
 
