@@ -138,7 +138,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                 Disponível
               </span>
-              <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${isLight ? 'bg-[#f1f5f9] border-[#e2e8f0] text-[#475569]' : 'bg-white/5 border-white/10 text-[#a1a1aa]'}`}>
+              <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${isLight ? 'bg-[#eff6ff] border-blue-200 text-blue-700' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
                 NF-e • NFC-e • CT-e • NFS-e
               </span>
             </div>
@@ -168,7 +168,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
               ].map((f) => (
                 <span
                   key={f.label}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isLight ? 'bg-[#f8fafc] border-[#e2e8f0] text-[#475569]' : 'bg-white/[0.04] border-white/10 text-[#d4d4d8]'}`}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isLight ? 'bg-[#eff6ff] border-blue-200 text-blue-800' : 'bg-blue-500/10 border-blue-500/20 text-blue-300'}`}
                 >
                   <f.icon className="w-3 h-3" />
                   {f.label}

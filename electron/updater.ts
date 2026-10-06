@@ -1,5 +1,8 @@
-﻿import { autoUpdater, CancellationToken, UpdateInfo, ProgressInfo } from 'electron-updater';
+import { autoUpdater, CancellationToken, UpdateInfo, ProgressInfo } from 'electron-updater';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { spawn } from 'child_process';
 import { updateService } from '../src/api/services/update.service';
 
 export type UpdateStatus =
@@ -43,6 +46,9 @@ export interface UpdaterState {
 class AppUpdaterManager {
   private mainWindow: BrowserWindow | null = null;
   private cancellationToken: CancellationToken | null = null;
+  private fallbackAbortController: AbortController | null = null;
+  private fallbackInstallerPath: string | null = null;
+  private isDownloadingFallback: boolean = false;
   private isPortable: boolean = false;
   private isDev: boolean = false;
 
@@ -163,6 +169,13 @@ class AppUpdaterManager {
       // Não sobrescreve se o download foi cancelado intencionalmente
       if (this.state.status === 'idle') return;
 
+      // Se falhou durante o download do autoUpdater, tenta o fallback direto do GitHub
+      if (this.state.status === 'downloading' && !this.isDownloadingFallback) {
+        console.warn('[autoUpdater] download error encountered, initiating fallback:', err?.message);
+        this.downloadFallbackDirect(this.state.updateInfo?.version).catch(() => {});
+        return;
+      }
+
       this.state.status = 'error';
       this.state.errorMessage = err?.message || 'Erro ao processar atualização';
       this.broadcastStatus();
@@ -236,6 +249,9 @@ class AppUpdaterManager {
       return;
     }
 
+    this.isDownloadingFallback = false;
+    this.fallbackInstallerPath = null;
+
     try {
       this.state.status = 'downloading';
       this.state.errorMessage = null;
@@ -245,12 +261,142 @@ class AppUpdaterManager {
       this.cancellationToken = new CancellationToken();
       await autoUpdater.downloadUpdate(this.cancellationToken);
     } catch (err: any) {
-      if (this.state.status !== 'available') {
-        console.error('[autoUpdater] downloadUpdate error:', err);
-        this.state.status = 'error';
-        this.state.errorMessage = err?.message || 'Falha ao baixar a atualização';
-        this.broadcastStatus();
+      console.warn('[autoUpdater] downloadUpdate failed, trying fallback direct download:', err?.message);
+      await this.downloadFallbackDirect(this.state.updateInfo?.version);
+    }
+  }
+
+  private async downloadFallbackDirect(targetVersion?: string): Promise<void> {
+    if (this.isDownloadingFallback) return;
+    this.isDownloadingFallback = true;
+    this.state.status = 'downloading';
+    this.state.errorMessage = null;
+    this.broadcastStatus();
+
+    try {
+      const repo = 'sAlly-19/workspace-fiscal';
+      const endpoint = targetVersion
+        ? `https://api.github.com/repos/${repo}/releases/tags/v${targetVersion.replace(/^v/, '')}`
+        : `https://api.github.com/repos/${repo}/releases/latest`;
+
+      const res = await fetch(endpoint, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': `WorkspaceFiscal/${app.getVersion()}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Falha ao consultar release do GitHub (HTTP ${res.status})`);
       }
+
+      const releaseData = await res.json();
+      const assets = Array.isArray(releaseData.assets) ? releaseData.assets : [];
+
+      // Procura o asset do instalador Setup NSIS (.exe)
+      let installerAsset = assets.find((a: any) =>
+        typeof a?.name === 'string' &&
+        a.name.toLowerCase().endsWith('.exe') &&
+        (a.name.toLowerCase().includes('setup') || !a.name.toLowerCase().includes('portable'))
+      );
+
+      // Fallback para qualquer .exe caso não tenha encontrado pelo padrão acima
+      if (!installerAsset) {
+        installerAsset = assets.find((a: any) =>
+          typeof a?.name === 'string' && a.name.toLowerCase().endsWith('.exe')
+        );
+      }
+
+      if (!installerAsset || !installerAsset.browser_download_url) {
+        throw new Error('Nenhum instalador executável (.exe) encontrado nos anexos da release do GitHub.');
+      }
+
+      const downloadUrl = installerAsset.browser_download_url;
+      const totalBytes = installerAsset.size || 0;
+      const tempDest = path.join(app.getPath('temp'), installerAsset.name);
+
+      this.fallbackAbortController = new AbortController();
+
+      const dlResponse = await fetch(downloadUrl, {
+        signal: this.fallbackAbortController.signal,
+        headers: {
+          'User-Agent': `WorkspaceFiscal/${app.getVersion()}`,
+        },
+      });
+
+      if (!dlResponse.ok || !dlResponse.body) {
+        throw new Error(`Erro no download do instalador (HTTP ${dlResponse.status})`);
+      }
+
+      const fileStream = fs.createWriteStream(tempDest);
+      let transferred = 0;
+      let lastReport = Date.now();
+      let lastTransferred = 0;
+
+      const reader = dlResponse.body.getReader();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (value) {
+          fileStream.write(Buffer.from(value));
+          transferred += value.length;
+
+          const now = Date.now();
+          if (now - lastReport > 200 || transferred === totalBytes) {
+            const timeDelta = (now - lastReport) / 1000 || 0.001;
+            const bytesDelta = transferred - lastTransferred;
+            const bps = Math.round(bytesDelta / timeDelta);
+
+            const percent = totalBytes > 0
+              ? Math.min(100, Math.round((transferred / totalBytes) * 1000) / 10)
+              : 0;
+
+            this.state.progress = {
+              percent,
+              transferred,
+              total: totalBytes || transferred,
+              bytesPerSecond: bps,
+            };
+            this.broadcastProgress(this.state.progress);
+
+            lastReport = now;
+            lastTransferred = transferred;
+          }
+        }
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        fileStream.end((err?: Error | null) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      this.fallbackInstallerPath = tempDest;
+      this.state.status = 'downloaded';
+      this.state.progress = {
+        percent: 100,
+        transferred,
+        total: totalBytes || transferred,
+        bytesPerSecond: 0,
+      };
+      this.state.errorMessage = null;
+      this.isDownloadingFallback = false;
+      this.broadcastStatus();
+    } catch (err: any) {
+      if (this.fallbackAbortController?.signal.aborted) {
+        this.state.status = 'available';
+        this.state.progress = null;
+        this.state.errorMessage = null;
+      } else {
+        console.error('[AppUpdaterManager] fallback download error:', err);
+        this.state.status = 'error';
+        this.state.errorMessage = err?.message || 'Falha ao baixar o instalador de atualização.';
+      }
+      this.isDownloadingFallback = false;
+      this.broadcastStatus();
     }
   }
 
@@ -259,6 +405,11 @@ class AppUpdaterManager {
       this.cancellationToken.cancel();
       this.cancellationToken = null;
     }
+    if (this.fallbackAbortController) {
+      this.fallbackAbortController.abort();
+      this.fallbackAbortController = null;
+    }
+    this.isDownloadingFallback = false;
     this.state.status = 'available';
     this.state.progress = null;
     this.state.errorMessage = null;
@@ -271,6 +422,23 @@ class AppUpdaterManager {
     }
     this.state.status = 'installing';
     this.broadcastStatus();
+
+    if (this.fallbackInstallerPath && fs.existsSync(this.fallbackInstallerPath)) {
+      setImmediate(() => {
+        try {
+          const child = spawn(this.fallbackInstallerPath!, ['--updated'], {
+            detached: true,
+            stdio: 'ignore',
+          });
+          child.unref();
+          app.quit();
+        } catch (err) {
+          console.error('[AppUpdaterManager] fallback execution error:', err);
+          autoUpdater.quitAndInstall(false, true);
+        }
+      });
+      return;
+    }
 
     // Fecha o aplicativo e executa o instalador NSIS
     setImmediate(() => {

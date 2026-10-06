@@ -926,12 +926,16 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
               <ArrowLeft className="w-3.5 h-3.5" />
             </button>
           )}
-          <img
-            src="/icon.png"
-            alt="NFView"
-            className="w-7 h-7 rounded-lg object-cover shadow-xs border border-blue-500/20"
-            referrerPolicy="no-referrer"
-          />
+          <div
+            className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs border shrink-0 ${
+              currentTheme === 'light'
+                ? 'bg-red-50 border-red-200 text-red-600'
+                : 'bg-red-500/10 border-red-500/25 text-red-400'
+            }`}
+            title="Visualizador DANFE / PDF"
+          >
+            <FileText className="w-4 h-4" strokeWidth={2.2} />
+          </div>
           <div className="flex items-center gap-2">
             <span className={`font-bold text-sm tracking-tight ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>
               NFView
