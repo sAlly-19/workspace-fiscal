@@ -27,6 +27,7 @@ import { normalizePageSize, PageSize } from '@/core/buscador/domain/page-size';
 import { changePageSize } from './features/documents/page-size-controller';
 import { FeedbackInput, useUiStore } from './stores/ui.store';
 import { feedbackFromError, feedbackFromSyncResult } from './features/feedback/feedback-adapters';
+import type { BuscadorWorkspaceMode } from './features/workspace/workspace-controller';
 
 function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
@@ -55,6 +56,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     nfeLastNSU: '000000000000000',
     cteLastNSU: '000000000000000',
   });
+  const [workspaceMode, setWorkspaceMode] = useState<BuscadorWorkspaceMode>('SEFAZ');
 
   // Filtros locais
   const [selectedDocTypes, setSelectedDocTypes] = useState<{ nfe: boolean; cte: boolean }>({ nfe: true, cte: true });
@@ -151,23 +153,34 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     companyId?: number,
     page: number = 1,
     typeOverride?: { nfe: boolean; cte: boolean },
-    pageSizeOverride?: number
+    pageSizeOverride?: number,
+    modeOverride?: BuscadorWorkspaceMode
   ) => {
     const targetCompanyId = companyId || activeCompany?.id;
     if (!targetCompanyId) return;
+    const currentMode = modeOverride || workspaceMode;
     const requestId = ++documentSearchRequest.current;
 
     setLoadingDocs(true);
 
     const docTypes: DocumentType[] = [];
-    const effectiveTypes = typeOverride || selectedDocTypes;
-    if (effectiveTypes.nfe) docTypes.push('NFE');
-    if (effectiveTypes.cte) docTypes.push('CTE');
+    if (currentMode === 'NFSE') {
+      docTypes.push('NFSE');
+    } else {
+      const effectiveTypes = typeOverride || selectedDocTypes;
+      if (effectiveTypes.nfe) docTypes.push('NFE');
+      if (effectiveTypes.cte) docTypes.push('CTE');
+    }
+
+    const currentEnv = currentMode === 'NFSE'
+      ? (settings?.nfse_environment || 'homologation')
+      : (settings?.sefaz_environment || 'homologation');
 
     try {
       const result = await window.fiscalApi?.documents.search({
         company_id: targetCompanyId,
         document_types: docTypes.length > 0 ? docTypes : undefined,
+        environment: currentEnv,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
         search_query: searchQuery || undefined,
@@ -188,7 +201,16 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     } finally {
       if (requestId === documentSearchRequest.current) setLoadingDocs(false);
     }
-  }, [activeCompany, selectedDocTypes, startDate, endDate, searchQuery, settings]);
+  }, [activeCompany, workspaceMode, selectedDocTypes, startDate, endDate, searchQuery, settings]);
+
+  const handleWorkspaceModeChange = (newMode: BuscadorWorkspaceMode) => {
+    setWorkspaceMode(newMode);
+    setSelectedDocIds([]);
+    setCurrentPage(1);
+    if (activeCompany) {
+      searchLocalDocuments(activeCompany.id, 1, undefined, undefined, newMode);
+    }
+  };
 
   // Consulta SEFAZ Real
   const handleConsultSefaz = async () => {
@@ -378,7 +400,9 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       header={(
         <AppHeader
           activeCompany={activeCompany}
-          environment={settings?.sefaz_environment || 'homologation'}
+          environment={workspaceMode === 'NFSE' ? (settings?.nfse_environment || 'homologation') : (settings?.sefaz_environment || 'homologation')}
+          workspaceMode={workspaceMode}
+          onWorkspaceModeChange={handleWorkspaceModeChange}
           theme={theme}
           onBackToHome={onBackToHome}
           onToggleTheme={toggleTheme}

@@ -42,11 +42,12 @@ function parseFilters(value: unknown): DocumentSearchFilters {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Filtros de pesquisa inválidos.');
   const raw = value as Partial<DocumentSearchFilters>;
   const companyId = requirePositiveInteger(raw.company_id, 'ID da empresa');
-  const documentTypes = raw.document_types?.filter((type): type is DocumentType => type === 'NFE' || type === 'CTE');
+  const documentTypes = raw.document_types?.filter((type): type is DocumentType => type === 'NFE' || type === 'CTE' || type === 'NFSE');
   if (raw.document_types && documentTypes?.length !== raw.document_types.length) throw new Error('Tipo de documento inválido.');
   return {
     company_id: companyId,
     document_types: documentTypes,
+    environment: raw.environment === 'production' || raw.environment === 'homologation' ? raw.environment : undefined,
     start_date: typeof raw.start_date === 'string' ? raw.start_date.slice(0, 10) : undefined,
     end_date: typeof raw.end_date === 'string' ? raw.end_date.slice(0, 10) : undefined,
     search_query: typeof raw.search_query === 'string' ? raw.search_query.slice(0, 200) : undefined,

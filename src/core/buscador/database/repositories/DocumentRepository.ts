@@ -191,6 +191,11 @@ export class DocumentRepository {
       params.push(...filters.document_types);
     }
 
+    if (filters.environment) {
+      conditions.push('d.environment = ?');
+      params.push(filters.environment);
+    }
+
     if (filters.start_date) {
       conditions.push('substr(d.issue_date, 1, 10) >= ?');
       params.push(filters.start_date);

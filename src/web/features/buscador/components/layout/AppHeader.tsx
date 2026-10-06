@@ -1,10 +1,15 @@
 import React from 'react';
 import { Building2, ChevronLeft, Moon, RefreshCw, Settings, Sun } from 'lucide-react';
 import type { Company, SefazEnvironment } from '@/core/buscador/domain/types';
+import type { NfseEnvironment } from '@/core/buscador/nfse/domain/types';
+import { NfseWorkspaceSelector } from '../NfseWorkspaceSelector';
+import type { BuscadorWorkspaceMode } from '../../features/workspace/workspace-controller';
 
 interface AppHeaderProps {
   activeCompany: Pick<Company, 'name'> | null;
-  environment: SefazEnvironment;
+  environment: SefazEnvironment | NfseEnvironment;
+  workspaceMode?: BuscadorWorkspaceMode;
+  onWorkspaceModeChange?: (mode: BuscadorWorkspaceMode) => void;
   theme: 'dark' | 'light';
   onBackToHome?: () => void;
   onToggleTheme: () => void;
@@ -16,6 +21,8 @@ interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   activeCompany,
   environment,
+  workspaceMode = 'SEFAZ',
+  onWorkspaceModeChange,
   theme,
   onBackToHome,
   onToggleTheme,
@@ -35,15 +42,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </button>
     )}
 
-    <div className="flex min-w-52 items-center gap-2.5">
+    <div className="flex min-w-44 items-center gap-2.5">
       <div className="grid h-8 w-8 place-items-center rounded-lg bg-purple-600 text-white shadow-sm shadow-purple-950/20">
         <Building2 className="h-4.5 w-4.5" />
       </div>
       <div className="leading-tight">
         <div className="text-sm font-semibold">Buscador NF</div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">NF-e e CT-e · SEFAZ</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          {workspaceMode === 'NFSE' ? 'NFS-e · ADN / SEFIN' : 'NF-e e CT-e · SEFAZ'}
+        </div>
       </div>
     </div>
+
+    {onWorkspaceModeChange && (
+      <NfseWorkspaceSelector
+        mode={workspaceMode}
+        onChange={onWorkspaceModeChange}
+        disabled={isSynchronizing}
+      />
+    )}
 
     <div className="min-w-0 flex-1 border-l border-[var(--border-subtle)] pl-4">
       <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Empresa ativa</div>
@@ -57,14 +74,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-500'
         : 'border-amber-500/35 bg-amber-500/10 text-amber-500'
     }`}>
-      {environment === 'production' ? 'Produção' : 'Homologação'}
+      {environment === 'production'
+        ? 'Produção'
+        : (workspaceMode === 'NFSE' ? 'Produção Restrita' : 'Homologação')}
     </span>
 
     <button
       type="button"
       onClick={onSynchronize}
       disabled={isSynchronizing || !activeCompany}
-      aria-label="Sincronizar com a SEFAZ"
+      aria-label={workspaceMode === 'NFSE' ? 'Sincronizar com o ADN NFS-e' : 'Sincronizar com a SEFAZ'}
       className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-45 cursor-pointer"
     >
       <RefreshCw className={`h-4 w-4 ${isSynchronizing ? 'animate-spin' : ''}`} />
