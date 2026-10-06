@@ -19,7 +19,7 @@ coverage/
 *.tsbuildinfo
 *.local
 
-# Database & Storage (local only, recriado automaticamente)
+# Database, Storage & Backups (local only, recriado automaticamente)
 sqlite.db
 sqlite.db-shm
 sqlite.db-wal
@@ -30,9 +30,21 @@ sqlite.db-journal
 *.db-wal
 *.bak
 backups/
+*.wfb
 /storage/
+/documents/
+/downloads/
+*.zip
 # Electron userData (quando empacotado)
-# O SQLite em produção vai para AppData/Roaming/Electron/workspace-fiscal.sqlite
+# O SQLite em produção vai para AppData/Roaming/Workspace Fiscal/
+
+# Digital Certificates & Secrets (NUNCA versionar certificados ou chaves)
+*.pfx
+*.p12
+*.cer
+*.crt
+*.pem
+*.key
 
 # Environment variables
 .env
@@ -64,6 +76,8 @@ Desktop.ini
 *.sw?
 *.code-workspace
 .kilo/
+.cursor/
+.windsurf/
 
 # AI & Agent artifacts
 .gemini/
@@ -71,11 +85,15 @@ Desktop.ini
 .cortex/
 .superpowers/
 .system_generated/
+.antigravity/
 scratch/
 temp/
 tmp/
 
-# Electron
+# Testing
+.vitest/
+
+# Electron packaging
 *.exe
 *.dmg
 *.AppImage

@@ -29,6 +29,7 @@ Versão: **3.0.0**
   - [Build e Empacotamento](#build-e-empacotamento)
   - [Testes Automatizados](#testes-automatizados)
   - [Validação de Tipos](#validação-de-tipos)
+- [Histórico de Versões e Novidades](#histórico-de-versões-e-novidades)
 - [Segurança e Privacidade](#segurança-e-privacidade)
 - [Licença e Autoria](#licença-e-autoria)
 
@@ -164,21 +165,24 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
 ---
 
 ### 4. Buscador NF (Consulta e Distribuição SEFAZ & NFS-e Nacional)
-- **Seleção de Workspace Fiscal:**
+- **Seleção e Sincronização Inteligente de Workspace Fiscal:**
   - Alternância intuitiva no cabeçalho entre o ecossistema **SEFAZ (NF-e e CT-e)** e o **NFS-e Nacional (ADN / SEFIN)**.
+  - O botão universal **Sincronizar** no cabeçalho identifica automaticamente o modo de workspace ativo: consulta a SEFAZ quando em DF-e e o ADN Nacional quando em NFS-e.
   - Preservação da empresa ativa, certificados associados e filtros temporais durante a alternância.
 - **Consulta e Distribuição Oficial SEFAZ:**
   - Comunicação nativa com os Web Services oficiais de Distribuição de DF-e de Interesse dos Atores (NF-e e CT-e).
   - Consulta incremental baseada em NSU (Número Seqüencial Único), registrando o `ultNSU` e o `maxNSU` por empresa.
   - Prevenção automática e inteligente contra consumo indevido (*cStat 656*), respeitando as diretrizes e intervalos de requisições da SEFAZ.
-- **NFS-e Nacional (Padrão ADN e SEFIN):**
+- **NFS-e Nacional (Padrão Oficial ADN e SEFIN):**
+  - Implementação estrita do contrato wire oficial (`OfficialNfseWireContract`) baseado nas especificações OpenAPI/Swagger oficiais do governo (`/DFe/{NSU}`, `/nfse/{chaveAcesso}` e `/NFSe/{chaveAcesso}/Eventos`).
   - Suporte completo a chaves de acesso de 50 dígitos numéricos (padrão oficial nacional).
-  - Consulta e sincronização incremental via Ambiente de Dados Nacional (ADN) a partir de NSU zero.
+  - Consulta e sincronização incremental via Ambiente de Dados Nacional (ADN) a partir de NSU zero com descompactação automática gzip base64.
+  - Tratamento nativo e resiliente de respostas HTTP 404 do ADN como conclusão com zero novos documentos (`NO_DOCUMENTS`), mantendo o estado `IDLE` e prevenindo falso-positivos de erro.
   - Consulta direta por chave de acesso via Secretaria de Finanças Nacional (SEFIN) sem afetar o cursor de distribuição.
-  - Acompanhamento e vinculação atômica de eventos fiscais (Cancelamentos, Cartas de Correção, etc.).
-  - Gate de contrato wire deliberado para homologação contínua de schemas oficiais (consulte `docs/nfse-contract-artifacts.md`).
+  - Acompanhamento, decodificação e vinculação atômica de eventos fiscais (suporte completo a `<pedRegEvento>`, `<infPedReg>`, extração recursiva de `<chNFSe>` e eventos de cancelamento).
 - **Certificados Digitais ICP-Brasil (A1):**
-  - Integração nativa com o Windows Certificate Store (`CurrentUser\My`) e suporte completo a certificados modelo A1.
+  - Integração nativa com o Windows Certificate Store (`CurrentUser\My`) e suporte completo a certificados modelo A1 (.pfx / .p12).
+  - Criptografia e chaves privadas estritamente mantidas em memória local segura, sem envio a terceiros.
   - Validação instantânea de vigência, titularidade e CNPJ vinculado ao certificado.
 - **Download e Organização de Arquivos XML:**
   - Descompactação automática de documentos retornados nos lotes oficiais.
@@ -398,6 +402,70 @@ Para verificar a integridade da tipagem TypeScript em todo o projeto:
 ```bash
 npm run lint
 ```
+
+---
+
+## Histórico de Versões e Novidades
+
+O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
+
+### Versão 3.0.0 (Atual)
+- **Módulo Buscador NF:**
+  - Consulta e distribuição incremental direta com a SEFAZ Nacional para NF-e (Modelo 55) e CT-e (Modelo 57).
+  - Suporte completo ao ecossistema da NFS-e Nacional via Ambiente de Dados Nacional (ADN) e consulta direta na Secretaria de Finanças Nacional (SEFIN), com contratos baseados nos schemas Swagger oficiais.
+  - Controle inteligente de NSU, prevenção contra bloqueios por consumo indevido (*cStat 656*) e tratamento nativo de código HTTP 404 como ausência de novos documentos (*NO_DOCUMENTS*).
+  - Extração e persistência atômica de eventos fiscais da NFS-e (`pedRegEvento`, `infPedReg`, `chNFSe` e eventos de cancelamento).
+- **Certificados Digitais ICP-Brasil (A1):**
+  - Gerenciamento local e criptografado de credenciais via Windows Certificate Store e arquivos `.pfx`/`.p12`.
+  - Chaves privadas mantidas estritamente em memória local sem exposição.
+- **Produtividade e Layout Unificado:**
+  - Tela inicial distribuída horizontalmente com os 3 módulos: **NF View**, **Depreciação Fiscal** e **Buscador NF**.
+  - Sincronização inteligente no cabeçalho adaptada ao módulo ativo.
+  - Download em lote e exportação de XMLs em pacotes compactados `.zip`.
+
+### Versão 2.5.3
+- **Atualização Integrada no Próprio Aplicativo (In-App Auto-Updater):**
+  - Download interno verificado do instalador ou pacote executável sem necessidade de navegadores externos.
+  - Barra de progresso em tempo real com taxa de transferência (MB/s) e aplicação do update com um clique.
+- **Sistema de Backup Estruturado (.wfb) e Restauração Segura:**
+  - Pacote autocontido `.wfb` com banco SQLite, manifesto de integridade e arquivos XML físicos.
+  - Restauração seletiva por módulo e criação compulsória de backup de emergência prévio.
+- **Exportação Direta e Modularização da Depreciação:**
+  - Ação de exportação direta de planilhas CSV com separação do configurador de colunas.
+  - Refatoração modular da arquitetura do motor de depreciação contábil.
+
+### Versão 2.5.2
+- **Filtros Avançados e Ordenação na Lista de Bens:**
+  - Filtro simultâneo por Categoria, Status (Ativos / Baixados) e Ano de Aquisição.
+  - Busca instantânea e ordenação interativa com cliques diretos nos cabeçalhos das colunas.
+- **Depreciação Retroativa em Lote com Gravação de Arquivo:**
+  - Cálculo exato de quotas acumuladas para intervalos selecionados e diálogo nativo para salvar a planilha CSV.
+  - Compatibilidade com Excel com codificação UTF-8 BOM (`\uFEFF`) e quebras de linha Windows CRLF.
+- **Edição e Gerenciamento de Categorias:**
+  - Edição direta de nome e taxa anual padrão na listagem de categorias com atualização automática dos bens vinculados.
+
+### Versão 2.5.1
+- **Layout Customizável de Colunas no CSV:**
+  - Seleção livre das colunas (A até G) de cada campo contábil para integração com qualquer software contábil (ex.: Domínio Sistemas).
+  - Pré-visualização em tempo real e customização de delimitadores.
+- **Visualizador de DANFE: Zoom Interativo e Cópia de Dados:**
+  - Controles de zoom por botões e atalhos (`Ctrl + Scroll`, `+`, `-`, `0`).
+  - Seleção e cópia rápida de textos, chaves e CNPJs diretamente no layout da nota.
+- **Atualizações Automáticas via GitHub:**
+  - Verificação diária e integrada com os releases oficiais do repositório no GitHub.
+
+### Versão 2.5.0 (Base)
+- **Módulo NF View — Gestão e Visualização de Documentos Fiscais:**
+  - Leitor de XMLs para NF-e (Modelo 55), NFC-e (Modelo 65), CT-e (Modelo 57) e NFS-e (Padrão Nacional e ABRASF).
+  - Visualizadores e impressões fiéis aos padrões oficiais SEFAZ (DANFE, DANFE NFC-e, DACTE e DANFSE).
+  - Organização em árvore hierárquica de pastas (Workspaces) com movimentação e seleção em lote.
+  - Visualizador técnico com realce de sintaxe XML colorido.
+- **Módulo de Depreciação Contábil & Ativo Imobilizado:**
+  - Motor de cálculo linear estritamente em números inteiros (centavos), eliminando desvios de arredondamento.
+  - Taxas fiscais da Receita Federal pré-configuradas e ajuste proporcional de primeiro mês (*pro-rata die*).
+  - Controle de baixas, motivos de cessação e reativação patrimonial.
+- **Importação Flexível e Suporte a Arquivos ZIP:**
+  - Importação via seleção ou arrastar e soltar (drag & drop), varredura recursiva de pastas e descompactação de lotes `.zip`.
 
 ---
 

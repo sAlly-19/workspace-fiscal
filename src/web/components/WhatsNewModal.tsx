@@ -14,12 +14,17 @@ import {
   Search,
   KeyRound,
   Download,
+  FolderTree,
+  FileText,
+  Archive,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
 export const CURRENT_APP_VERSION = '3.0.0';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
+
+export type AppVersion = '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
 interface WhatsNewModalProps {
   open?: boolean;
@@ -31,7 +36,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState<'3.0.0' | '2.5.3' | '2.5.2'>('3.0.0');
+  const [activeVersion, setActiveVersion] = useState<AppVersion>('3.0.0');
 
   useEffect(() => {
     if (open !== undefined) {
@@ -144,54 +149,45 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
 
           {/* Abas de Navegação entre Versões */}
           <div
-            className={`px-6 py-2.5 border-b flex items-center justify-between ${
+            className={`px-6 py-2.5 border-b flex items-center justify-between gap-3 ${
               isLight ? 'bg-slate-50 border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className={`text-[11px] font-bold mr-1 uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 max-w-full">
+              <span className={`text-[11px] font-bold mr-1 uppercase tracking-wider shrink-0 ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
                 Versão:
               </span>
-              <button
-                onClick={() => setActiveVersion('3.0.0')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeVersion === '3.0.0'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : isLight
-                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
-                }`}
-              >
-                <span>v3.0.0 (Atual)</span>
-                {activeVersion === '3.0.0' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-              </button>
-              <button
-                onClick={() => setActiveVersion('2.5.3')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeVersion === '2.5.3'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : isLight
-                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
-                }`}
-              >
-                <span>v2.5.3</span>
-              </button>
-              <button
-                onClick={() => setActiveVersion('2.5.2')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeVersion === '2.5.2'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : isLight
-                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
-                }`}
-              >
-                <span>v2.5.2</span>
-              </button>
+              {[
+                { id: '3.0.0' as const, label: 'v3.0.0 (Atual)', isCurrent: true },
+                { id: '2.5.3' as const, label: 'v2.5.3' },
+                { id: '2.5.2' as const, label: 'v2.5.2' },
+                { id: '2.5.1' as const, label: 'v2.5.1' },
+                { id: '2.5.0' as const, label: 'v2.5.0 (Base)' },
+              ].map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setActiveVersion(v.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                    activeVersion === v.id
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : isLight
+                        ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                  }`}
+                >
+                  <span>{v.label}</span>
+                  {v.isCurrent && activeVersion === '3.0.0' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  )}
+                </button>
+              ))}
             </div>
-            <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
-              {activeVersion === '3.0.0' ? 'Lançamento mais recente' : 'Versão anterior'}
+            <span className={`text-[11px] shrink-0 hidden sm:inline ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
+              {activeVersion === '3.0.0'
+                ? 'Lançamento mais recente'
+                : activeVersion === '2.5.0'
+                  ? 'Lançamento do Hub Fiscal'
+                  : 'Versão anterior'}
             </span>
           </div>
 
@@ -213,16 +209,17 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                     </div>
                     <div className="space-y-1.5 flex-1">
                       <h3 className="font-bold text-sm flex items-center justify-between">
-                        <span>Novo Módulo: Buscador NF (Consulta e Distribuição SEFAZ)</span>
+                        <span>Novo Módulo: Buscador NF (SEFAZ e NFS-e Nacional)</span>
                         <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Novo Módulo</span>
                       </h3>
                       <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        Integração nativa e inteligente com os Web Services oficiais da SEFAZ para consulta e sincronização de notas fiscais eletrônicas:
+                        Integração nativa com os Web Services oficiais da SEFAZ e as APIs REST do Ambiente de Dados Nacional (ADN) e SEFIN:
                       </p>
                       <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-                        <li><b>Distribuição Automatizada:</b> Consulta e distribuição em lote de NF-e e CT-e emitidas para o CNPJ cadastrado.</li>
-                        <li><b>Controle Inteligente de NSU:</b> Persistência rigorosa do último NSU e maxNSU, respeitando os limites para prevenir bloqueios de consumo indevido (cStat 656).</li>
-                        <li><b>Ambientes SEFAZ:</b> Suporte transparente para alternância entre ambientes de Produção e Homologação.</li>
+                        <li><b>Distribuição Automatizada:</b> Consulta e distribuição incremental de NF-e, CT-e e NFS-e Nacional emitidas para o CNPJ cadastrado.</li>
+                        <li><b>Protocolos Oficiais e Eventos:</b> Comunicação direta com ADN/SEFIN baseada em schemas OpenAPI oficiais, com suporte a cancelamentos e cartas de correção.</li>
+                        <li><b>Controle Inteligente de NSU:</b> Persistência rigorosa de cursores NSU, prevenção contra bloqueios de consumo indevido (cStat 656) e tratamento nativo de HTTP 404 como ausência de novos documentos.</li>
+                        <li><b>Ambientes Flexíveis:</b> Alternância entre Produção e Homologação (SEFAZ) e Produção e Produção Restrita (NFS-e).</li>
                       </ul>
                     </div>
                   </div>
@@ -460,7 +457,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : activeVersion === '2.5.1' ? (
               <>
                 {/* 1. Seleção de Colunas do CSV */}
                 <div
@@ -530,6 +527,95 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                       <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
                         Verificação diária e integrada com os releases do GitHub para download e instalação automática das versões mais recentes do aplicativo.
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* 1. NF View - Gestão e Visualização de XMLs */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <FolderTree className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Módulo NF View: Gestão e Leitura Oficial de Documentos Fiscais</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Lançamento</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Plataforma desktop completa para visualização e organização de notas fiscais eletrônicas brasileiras:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Modelos Fiscais Suportados:</b> NF-e (Mod. 55), NFC-e (Mod. 65), CT-e (Mod. 57) e NFS-e (Padrão Nacional e ABRASF).</li>
+                        <li><b>Impressão Oficial:</b> Visualizadores fiéis de DANFE, DANFE NFC-e, DACTE e DANFSE com detalhamento de tributos, retenções e duplicatas.</li>
+                        <li><b>Workspaces em Árvore:</b> Criação de pastas estruturadas, movimentação em lote e visualizador técnico de código XML com destaque de sintaxe.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Depreciação Contábil Linear */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-emerald-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-emerald-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Módulo de Depreciação Fiscal & Ativo Imobilizado</span>
+                        <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Contabilidade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Controle patrimonial com cálculo rigoroso de quotas mensais de depreciação:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Precisão em Centavos:</b> Cálculo linear estritamente em números inteiros, eliminando imprecisões de ponto flutuante.</li>
+                        <li><b>Taxas da Receita Federal:</b> Categorias pré-configuradas com taxas anuais oficiais e suporte a ajuste proporcional (<i>pro-rata die</i>).</li>
+                        <li><b>Gestão Patrimonial:</b> Acompanhamento de valor contábil líquido, registro de baixas e reativação de bens.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Importação Flexível e Suporte a ZIP */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-blue-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-blue-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                      <Archive className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Importação em Massa e Descompactação Automática</span>
+                        <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Produtividade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Importação simplificada de arquivos e diretórios inteiros:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Arrastar e Soltar:</b> Arraste múltiplos arquivos XML ou pastas diretamente para a janela do sistema.</li>
+                        <li><b>Varredura Recursiva:</b> Leitura inteligente de diretórios com centenas de notas em subpastas.</li>
+                        <li><b>Lotes Compactados:</b> Descompactação automática de arquivos <code>.zip</code> com processamento imediato dos documentos fiscais.</li>
+                      </ul>
                     </div>
                   </div>
                 </div>
