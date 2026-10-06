@@ -27,7 +27,7 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
   onDownloadPdf,
 }) => {
   const isEventOnly = isEventOnlyDocument(doc);
-  const typeLabel = doc.document_type === 'NFE' ? 'NF-e' : 'CT-e';
+  const typeLabel = doc.document_type === 'NFE' ? 'NF-e' : doc.document_type === 'NFSE' ? 'NFS-e' : 'CT-e';
   const displayType = isEventOnly && doc.direction === 'OUTBOUND' ? `${typeLabel} · Saída` : typeLabel;
   const displayTotal = isEventOnly
     ? '—'
@@ -119,16 +119,18 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
             <FileText className="h-3.5 w-3.5" />
           </button>
 
-          <button
-            type="button"
-            onClick={onDownloadPdf}
-            disabled={isEventOnly || doc.pdf_status !== 'PDF_DISPONIVEL'}
-            className="rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
-            title={isEventOnly ? 'PDF indisponível para dados parciais' : 'Baixar PDF'}
-            aria-label="Baixar PDF"
-          >
-            <Download className="h-3.5 w-3.5" />
-          </button>
+          {doc.document_type !== 'NFSE' && (
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              disabled={isEventOnly || doc.pdf_status !== 'PDF_DISPONIVEL'}
+              className="rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+              title={isEventOnly ? 'PDF indisponível para dados parciais' : 'Baixar PDF'}
+              aria-label="Baixar PDF"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </td>
     </tr>

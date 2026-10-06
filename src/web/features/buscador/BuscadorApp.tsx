@@ -13,6 +13,7 @@ import { FeedbackModalHost } from './components/feedback/FeedbackModalHost';
 import { ConfirmDialog } from './components/feedback/ConfirmDialog';
 import { CompanySidebar } from './components/layout/CompanySidebar';
 import { DocumentWorkspace } from './components/documents/DocumentWorkspace';
+import { NfseWorkspace } from './components/nfse/NfseWorkspace';
 import { FooterDownloadBar } from './components/FooterDownloadBar';
 import { CompanyModal } from './components/CompanyModal';
 import { CertificateModal } from './components/CertificateModal';
@@ -440,7 +441,15 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
         />
       )}
       toolbar={null}
-      content={(
+      content={workspaceMode === 'NFSE' ? (
+        <NfseWorkspace
+          company={activeCompany}
+          environment={(settings?.nfse_environment || 'homologation')}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onDownloadXml={handleDownloadXml}
+          onOpenFileFolder={handleOpenFolder}
+        />
+      ) : (
         <DocumentWorkspace
           nsuStatus={nsuStatus}
           selectedDocTypes={selectedDocTypes}

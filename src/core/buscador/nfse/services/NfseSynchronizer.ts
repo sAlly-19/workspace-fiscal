@@ -32,6 +32,8 @@ export interface NfseSyncResult {
   error?: string;
 }
 
+export type NfseSyncStatus = DistributionState;
+
 export class NfseSynchronizer {
   private readonly activeQueries = new Map<string, AbortController>();
 
