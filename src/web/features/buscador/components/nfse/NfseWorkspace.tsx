@@ -16,6 +16,8 @@ export interface NfseWorkspaceProps {
   onOpenSettings: () => void;
   onDownloadXml: (id: number) => void;
   onOpenFileFolder: (filePath: string) => void;
+  onSyncStateChange?: (syncing: boolean) => void;
+  registerSyncTrigger?: (trigger: () => Promise<void>) => void;
 }
 
 export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
@@ -23,6 +25,8 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
   environment,
   onDownloadXml,
   onOpenFileFolder,
+  onSyncStateChange,
+  registerSyncTrigger,
 }) => {
   const pushFeedback = useUiStore((state) => state.pushFeedback);
   const [selectedDocIds, setSelectedDocIds] = useState<number[]>([]);
@@ -57,7 +61,7 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
     }
   }, [company?.id, environment, vm]);
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     const res = await vm.startSync();
     if (res.success) {
       pushFeedback({
@@ -72,7 +76,15 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
         message: res.error,
       });
     }
-  };
+  }, [vm, pushFeedback]);
+
+  useEffect(() => {
+    onSyncStateChange?.(state.syncing || state.status.isRunning);
+  }, [state.syncing, state.status.isRunning, onSyncStateChange]);
+
+  useEffect(() => {
+    registerSyncTrigger?.(handleSync);
+  }, [registerSyncTrigger, handleSync]);
 
   const handleResetNsu = async () => {
     const confirmed = window.confirm(

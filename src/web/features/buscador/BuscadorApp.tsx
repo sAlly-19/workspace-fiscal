@@ -94,6 +94,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [sefazProgressNSU, setSefazProgressNSU] = useState('');
   const [sefazReceivedCount, setSefazReceivedCount] = useState<number | undefined>(undefined);
   const [activeConsultType, setActiveConsultType] = useState<'NF-e' | 'CT-e'>('NF-e');
+  const nfseSyncTriggerRef = useRef<(() => Promise<void>) | null>(null);
+  const [isNfseSyncing, setIsNfseSyncing] = useState(false);
 
   // Carregamento inicial
   useEffect(() => {
@@ -408,8 +410,14 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onBackToHome={onBackToHome}
           onToggleTheme={toggleTheme}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
-          onSynchronize={handleConsultSefaz}
-          isSynchronizing={isSefazModalOpen}
+          onSynchronize={() => {
+            if (workspaceMode === 'NFSE') {
+              nfseSyncTriggerRef.current?.();
+            } else {
+              handleConsultSefaz();
+            }
+          }}
+          isSynchronizing={workspaceMode === 'NFSE' ? isNfseSyncing : isSefazModalOpen}
         />
       )}
       sidebar={(
@@ -448,6 +456,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onDownloadXml={handleDownloadXml}
           onOpenFileFolder={handleOpenFolder}
+          onSyncStateChange={setIsNfseSyncing}
+          registerSyncTrigger={(fn) => { nfseSyncTriggerRef.current = fn; }}
         />
       ) : (
         <DocumentWorkspace
