@@ -1,3 +1,5 @@
+import type { DocumentOrigin, NfseEnvironment } from '../nfse/domain/types';
+
 export type DocumentType = 'NFE' | 'CTE' | 'NFSE';
 
 export type SefazEnvironment = 'homologation' | 'production';
@@ -81,9 +83,12 @@ export interface FiscalDocument {
   id: number;
   company_id: number;
   document_type: DocumentType;
+  environment: SefazEnvironment;
+  origin: DocumentOrigin;
   nsu: string;
   schema_type: string; // resNFe, procNFe, resCTe, procCTe, etc.
   access_key: string;  // 44 dígitos
+  content_hash?: string;
   document_number?: string;
   series?: string;
   issue_date?: string;
@@ -132,6 +137,7 @@ export interface PaginatedResult<T> {
 export interface AppSettings {
   default_storage_path: string;
   sefaz_environment: SefazEnvironment;
+  nfse_environment: NfseEnvironment;
   items_per_page: number;
   log_level: 'info' | 'warn' | 'error' | 'debug';
 }

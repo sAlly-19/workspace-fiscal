@@ -80,8 +80,20 @@ export class DatabaseManager {
       if (!this.hasColumn('query_history', 'environment')) {
         this.db.run("ALTER TABLE query_history ADD COLUMN environment TEXT NOT NULL DEFAULT 'homologation';");
       }
+      const distributionSql = this.queryOne<{ sql: string }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'distribution_state';"
+      )?.sql || '';
+      if (!/['\"]NFSE['\"]/.test(distributionSql)) this.migrateDistributionStateV3();
+
+      const needsDocumentsV3 = !this.hasColumn('documents', 'environment')
+        || !this.hasColumn('documents', 'origin')
+        || !this.hasColumn('documents', 'content_hash');
+      if (needsDocumentsV3) this.migrateDocumentsV3();
+
+      this.createNfseEventsTable();
+      this.db.run("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('nfse_environment', 'homologation');");
       this.createDocumentIndexes();
-      this.db.run('PRAGMA user_version = 2;');
+      this.db.run('PRAGMA user_version = 3;');
       this.db.exec('COMMIT;');
     } catch (error) {
       this.db.exec('ROLLBACK;');
@@ -132,11 +144,98 @@ export class DatabaseManager {
     this.db.run('ALTER TABLE documents_v2 RENAME TO documents;');
   }
 
+  private migrateDistributionStateV3(): void {
+    this.db.run(`CREATE TABLE distribution_state_v3 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
+      document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+      environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
+      last_nsu TEXT NOT NULL DEFAULT '000000000000000', max_nsu TEXT NOT NULL DEFAULT '000000000000000',
+      last_query_at TEXT, status TEXT NOT NULL DEFAULT 'IDLE' CHECK(status IN ('IDLE', 'RUNNING', 'RATE_LIMITED', 'ERROR')),
+      last_error TEXT, last_cstat INTEGER, next_query_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE(company_id, document_type, environment),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    );`);
+    this.db.run(`INSERT INTO distribution_state_v3 (
+      id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at,
+      status, last_error, last_cstat, next_query_at, created_at, updated_at
+    ) SELECT id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at,
+      status, last_error, last_cstat, next_query_at, created_at, updated_at FROM distribution_state;`);
+    this.db.run('DROP TABLE distribution_state;');
+    this.db.run('ALTER TABLE distribution_state_v3 RENAME TO distribution_state;');
+  }
+
+  private migrateDocumentsV3(): void {
+    const legacyEnvironment = this.queryOne<{ value: string }>(
+      "SELECT value FROM app_settings WHERE key = 'sefaz_environment';"
+    )?.value === 'production' ? 'production' : 'homologation';
+
+    this.db.run(`CREATE TABLE documents_v3 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
+      document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+      environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
+      origin TEXT NOT NULL CHECK(origin IN ('SEFAZ_DISTRIBUTION', 'NFSE_ADN_DISTRIBUTION', 'NFSE_SEFIN_DIRECT')),
+      nsu TEXT NOT NULL, schema_type TEXT NOT NULL, access_key TEXT NOT NULL, content_hash TEXT,
+      document_number TEXT, series TEXT, issue_date TEXT,
+      received_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')), issuer_cnpj TEXT, issuer_name TEXT,
+      recipient_cnpj TEXT, recipient_name TEXT, total_value REAL DEFAULT 0, xml_path TEXT, pdf_path TEXT,
+      xml_status TEXT NOT NULL DEFAULT 'XML_DISPONIVEL' CHECK(xml_status IN ('XML_DISPONIVEL', 'XML_INDISPONIVEL')),
+      pdf_status TEXT NOT NULL DEFAULT 'PDF_INDISPONIVEL' CHECK(pdf_status IN ('PDF_DISPONIVEL', 'PDF_INDISPONIVEL')),
+      situacao_fiscal TEXT DEFAULT 'AUTORIZADA' CHECK(situacao_fiscal IN ('AUTORIZADA', 'CANCELADA', 'DENEGADA')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE(company_id, document_type, environment, access_key),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    );`);
+    this.db.run(`INSERT INTO documents_v3 (
+      id, company_id, document_type, environment, origin, nsu, schema_type, access_key, content_hash,
+      document_number, series, issue_date, received_at, issuer_cnpj, issuer_name,
+      recipient_cnpj, recipient_name, total_value, xml_path, pdf_path, xml_status, pdf_status,
+      situacao_fiscal, created_at, updated_at
+    ) SELECT id, company_id, document_type, ?, 'SEFAZ_DISTRIBUTION', nsu, schema_type, access_key, NULL,
+      document_number, series, issue_date, received_at, issuer_cnpj, issuer_name,
+      recipient_cnpj, recipient_name, total_value, xml_path, pdf_path, xml_status, pdf_status,
+      situacao_fiscal, created_at, updated_at FROM documents;`, [legacyEnvironment]);
+    this.db.run('DROP TABLE documents;');
+    this.db.run('ALTER TABLE documents_v3 RENAME TO documents;');
+  }
+
+  private createNfseEventsTable(): void {
+    this.db.run(`CREATE TABLE IF NOT EXISTS nfse_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL,
+      document_id INTEGER,
+      environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
+      access_key TEXT NOT NULL,
+      nsu TEXT,
+      event_identifier TEXT,
+      event_type TEXT NOT NULL,
+      event_sequence INTEGER,
+      event_date TEXT,
+      schema_type TEXT NOT NULL,
+      xml_path TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL
+    );`);
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_nfse_events_document ON nfse_events(document_id);');
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_nfse_events_key ON nfse_events(company_id, environment, access_key);');
+    this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_hash
+      ON nfse_events(company_id, environment, content_hash);`);
+    this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_identifier
+      ON nfse_events(company_id, environment, event_identifier) WHERE event_identifier IS NOT NULL;`);
+  }
+
   private createDocumentIndexes(): void {
     const statements = [
+      'DROP INDEX IF EXISTS idx_docs_company_access_key;',
       'CREATE INDEX IF NOT EXISTS idx_docs_company_id ON documents(company_id);',
       'CREATE INDEX IF NOT EXISTS idx_docs_access_key ON documents(access_key);',
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_company_access_key ON documents(company_id, access_key);',
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_identity
+        ON documents(company_id, document_type, environment, access_key);`,
       'CREATE INDEX IF NOT EXISTS idx_docs_nsu ON documents(nsu);',
       'CREATE INDEX IF NOT EXISTS idx_docs_issue_date ON documents(issue_date);',
       'CREATE INDEX IF NOT EXISTS idx_docs_issuer_cnpj ON documents(issuer_cnpj);',

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS certificates (
 CREATE TABLE IF NOT EXISTS distribution_state (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER NOT NULL,
-    document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')),
+    document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
     environment TEXT NOT NULL DEFAULT 'homologation' CHECK(environment IN ('homologation', 'production')),
     last_nsu TEXT NOT NULL DEFAULT '000000000000000',
     max_nsu TEXT NOT NULL DEFAULT '000000000000000',
@@ -56,10 +56,13 @@ CREATE TABLE IF NOT EXISTS distribution_state (
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     company_id INTEGER NOT NULL,
-    document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')),
+    document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+    environment TEXT NOT NULL DEFAULT 'homologation' CHECK(environment IN ('homologation', 'production')),
+    origin TEXT NOT NULL DEFAULT 'SEFAZ_DISTRIBUTION' CHECK(origin IN ('SEFAZ_DISTRIBUTION', 'NFSE_ADN_DISTRIBUTION', 'NFSE_SEFIN_DIRECT')),
     nsu TEXT NOT NULL,
     schema_type TEXT NOT NULL,
     access_key TEXT NOT NULL,
+    content_hash TEXT,
     document_number TEXT,
     series TEXT,
     issue_date TEXT,
@@ -79,15 +82,36 @@ CREATE TABLE IF NOT EXISTS documents (
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );
 
--- Índices essenciais para consultas locais rápidas
-CREATE INDEX IF NOT EXISTS idx_docs_company_id ON documents(company_id);
-CREATE INDEX IF NOT EXISTS idx_docs_access_key ON documents(access_key);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_company_access_key ON documents(company_id, access_key);
-CREATE INDEX IF NOT EXISTS idx_docs_nsu ON documents(nsu);
-CREATE INDEX IF NOT EXISTS idx_docs_issue_date ON documents(issue_date);
-CREATE INDEX IF NOT EXISTS idx_docs_issuer_cnpj ON documents(issuer_cnpj);
-CREATE INDEX IF NOT EXISTS idx_docs_recipient_cnpj ON documents(recipient_cnpj);
-CREATE INDEX IF NOT EXISTS idx_docs_document_type ON documents(document_type);
+-- Os índices de documentos são criados após as migrations para permitir
+-- abrir bancos legados que ainda não possuem as colunas da versão 3.
+
+-- 5. Eventos de NFS-e Nacional
+CREATE TABLE IF NOT EXISTS nfse_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    document_id INTEGER,
+    environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
+    access_key TEXT NOT NULL,
+    nsu TEXT,
+    event_identifier TEXT,
+    event_type TEXT NOT NULL,
+    event_sequence INTEGER,
+    event_date TEXT,
+    schema_type TEXT NOT NULL,
+    xml_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_nfse_events_document ON nfse_events(document_id);
+CREATE INDEX IF NOT EXISTS idx_nfse_events_key ON nfse_events(company_id, environment, access_key);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_hash ON nfse_events(company_id, environment, content_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_identifier
+    ON nfse_events(company_id, environment, event_identifier)
+    WHERE event_identifier IS NOT NULL;
 
 -- 5. Histórico de Consultas SEFAZ
 CREATE TABLE IF NOT EXISTS query_history (
@@ -128,6 +152,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 INSERT OR IGNORE INTO app_settings (key, value) VALUES 
 ('default_storage_path', ''),
 ('sefaz_environment', 'homologation'),
+('nfse_environment', 'homologation'),
 ('items_per_page', '50'),
 ('log_level', 'info');
 `;

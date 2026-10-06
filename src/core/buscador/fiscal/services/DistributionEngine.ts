@@ -307,6 +307,8 @@ export class DistributionEngine {
           this.docRepo.upsert({
             company_id: companyId,
             document_type: doc.document_type,
+            environment,
+            origin: 'SEFAZ_DISTRIBUTION',
             nsu: doc.nsu,
             schema_type: doc.schema_type,
             access_key: doc.access_key,

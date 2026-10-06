@@ -1,6 +1,15 @@
 import { DatabaseManager } from '../connection';
 import { DistributionState, DocumentType, SefazEnvironment } from '../../domain/types';
 import { formatNSU, INITIAL_NSU } from '../../domain/nsu';
+import { normalizeNfseNsu } from '../../nfse/domain/nsu';
+
+function initialNsu(documentType: DocumentType): string {
+  return documentType === 'NFSE' ? '0' : INITIAL_NSU;
+}
+
+function normalizeNsu(documentType: DocumentType, value: string): string {
+  return documentType === 'NFSE' ? normalizeNfseNsu(value) : formatNSU(value);
+}
 
 export class DistributionStateRepository {
   constructor(private db: DatabaseManager) {}
@@ -21,7 +30,7 @@ export class DistributionStateRepository {
         `INSERT OR IGNORE INTO distribution_state
           (company_id, document_type, environment, last_nsu, max_nsu, status)
          VALUES (?, ?, ?, ?, ?, 'IDLE');`,
-        [companyId, documentType, environment, INITIAL_NSU, INITIAL_NSU]
+        [companyId, documentType, environment, initialNsu(documentType), initialNsu(documentType)]
       );
       row = this.db.queryOne<DistributionState>(
         `SELECT * FROM distribution_state
@@ -81,7 +90,7 @@ export class DistributionStateRepository {
         last_cstat = excluded.last_cstat,
         next_query_at = excluded.next_query_at,
         updated_at = excluded.last_query_at;`,
-      [companyId, documentType, environment, formatNSU(lastNSU), formatNSU(maxNSU),
+      [companyId, documentType, environment, normalizeNsu(documentType, lastNSU), normalizeNsu(documentType, maxNSU),
         now, status, error || null, lastCStat ?? null, nextQueryAt || null]
     );
     return this.getOrCreate(companyId, documentType, environment);
@@ -99,7 +108,7 @@ export class DistributionStateRepository {
            last_cstat = NULL, next_query_at = NULL, last_query_at = NULL,
            updated_at = ?
        WHERE company_id = ? AND document_type = ? AND environment = ?;`,
-      [INITIAL_NSU, INITIAL_NSU, new Date().toISOString(), companyId, documentType, environment]
+      [initialNsu(documentType), initialNsu(documentType), new Date().toISOString(), companyId, documentType, environment]
     );
     return this.getOrCreate(companyId, documentType, environment);
   }

@@ -24,3 +24,21 @@ export interface NfseDistributionBatch {
   retryAfter?: string;
   message?: string;
 }
+
+export interface NfseEvent {
+  id: number;
+  company_id: number;
+  document_id?: number;
+  environment: NfseEnvironment;
+  access_key: string;
+  nsu?: string;
+  event_identifier?: string;
+  event_type: string;
+  event_sequence?: number;
+  event_date?: string;
+  schema_type: string;
+  xml_path: string;
+  content_hash: string;
+  created_at: string;
+  updated_at: string;
+}

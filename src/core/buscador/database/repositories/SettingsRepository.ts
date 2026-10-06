@@ -13,11 +13,13 @@ export class SettingsRepository {
     }
 
     const environment = map.get('sefaz_environment');
+    const nfseEnvironment = map.get('nfse_environment');
     const logLevel = map.get('log_level');
     const parsedPageSize = Number(map.get('items_per_page'));
     return {
       default_storage_path: map.get('default_storage_path') || '',
       sefaz_environment: environment === 'production' ? 'production' : 'homologation',
+      nfse_environment: nfseEnvironment === 'production' ? 'production' : 'homologation',
       items_per_page: normalizePageSize(parsedPageSize),
       log_level: logLevel === 'warn' || logLevel === 'error' || logLevel === 'debug' ? logLevel : 'info',
     };
@@ -25,13 +27,16 @@ export class SettingsRepository {
 
   public updateSettings(partial: Partial<AppSettings>): AppSettings {
     const allowedKeys = new Set<keyof AppSettings>([
-      'default_storage_path', 'sefaz_environment', 'items_per_page', 'log_level'
+      'default_storage_path', 'sefaz_environment', 'nfse_environment', 'items_per_page', 'log_level'
     ]);
     for (const key of Object.keys(partial)) {
       if (!allowedKeys.has(key as keyof AppSettings)) throw new Error(`Configuração não permitida: ${key}`);
     }
     if (partial.sefaz_environment && !['homologation', 'production'].includes(partial.sefaz_environment)) {
       throw new Error('Ambiente SEFAZ inválido.');
+    }
+    if (partial.nfse_environment && !['homologation', 'production'].includes(partial.nfse_environment)) {
+      throw new Error('Ambiente NFS-e inválido.');
     }
     if (partial.log_level && !['info', 'warn', 'error', 'debug'].includes(partial.log_level)) {
       throw new Error('Nível de log inválido.');

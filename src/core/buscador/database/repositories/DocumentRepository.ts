@@ -4,24 +4,39 @@ import { sanitizeAccessKey } from '../../domain/access-key';
 import { formatNSU } from '../../domain/nsu';
 import { deriveDocumentPresentation } from '../../domain/document-presentation';
 import { normalizePageSize } from '../../domain/page-size';
+import { normalizeNfseAccessKey } from '../../nfse/domain/access-key';
+import { normalizeNfseNsu } from '../../nfse/domain/nsu';
 
 export class DocumentRepository {
   constructor(private db: DatabaseManager) {}
 
   public upsert(doc: Omit<FiscalDocument, 'id' | 'created_at' | 'updated_at'>): FiscalDocument {
-    const cleanKey = sanitizeAccessKey(doc.access_key);
-    const cleanNSU = formatNSU(doc.nsu);
+    const cleanKey = doc.document_type === 'NFSE'
+      ? normalizeNfseAccessKey(doc.access_key)
+      : sanitizeAccessKey(doc.access_key);
+    const cleanNSU = doc.document_type === 'NFSE' ? normalizeNfseNsu(doc.nsu) : formatNSU(doc.nsu);
 
     this.db.execute(
       `INSERT INTO documents (
-        company_id, document_type, nsu, schema_type, access_key,
+        company_id, document_type, environment, origin, nsu, schema_type, access_key, content_hash,
         document_number, series, issue_date, received_at,
         issuer_cnpj, issuer_name, recipient_cnpj, recipient_name,
         total_value, xml_path, pdf_path, xml_status, pdf_status,
         situacao_fiscal
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(company_id, access_key) DO UPDATE SET
-        nsu = CASE WHEN excluded.nsu > documents.nsu THEN excluded.nsu ELSE documents.nsu END,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(company_id, document_type, environment, access_key) DO UPDATE SET
+        nsu = CASE
+          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) > length(documents.nsu) THEN excluded.nsu
+          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) = length(documents.nsu) AND excluded.nsu > documents.nsu THEN excluded.nsu
+          WHEN excluded.document_type <> 'NFSE' AND excluded.nsu > documents.nsu THEN excluded.nsu
+          ELSE documents.nsu
+        END,
+        origin = CASE
+          WHEN documents.origin = 'NFSE_ADN_DISTRIBUTION' OR excluded.origin = 'NFSE_ADN_DISTRIBUTION'
+            THEN 'NFSE_ADN_DISTRIBUTION'
+          ELSE documents.origin
+        END,
+        content_hash = COALESCE(excluded.content_hash, documents.content_hash),
         schema_type = CASE
           WHEN documents.schema_type LIKE 'procNFe%' OR documents.schema_type LIKE 'procCTe%' THEN documents.schema_type
           WHEN excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%' THEN excluded.schema_type
@@ -92,9 +107,12 @@ export class DocumentRepository {
       [
         doc.company_id,
         doc.document_type,
+        doc.environment,
+        doc.origin,
         cleanNSU,
         doc.schema_type,
         cleanKey,
+        doc.content_hash || null,
         doc.document_number || null,
         doc.series || null,
         doc.issue_date || null,
@@ -112,7 +130,16 @@ export class DocumentRepository {
       ]
     );
 
-    return this.findByAccessKey(cleanKey, doc.company_id)!;
+    const saved = this.findByAccessKey(cleanKey, doc.company_id, doc.document_type, doc.environment);
+    if (!saved) throw new Error('Não foi possível localizar o documento após a persistência.');
+    if (doc.document_type === 'NFSE') {
+      this.db.execute(
+        `UPDATE nfse_events SET document_id = ?, updated_at = datetime('now', 'localtime')
+         WHERE company_id = ? AND environment = ? AND access_key = ? AND document_id IS NULL;`,
+        [saved.id, doc.company_id, doc.environment, cleanKey]
+      );
+    }
+    return saved;
   }
 
   public findById(id: number, companyId: number): FiscalDocument | null {
@@ -122,8 +149,20 @@ export class DocumentRepository {
     );
   }
 
-  public findByAccessKey(accessKey: string, companyId?: number): FiscalDocument | null {
+  public findByAccessKey(
+    accessKey: string,
+    companyId?: number,
+    documentType?: FiscalDocument['document_type'],
+    environment?: FiscalDocument['environment']
+  ): FiscalDocument | null {
     const cleanKey = sanitizeAccessKey(accessKey);
+    if (companyId !== undefined && documentType && environment) {
+      return this.db.queryOne<FiscalDocument>(
+        `SELECT * FROM documents
+         WHERE company_id = ? AND document_type = ? AND environment = ? AND access_key = ?;`,
+        [companyId, documentType, environment, cleanKey]
+      );
+    }
     return companyId === undefined
       ? this.db.queryOne<FiscalDocument>(
           'SELECT * FROM documents WHERE access_key = ? ORDER BY id LIMIT 1;',
