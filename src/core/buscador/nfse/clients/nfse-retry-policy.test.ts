@@ -10,10 +10,11 @@ describe('NfseRetryPolicy', () => {
 
     const result = await policy.execute(async () => {
       attempts += 1;
+      const responseHeaders: Record<string, string> = statusCode === 429 ? { 'retry-after': '2' } : {};
       return {
         statusCode: attempts === 1 ? statusCode : 200,
         responseBody: '',
-        responseHeaders: statusCode === 429 ? { 'retry-after': '2' } : {},
+        responseHeaders,
       };
     });
 

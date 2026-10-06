@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evento>
+  <infEvento Id="EVT12345678901234567890123456789012345678901234567890999999001">
+    <chNFSe>12345678901234567890123456789012345678901234567890</chNFSe>
+    <dhEvento>2026-10-06T09:30:00-03:00</dhEvento>
+    <tpEvento>999999</tpEvento>
+    <nSeqEvento>1</nSeqEvento>
+  </infEvento>
+</evento>
