@@ -1,10 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import { sanitizeFilename, buildSafeDocumentPath } from './path-sanitizer';
-import { Company } from '../domain/types';
+import { Company, DocumentType, SefazEnvironment } from '../domain/types';
+import { normalizeNfseAccessKey } from '../nfse/domain/access-key';
 
 export interface PendingFileWrite {
   filePath: string;
+  contentHash: string;
   commit(): void;
   rollback(): void;
 }
@@ -20,7 +23,8 @@ export class StorageService {
 
   public saveXml(
     company: Company,
-    docType: 'NFe' | 'CTe',
+    docType: DocumentType,
+    environment: SefazEnvironment,
     accessKey: string,
     xmlContent: string | Buffer,
     issueDate?: string,
@@ -28,7 +32,7 @@ export class StorageService {
     configuredBasePath?: string
   ): string {
     const pending = this.saveXmlTransactional(
-      company, docType, accessKey, xmlContent, issueDate, schemaType, configuredBasePath
+      company, docType, environment, accessKey, xmlContent, issueDate, schemaType, configuredBasePath
     );
     pending.commit();
     return pending.filePath;
@@ -36,7 +40,8 @@ export class StorageService {
 
   public saveXmlTransactional(
     company: Company,
-    docType: 'NFe' | 'CTe',
+    docType: DocumentType,
+    environment: SefazEnvironment,
     accessKey: string,
     xmlContent: string | Buffer,
     issueDate?: string,
@@ -45,19 +50,25 @@ export class StorageService {
   ): PendingFileWrite {
     const baseDir = this.getCompanyStoragePath(company, configuredBasePath);
     const { year, month } = this.getDateParts(issueDate);
-    const cleanKey = sanitizeFilename(accessKey);
-    if (!/^\d{44}$/.test(cleanKey)) throw new Error('Chave de acesso inválida para armazenamento.');
+    if (accessKey.includes('..') || accessKey.includes('\\')) {
+      throw new Error('Chave de acesso contém sequência de caminho inválida.');
+    }
+    const cleanKey = docType === 'NFSE' ? normalizeNfseAccessKey(accessKey) : accessKey;
+    if (docType !== 'NFSE' && !/^\d{44}$/.test(cleanKey)) {
+      throw new Error('A chave de acesso de NF-e/CT-e deve conter exatamente 44 dígitos.');
+    }
 
     const isEvent = Boolean(schemaType?.toLowerCase().includes('evento'));
     const cleanSchema = sanitizeFilename((schemaType || 'evento').replace(/\.xsd$/i, ''));
     const filename = isEvent ? `${cleanKey}-${cleanSchema}.xml` : `${cleanKey}.xml`;
-    const filePath = buildSafeDocumentPath(baseDir, '', docType, year, month, filename);
+    const filePath = buildSafeDocumentPath(baseDir, '', docType, environment, year, month, filename);
     return this.atomicWrite(filePath, xmlContent);
   }
 
   public savePdf(
     company: Company,
-    docType: 'NFe' | 'CTe',
+    docType: 'NFE' | 'CTE',
+    environment: SefazEnvironment,
     accessKey: string,
     pdfBuffer: Buffer,
     issueDate?: string,
@@ -67,7 +78,7 @@ export class StorageService {
     const { year, month } = this.getDateParts(issueDate);
     const cleanKey = sanitizeFilename(accessKey);
     if (!/^\d{44}$/.test(cleanKey)) throw new Error('Chave de acesso inválida para armazenamento.');
-    const filePath = buildSafeDocumentPath(baseDir, '', docType, year, month, `${cleanKey}.pdf`);
+    const filePath = buildSafeDocumentPath(baseDir, '', docType, environment, year, month, `${cleanKey}.pdf`);
     const pending = this.atomicWrite(filePath, pdfBuffer);
     pending.commit();
     return filePath;
@@ -106,11 +117,13 @@ export class StorageService {
     const targetDir = path.dirname(filePath);
     fs.mkdirSync(targetDir, { recursive: true });
 
+    const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+    const contentHash = createHash('sha256').update(contentBuffer).digest('hex');
     const previous = fs.existsSync(filePath) ? fs.readFileSync(filePath) : undefined;
     const tempPath = path.join(targetDir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
     const fd = fs.openSync(tempPath, 'wx');
     try {
-      fs.writeFileSync(fd, content);
+      fs.writeFileSync(fd, contentBuffer);
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
@@ -120,6 +133,7 @@ export class StorageService {
     let finished = false;
     return {
       filePath,
+      contentHash,
       commit: () => { finished = true; },
       rollback: () => {
         if (finished) return;

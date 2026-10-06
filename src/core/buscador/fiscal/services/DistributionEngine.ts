@@ -300,7 +300,7 @@ export class DistributionEngine {
       this.db.transaction(() => {
         for (const doc of documents) {
           const pending = this.storageService.saveXmlTransactional(
-            company, docType === 'NFE' ? 'NFe' : 'CTe', doc.access_key, doc.rawXml,
+            company, docType, environment, doc.access_key, doc.rawXml,
             doc.issue_date, doc.schema_type, configuredBasePath
           );
           pendingWrites.push(pending);

@@ -1,4 +1,5 @@
 import path from 'path';
+import type { DocumentType, SefazEnvironment } from '../domain/types';
 
 /**
  * Sanitiza um nome de arquivo ou pasta removendo caracteres ilegais para o sistema de arquivos do Windows
@@ -39,18 +40,20 @@ export function isSafeSubpath(baseDir: string, targetPath: string): boolean {
 export function buildSafeDocumentPath(
   baseDir: string,
   companyFolder: string,
-  docType: 'NFe' | 'CTe',
+  docType: DocumentType,
+  environment: SefazEnvironment,
   year: string,
   month: string,
   filename: string
 ): string {
   const safeCompany = sanitizeFilename(companyFolder);
-  const safeDocType = docType === 'NFe' ? 'NFe' : 'CTe';
+  const safeDocType = docType === 'NFE' ? 'NFe' : docType === 'CTE' ? 'CTe' : 'NFSE';
+  const safeEnvironment = environment === 'production' ? 'production' : 'homologation';
   const safeYear = sanitizeFilename(year);
   const safeMonth = sanitizeFilename(month);
   const safeFilename = sanitizeFilename(filename);
 
-  const fullPath = path.join(baseDir, safeCompany, safeDocType, safeYear, safeMonth, safeFilename);
+  const fullPath = path.join(baseDir, safeCompany, safeDocType, safeEnvironment, safeYear, safeMonth, safeFilename);
 
   if (!isSafeSubpath(baseDir, fullPath)) {
     throw new Error(`Tentativa de violação de diretório seguro detectada: ${fullPath}`);

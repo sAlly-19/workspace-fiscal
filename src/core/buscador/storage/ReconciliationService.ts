@@ -19,7 +19,7 @@ export class ReconciliationService {
    */
   public reconcileCompanyStorage(companyId: number): ReconciliationReport {
     const docs = this.db.queryAll<FiscalDocument>(
-      'SELECT id, xml_path, pdf_path, xml_status, pdf_status FROM documents WHERE company_id = ?;',
+      'SELECT id, document_type, xml_path, pdf_path, xml_status, pdf_status FROM documents WHERE company_id = ?;',
       [companyId]
     );
 
@@ -46,8 +46,13 @@ export class ReconciliationService {
           shouldUpdate = true;
         }
 
-        // Verifica integridade do PDF
-        if (doc.pdf_status === 'PDF_DISPONIVEL') {
+        // NFS-e não possui PDF/DANFSE ativo nesta etapa.
+        if (doc.document_type === 'NFSE') {
+          if (doc.pdf_status !== 'PDF_INDISPONIVEL') {
+            newPdfStatus = 'PDF_INDISPONIVEL';
+            shouldUpdate = true;
+          }
+        } else if (doc.pdf_status === 'PDF_DISPONIVEL') {
           if (!doc.pdf_path || !fs.existsSync(doc.pdf_path)) {
             newPdfStatus = 'PDF_INDISPONIVEL';
             missingPdfCount++;
