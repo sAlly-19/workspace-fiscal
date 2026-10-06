@@ -106,12 +106,20 @@ export class OfficialNfseWireContract implements NfseWireContract {
       const xmlGzip = item.ArquivoXml || item.arquivoXml || '';
       const xml = xmlGzip ? decompressDocZip(xmlGzip) : '';
 
+      let accessKey = item.ChaveAcesso || item.chaveAcesso;
+      if (!accessKey && xml) {
+        const match = xml.match(/(?:chNFSe|chAcesso|chaveAcesso)>(\d{50})<|PRE(\d{50})/i);
+        if (match) {
+          accessKey = match[1] || match[2];
+        }
+      }
+
       documents.push({
         nsu: nsuVal != null ? String(nsuVal) : undefined,
         kind,
         schemaType,
         xml,
-        accessKey: item.ChaveAcesso || item.chaveAcesso,
+        accessKey,
         generatedAt: item.DataHoraGeracao || item.dataHoraGeracao,
       });
     }
@@ -186,12 +194,20 @@ export class OfficialNfseWireContract implements NfseWireContract {
       const xml = xmlGzip ? decompressDocZip(xmlGzip) : '';
       const nsuVal = item.NSU ?? item.nsu;
 
+      let accessKey = item.ChaveAcesso || item.chaveAcesso;
+      if (!accessKey && xml) {
+        const match = xml.match(/(?:chNFSe|chAcesso|chaveAcesso)>(\d{50})<|PRE(\d{50})/i);
+        if (match) {
+          accessKey = match[1] || match[2];
+        }
+      }
+
       events.push({
         nsu: nsuVal != null ? String(nsuVal) : undefined,
         kind: 'EVENT',
         schemaType: tipoEvento || tipoDoc || 'EVENT',
         xml,
-        accessKey: item.ChaveAcesso || item.chaveAcesso,
+        accessKey,
         generatedAt: item.DataHoraGeracao || item.dataHoraGeracao,
       });
     }

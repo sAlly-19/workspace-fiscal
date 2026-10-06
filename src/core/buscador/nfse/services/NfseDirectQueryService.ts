@@ -75,13 +75,28 @@ export class NfseDirectQueryService {
         }
       }
 
-      const persistResult = this.persistenceService.persistBatch({
-        company,
-        environment,
-        origin: 'NFSE_SEFIN_DIRECT',
-        payloads,
-        configuredBasePath: options.configuredBasePath,
-      });
+      let persistResult;
+      try {
+        persistResult = this.persistenceService.persistBatch({
+          company,
+          environment,
+          origin: 'NFSE_SEFIN_DIRECT',
+          payloads,
+          configuredBasePath: options.configuredBasePath,
+        });
+      } catch (persistErr) {
+        if (payloads.length > 1) {
+          persistResult = this.persistenceService.persistBatch({
+            company,
+            environment,
+            origin: 'NFSE_SEFIN_DIRECT',
+            payloads: [docPayload],
+            configuredBasePath: options.configuredBasePath,
+          });
+        } else {
+          throw persistErr;
+        }
+      }
 
       const savedDoc = this.docRepo.findByAccessKey(cleanKey, options.companyId, 'NFSE', environment);
 

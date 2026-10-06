@@ -75,4 +75,75 @@ describe('NfseEventParser', () => {
       fiscal_effect: 'NONE',
     });
   });
+
+  it('parses real pedRegEvento XML with infPedReg and infEvento containing e101101', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<pedRegEvento versao="1.01" xmlns="http://www.sped.fazenda.gov.br/nfse">
+  <infPedReg Id="PRE${KEY}">
+    <tpAmb>1</tpAmb>
+    <verAplic>1.0</verAplic>
+    <dhEvento>2026-10-06T15:00:00-03:00</dhEvento>
+    <tpEvento>101101</tpEvento>
+    <nSeqEvento>1</nSeqEvento>
+    <chNFSe>${KEY}</chNFSe>
+    <infEvento>
+      <e101101>
+        <xDesc>Cancelamento de NFS-e</xDesc>
+        <cMotivo>1</cMotivo>
+      </e101101>
+    </infEvento>
+  </infPedReg>
+</pedRegEvento>`;
+
+    const result = new NfseEventParser().parse(xml, 'pedRegEvento_v1.01', '10');
+
+    expect(result).toEqual({
+      access_key: KEY,
+      nsu: '10',
+      event_identifier: `PRE${KEY}`,
+      event_type: '101101',
+      event_sequence: 1,
+      event_date: '2026-10-06T15:00:00-03:00',
+      schema_type: 'pedRegEvento_v1.01',
+      raw_xml: xml,
+      fiscal_effect: 'CANCELADA',
+    });
+  });
+
+  it('parses pedRegEvento without infEvento tag', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<pedRegEvento versao="1.01">
+  <infPedReg Id="PRE${KEY}">
+    <dhEvento>2026-10-06T12:00:00-03:00</dhEvento>
+    <tpEvento>202201</tpEvento>
+    <nSeqEvento>2</nSeqEvento>
+    <chNFSe>${KEY}</chNFSe>
+  </infPedReg>
+</pedRegEvento>`;
+
+    const result = new NfseEventParser().parse(xml, 'EVENT', '11');
+
+    expect(result).toMatchObject({
+      access_key: KEY,
+      nsu: '11',
+      event_type: '202201',
+      event_sequence: 2,
+      event_date: '2026-10-06T12:00:00-03:00',
+    });
+  });
+
+  it('uses fallbackAccessKey when chNFSe is absent from XML', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<evento>
+  <infEvento>
+    <dhEvento>2026-10-06T14:00:00-03:00</dhEvento>
+    <tpEvento>101101</tpEvento>
+  </infEvento>
+</evento>`;
+
+    const result = new NfseEventParser().parse(xml, 'EVENT', undefined, KEY);
+
+    expect(result.access_key).toBe(KEY);
+    expect(result.fiscal_effect).toBe('CANCELADA');
+  });
 });

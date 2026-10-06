@@ -49,7 +49,12 @@ export class NfsePersistenceService {
       return {
         kind: 'EVENT',
         source: payload,
-        value: this.eventParser.parse(payload.xml, payload.schemaType, payload.nsu),
+        value: this.eventParser.parse(
+          payload.xml,
+          payload.schemaType,
+          payload.nsu,
+          payload.accessKey
+        ),
       };
     });
 
