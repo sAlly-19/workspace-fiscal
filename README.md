@@ -163,24 +163,32 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
 
 ---
 
-### 4. Buscador NF (Consulta e Distribuição SEFAZ)
+### 4. Buscador NF (Consulta e Distribuição SEFAZ & NFS-e Nacional)
+- **Seleção de Workspace Fiscal:**
+  - Alternância intuitiva no cabeçalho entre o ecossistema **SEFAZ (NF-e e CT-e)** e o **NFS-e Nacional (ADN / SEFIN)**.
+  - Preservação da empresa ativa, certificados associados e filtros temporais durante a alternância.
 - **Consulta e Distribuição Oficial SEFAZ:**
   - Comunicação nativa com os Web Services oficiais de Distribuição de DF-e de Interesse dos Atores (NF-e e CT-e).
   - Consulta incremental baseada em NSU (Número Seqüencial Único), registrando o `ultNSU` e o `maxNSU` por empresa.
   - Prevenção automática e inteligente contra consumo indevido (*cStat 656*), respeitando as diretrizes e intervalos de requisições da SEFAZ.
+- **NFS-e Nacional (Padrão ADN e SEFIN):**
+  - Suporte completo a chaves de acesso de 50 dígitos numéricos (padrão oficial nacional).
+  - Consulta e sincronização incremental via Ambiente de Dados Nacional (ADN) a partir de NSU zero.
+  - Consulta direta por chave de acesso via Secretaria de Finanças Nacional (SEFIN) sem afetar o cursor de distribuição.
+  - Acompanhamento e vinculação atômica de eventos fiscais (Cancelamentos, Cartas de Correção, etc.).
+  - Gate de contrato wire deliberado para homologação contínua de schemas oficiais (consulte `docs/nfse-contract-artifacts.md`).
 - **Certificados Digitais ICP-Brasil (A1):**
-  - Suporte completo a certificados digitais modelo A1 (`.pfx` / `.p12`) com senha protegida.
-  - Leitura segura em memória e armazenamento protegido de chaves e cadeias criptográficas no banco local.
+  - Integração nativa com o Windows Certificate Store (`CurrentUser\My`) e suporte completo a certificados modelo A1.
   - Validação instantânea de vigência, titularidade e CNPJ vinculado ao certificado.
 - **Download e Organização de Arquivos XML:**
-  - Descompactação automática de documentos em `gzip` retornados no lote da SEFAZ.
-  - Armazenamento físico automático no diretório configurado pelo usuário.
+  - Descompactação automática de documentos retornados nos lotes oficiais.
+  - Armazenamento físico atômico estruturado por empresa, tipo de documento e ambiente.
   - Exportação em lote de XMLs com geração de arquivos `.zip` organizados.
-- **Ambientes de Operação:**
-  - Alternância facilitada entre ambientes de **Produção** e **Homologação**.
+- **Ambientes de Operação Independentes:**
+  - Alternância facilitada entre **Produção** e **Homologação** (para SEFAZ) e **Produção** e **Produção Restrita** (para NFS-e Nacional), com cursores NSU estritamente isolados.
 - **Histórico e Consulta Local:**
-  - Tabela interativa com busca, filtros por status, data, emitente e chave de acesso.
-  - Ações rápidas para download individual do XML, visualização e conferência.
+  - Tabelas com busca instantânea, paginação, filtros por status, período, prestador, tomador e chave de acesso.
+  - Ações rápidas para download de XML, abertura de pasta e inspeção detalhada de metadados e eventos.
 
 ---
 
