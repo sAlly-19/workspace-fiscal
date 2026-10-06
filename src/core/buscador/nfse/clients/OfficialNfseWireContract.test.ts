@@ -145,6 +145,16 @@ describe('OfficialNfseWireContract', () => {
       expect(batch.message).toContain('Certificado digital do transmissor revogado');
       expect(batch.message).toContain('E001');
     });
+
+    it('returns NO_DOCUMENTS for empty or non-JSON 404 responses', () => {
+      const batchEmpty = contract.decodeDistribution('', {});
+      expect(batchEmpty.status).toBe('NO_DOCUMENTS');
+      expect(batchEmpty.documents).toEqual([]);
+
+      const batchHtml = contract.decodeDistribution('<html>404 Not Found</html>', {});
+      expect(batchHtml.status).toBe('NO_DOCUMENTS');
+      expect(batchHtml.documents).toEqual([]);
+    });
   });
 
   describe('decodeDocument', () => {

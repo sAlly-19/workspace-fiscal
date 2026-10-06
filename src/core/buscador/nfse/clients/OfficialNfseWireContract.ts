@@ -48,7 +48,36 @@ export class OfficialNfseWireContract implements NfseWireContract {
     body: string,
     _headers: Readonly<Record<string, string>>
   ): NfseDistributionBatch {
-    const data = typeof body === 'string' ? JSON.parse(body) : body;
+    if (!body || typeof body !== 'string' || body.trim() === '') {
+      return {
+        status: 'NO_DOCUMENTS',
+        lastNsu: '0',
+        maxNsu: '0',
+        documents: [],
+      };
+    }
+
+    let data: any;
+    try {
+      data = typeof body === 'string' ? JSON.parse(body) : body;
+    } catch {
+      return {
+        status: 'NO_DOCUMENTS',
+        lastNsu: '0',
+        maxNsu: '0',
+        documents: [],
+      };
+    }
+
+    if (!data || typeof data !== 'object') {
+      return {
+        status: 'NO_DOCUMENTS',
+        lastNsu: '0',
+        maxNsu: '0',
+        documents: [],
+      };
+    }
+
     const statusRaw = data.StatusProcessamento || data.statusProcessamento;
 
     if (statusRaw === 'REJEICAO') {
@@ -139,9 +168,18 @@ export class OfficialNfseWireContract implements NfseWireContract {
     body: string,
     _headers: Readonly<Record<string, string>>
   ): NfseDistributedPayload {
-    const data = typeof body === 'string' ? JSON.parse(body) : body;
+    if (!body || typeof body !== 'string' || body.trim() === '') {
+      throw new NfseDocumentError('Documento não localizado na SEFIN.');
+    }
 
-    const erro = data.erro || data.Erro;
+    let data: any;
+    try {
+      data = typeof body === 'string' ? JSON.parse(body) : body;
+    } catch {
+      throw new NfseDocumentError('Resposta inválida retornada pela SEFIN.');
+    }
+
+    const erro = data?.erro || data?.Erro;
     if (erro) {
       const message =
         erro.descricao ||
@@ -152,7 +190,7 @@ export class OfficialNfseWireContract implements NfseWireContract {
       throw new NfseDocumentError(message);
     }
 
-    const erros = data.erros || data.Erros;
+    const erros = data?.erros || data?.Erros;
     if (Array.isArray(erros) && erros.length > 0) {
       const first = erros[0];
       const message =
@@ -164,7 +202,7 @@ export class OfficialNfseWireContract implements NfseWireContract {
       throw new NfseDocumentError(message);
     }
 
-    const xmlGzip = data.nfseXmlGZipB64 || data.NfseXmlGZipB64;
+    const xmlGzip = data?.nfseXmlGZipB64 || data?.NfseXmlGZipB64;
     if (!xmlGzip) {
       throw new NfseDocumentError('Documento retornado sem XML compactado.');
     }
@@ -183,8 +221,18 @@ export class OfficialNfseWireContract implements NfseWireContract {
     body: string,
     _headers: Readonly<Record<string, string>>
   ): NfseDistributedPayload[] {
-    const data = typeof body === 'string' ? JSON.parse(body) : body;
-    const rawList: any[] = data.LoteDFe || data.loteDFe || [];
+    if (!body || typeof body !== 'string' || body.trim() === '') {
+      return [];
+    }
+
+    let data: any;
+    try {
+      data = typeof body === 'string' ? JSON.parse(body) : body;
+    } catch {
+      return [];
+    }
+
+    const rawList: any[] = data?.LoteDFe || data?.loteDFe || [];
     const events: NfseDistributedPayload[] = [];
 
     for (const item of rawList) {
