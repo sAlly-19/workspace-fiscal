@@ -2,8 +2,15 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { ICertificateProvider, SoapExecutionOptions, SoapExecutionResult } from './ICertificateProvider';
+import {
+  HttpExecutionOptions,
+  HttpExecutionResult,
+  ICertificateProvider,
+  SoapExecutionOptions,
+  SoapExecutionResult,
+} from './ICertificateProvider';
 import { CertificateInfo } from '../domain/types';
+import { sanitizedTransportFailure, validateHttpExecutionOptions } from './http-transport';
 
 export class WindowsStoreCertificateProvider implements ICertificateProvider {
   private scriptPath: string;
@@ -100,6 +107,43 @@ export class WindowsStoreCertificateProvider implements ICertificateProvider {
         } catch {
           // Ignora falha de limpeza temporária
         }
+      }
+    }
+  }
+
+  public async executeHttpRequest(options: HttpExecutionOptions): Promise<HttpExecutionResult> {
+    const validated = await validateHttpExecutionOptions(options, (thumbprint) => this.getCertificate(thumbprint));
+    const headersFile = path.join(
+      os.tmpdir(),
+      `nfse_headers_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.json`
+    );
+
+    try {
+      fs.writeFileSync(headersFile, JSON.stringify(validated.headers || {}), 'utf8');
+      const rawOutput = await this.runPowerShell([
+        '-Action', 'http',
+        '-Thumbprint', validated.thumbprint,
+        '-Url', validated.url,
+        '-Method', validated.method,
+        '-HeadersFile', headersFile,
+        '-TimeoutSec', String(validated.timeoutSec),
+      ], validated.signal);
+      const parsed = this.parseJsonOutput<{
+        StatusCode?: number;
+        ResponseBody?: string;
+        ResponseHeaders?: Record<string, string>;
+      }>(rawOutput);
+      return {
+        statusCode: parsed.StatusCode || 500,
+        responseBody: parsed.ResponseBody || '',
+        responseHeaders: parsed.ResponseHeaders || {},
+      };
+    } catch (error) {
+      if (validated.signal?.aborted) throw new Error('Consulta cancelada pelo usuário.');
+      throw sanitizedTransportFailure();
+    } finally {
+      if (fs.existsSync(headersFile)) {
+        try { fs.unlinkSync(headersFile); } catch { /* limpeza best-effort */ }
       }
     }
   }

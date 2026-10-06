@@ -1,7 +1,22 @@
-import { ICertificateProvider, SoapExecutionOptions, SoapExecutionResult } from './ICertificateProvider';
+import {
+  HttpExecutionOptions,
+  HttpExecutionResult,
+  ICertificateProvider,
+  SoapExecutionOptions,
+  SoapExecutionResult,
+} from './ICertificateProvider';
 import { CertificateInfo } from '../domain/types';
+import { sanitizedTransportFailure, validateHttpExecutionOptions } from './http-transport';
+
+type MockHttpHandler = (options: HttpExecutionOptions) => Promise<HttpExecutionResult>;
 
 export class MockCertificateProvider implements ICertificateProvider {
+  constructor(private readonly httpHandler: MockHttpHandler = async () => ({
+    statusCode: 501,
+    responseBody: '',
+    responseHeaders: {},
+  })) {}
+
   private mockCerts: CertificateInfo[] = [
     {
       subject: 'CN=EMPRESA DE TESTE LTDA:41777943000102, OU=Certificado PJ A1, O=ICP-Brasil, C=BR',
@@ -44,5 +59,14 @@ export class MockCertificateProvider implements ICertificateProvider {
       statusCode: 200,
       responseBody: `<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"><soap:Body><retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01"><cStat>137</cStat><xMotivo>Nenhum documento localizado</xMotivo></retDistDFeInt></soap:Body></soap:Envelope>`,
     };
+  }
+
+  public async executeHttpRequest(options: HttpExecutionOptions): Promise<HttpExecutionResult> {
+    const validated = await validateHttpExecutionOptions(options, (thumbprint) => this.getCertificate(thumbprint));
+    try {
+      return await this.httpHandler(validated);
+    } catch {
+      throw sanitizedTransportFailure();
+    }
   }
 }

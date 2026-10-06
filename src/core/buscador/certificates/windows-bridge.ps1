@@ -16,6 +16,12 @@ param(
     [string]$EnvelopeFile,
 
     [Parameter(Mandatory=$false)]
+    [string]$Method = "GET",
+
+    [Parameter(Mandatory=$false)]
+    [string]$HeadersFile,
+
+    [Parameter(Mandatory=$false)]
     [int]$TimeoutSec = 30
 )
 
@@ -167,6 +173,130 @@ if ($Action -eq "request") {
             ResponseBody = ""
         }
         Write-Output ($resObj | ConvertTo-Json -Depth 2 -Compress)
+        exit 0
+    }
+}
+
+if ($Action -eq "http") {
+    if (-not $Thumbprint -or -not $Url -or -not $HeadersFile) {
+        Write-Error "Parâmetros obrigatórios ausentes para ação 'http'."
+        exit 1
+    }
+    if ($Thumbprint -notmatch '^[a-fA-F0-9]{40,64}$') {
+        Write-Error "Thumbprint de certificado inválido."
+        exit 4
+    }
+    if ($Method -ne "GET") {
+        Write-Error "O transporte NFS-e permite somente GET."
+        exit 6
+    }
+
+    try { $uri = [System.Uri]$Url } catch {
+        Write-Error "URL NFS-e inválida."
+        exit 5
+    }
+    $allowedHosts = @(
+        "adn.nfse.gov.br",
+        "adn.producaorestrita.nfse.gov.br",
+        "sefin.nfse.gov.br",
+        "sefin.producaorestrita.nfse.gov.br"
+    )
+    if ($uri.Scheme -ne "https" -or $allowedHosts -notcontains $uri.DnsSafeHost.ToLowerInvariant()) {
+        Write-Error "A URL NFS-e deve usar uma base HTTPS oficial."
+        exit 5
+    }
+
+    $cert = Get-Item -Path "Cert:\CurrentUser\My\$Thumbprint" -ErrorAction SilentlyContinue
+    if (-not $cert) {
+        $cert = Get-Item -Path "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction SilentlyContinue
+    }
+    if (-not $cert) {
+        Write-Error "Certificado selecionado não foi localizado no repositório do Windows."
+        exit 2
+    }
+    if (-not $cert.HasPrivateKey -or $cert.NotAfter -le (Get-Date)) {
+        Write-Error "Certificado selecionado sem chave privada válida ou expirado."
+        exit 2
+    }
+    if (-not (Test-Path $HeadersFile)) {
+        Write-Error "Arquivo temporário de headers não encontrado."
+        exit 3
+    }
+
+    $request = [System.Net.HttpWebRequest]::Create($uri)
+    $request.Method = "GET"
+    $request.Timeout = $TimeoutSec * 1000
+    $request.ReadWriteTimeout = $TimeoutSec * 1000
+    $request.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+    [void]$request.ClientCertificates.Add($cert)
+    $request.KeepAlive = $false
+
+    $headersJson = [System.IO.File]::ReadAllText($HeadersFile, [System.Text.Encoding]::UTF8)
+    if ($headersJson) {
+        $headers = $headersJson | ConvertFrom-Json
+        foreach ($property in $headers.PSObject.Properties) {
+            $headerName = [string]$property.Name
+            $headerValue = [string]$property.Value
+            if ($headerName -match '[\r\n]' -or $headerValue -match '[\r\n]') {
+                Write-Error "Header HTTPS inválido."
+                exit 7
+            }
+            switch ($headerName.ToLowerInvariant()) {
+                "accept" { $request.Accept = $headerValue }
+                "user-agent" { $request.UserAgent = $headerValue }
+                "authorization" { Write-Error "Header não permitido."; exit 7 }
+                "cookie" { Write-Error "Header não permitido."; exit 7 }
+                "proxy-authorization" { Write-Error "Header não permitido."; exit 7 }
+                default { $request.Headers.Add($headerName, $headerValue) }
+            }
+        }
+    }
+
+    try {
+        $response = $request.GetResponse()
+        $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [System.Text.Encoding]::UTF8)
+        $responseBody = $reader.ReadToEnd()
+        $reader.Close()
+        $responseHeaders = @{}
+        foreach ($name in @("Content-Type", "Retry-After", "ETag", "Last-Modified", "Cache-Control", "Date")) {
+            $value = $response.Headers[$name]
+            if ($value) { $responseHeaders[$name.ToLowerInvariant()] = $value }
+        }
+        $statusCode = [int]$response.StatusCode
+        $response.Close()
+        Write-Output ([PSCustomObject]@{
+            StatusCode = $statusCode
+            ResponseBody = $responseBody
+            ResponseHeaders = $responseHeaders
+        } | ConvertTo-Json -Depth 4 -Compress)
+        exit 0
+    } catch [System.Net.WebException] {
+        $webEx = $_.Exception
+        $statusCode = 500
+        $responseBody = ""
+        $responseHeaders = @{}
+        if ($webEx.Response) {
+            $statusCode = [int]$webEx.Response.StatusCode
+            $reader = New-Object System.IO.StreamReader($webEx.Response.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            $responseBody = $reader.ReadToEnd()
+            $reader.Close()
+            foreach ($name in @("Content-Type", "Retry-After", "ETag", "Last-Modified", "Cache-Control", "Date")) {
+                $value = $webEx.Response.Headers[$name]
+                if ($value) { $responseHeaders[$name.ToLowerInvariant()] = $value }
+            }
+        }
+        Write-Output ([PSCustomObject]@{
+            StatusCode = $statusCode
+            ResponseBody = $responseBody
+            ResponseHeaders = $responseHeaders
+        } | ConvertTo-Json -Depth 4 -Compress)
+        exit 0
+    } catch {
+        Write-Output ([PSCustomObject]@{
+            StatusCode = 500
+            ResponseBody = ""
+            ResponseHeaders = @{}
+        } | ConvertTo-Json -Depth 4 -Compress)
         exit 0
     }
 }

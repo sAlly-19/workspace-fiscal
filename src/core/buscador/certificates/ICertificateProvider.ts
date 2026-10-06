@@ -15,6 +15,21 @@ export interface SoapExecutionResult {
   error?: string;
 }
 
+export interface HttpExecutionOptions {
+  url: string;
+  method: 'GET';
+  thumbprint: string;
+  headers?: Record<string, string>;
+  timeoutSec?: number;
+  signal?: AbortSignal;
+}
+
+export interface HttpExecutionResult {
+  statusCode: number;
+  responseBody: string;
+  responseHeaders: Record<string, string>;
+}
+
 export interface ICertificateProvider {
   /**
    * Lista todos os certificados válidos ou instalados no ambiente
@@ -30,4 +45,6 @@ export interface ICertificateProvider {
    * Executa uma requisição SOAP utilizando autenticação mTLS (TLS 1.2 com o certificado selecionado)
    */
   executeSoapRequest(options: SoapExecutionOptions): Promise<SoapExecutionResult>;
+
+  executeHttpRequest(options: HttpExecutionOptions): Promise<HttpExecutionResult>;
 }
