@@ -8,12 +8,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import { MainLayout } from './layouts/MainLayout';
 import { Home } from './features/home/Home';
 import { DepreciationApp } from './features/depreciation/DepreciationApp';
+import { BuscadorApp } from './features/buscador/BuscadorApp';
 import { ServerUnreachableOverlay, useServerUnreachable } from './components/ServerUnreachableOverlay';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { UpdatePromptModal } from './components/UpdatePromptModal';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 
-type View = 'home' | 'nfview' | 'depreciation';
+type View = 'home' | 'nfview' | 'depreciation' | 'buscador';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
@@ -40,7 +41,11 @@ export default function App() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="min-h-screen"
           >
-            <Home onOpenNFView={() => setView('nfview')} onOpenDepreciation={() => setView('depreciation')} />
+            <Home
+              onOpenNFView={() => setView('nfview')}
+              onOpenDepreciation={() => setView('depreciation')}
+              onOpenBuscador={() => setView('buscador')}
+            />
           </motion.div>
         ) : view === 'nfview' ? (
           <motion.div
@@ -53,7 +58,7 @@ export default function App() {
           >
             <MainLayout onBackToHome={() => setView('home')} />
           </motion.div>
-        ) : (
+        ) : view === 'depreciation' ? (
           <motion.div
             key="depreciation"
             initial={{ opacity: 0, y: 8 }}
@@ -63,6 +68,17 @@ export default function App() {
             className="min-h-screen"
           >
             <DepreciationApp onBackToHome={() => setView('home')} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="buscador"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="min-h-screen"
+          >
+            <BuscadorApp onBackToHome={() => setView('home')} />
           </motion.div>
         )}
       </AnimatePresence>

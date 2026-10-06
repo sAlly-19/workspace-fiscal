@@ -73,6 +73,7 @@ html, body {
   --bg-input: #18181b;
   --border-app: #27272a;
   --border-subtle: #1f1f23;
+  --border-default: #303036;
   --border-strong: #3f3f46;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
@@ -80,6 +81,24 @@ html, body {
   --preview-canvas-bg: #09090b;
   --split-resizer: #27272a;
   --split-resizer-hover: #3b82f6;
+
+  /* Tokens específicos do módulo Buscador NF */
+  --surface-app: #09090b;
+  --surface-header: #111114;
+  --surface-sidebar: #0f0f12;
+  --surface-workspace: #0c0c0f;
+  --surface-panel: #151518;
+  --surface-card: #18181b;
+  --surface-inset: #101014;
+  --surface-input: #111114;
+  --surface-hover: #202024;
+  --surface-selected: #3b0764;
+  --surface-overlay: rgb(0 0 0 / 0.72);
+  --primary: #9333ea;
+  --primary-hover: #a855f7;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
 }
 
 /* --- TEMA: LIGHT (Claro Elegante & Limpo) --- */
@@ -97,6 +116,7 @@ html, body {
   --bg-input: #ffffff;
   --border-app: #e2e8f0;
   --border-subtle: #cbd5e1;
+  --border-default: #cbd5e1;
   --border-strong: #94a3b8;
   --text-primary: #0f172a;
   --text-secondary: #475569;
@@ -104,6 +124,42 @@ html, body {
   --preview-canvas-bg: #e2e8f0;
   --split-resizer: #cbd5e1;
   --split-resizer-hover: #2563eb;
+
+  /* Tokens específicos do módulo Buscador NF */
+  --surface-app: #e9edf3;
+  --surface-header: #ffffff;
+  --surface-sidebar: #f8fafc;
+  --surface-workspace: #eef2f7;
+  --surface-panel: #ffffff;
+  --surface-card: #ffffff;
+  --surface-inset: #f1f5f9;
+  --surface-input: #ffffff;
+  --surface-hover: #e8edf4;
+  --surface-selected: #f3e8ff;
+  --surface-overlay: rgb(15 23 42 / 0.55);
+  --primary: #7e22ce;
+  --primary-hover: #9333ea;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #e11d48;
+}
+
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea,
+.theme-light input,
+.theme-light select,
+.theme-light textarea {
+  border-color: var(--border-default);
+  background: var(--surface-input);
+  color: var(--text-primary);
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder,
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: var(--text-muted);
 }
 
 /* =========================================================================

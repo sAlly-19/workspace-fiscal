@@ -11,11 +11,14 @@ import {
   Filter,
   Tag,
   Layers,
+  Search,
+  KeyRound,
+  Download,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '2.5.3';
+export const CURRENT_APP_VERSION = '3.0.0';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
 interface WhatsNewModalProps {
@@ -28,7 +31,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState<'2.5.3' | '2.5.2' | '2.5.1'>('2.5.3');
+  const [activeVersion, setActiveVersion] = useState<'3.0.0' | '2.5.3' | '2.5.2'>('3.0.0');
 
   useEffect(() => {
     if (open !== undefined) {
@@ -103,12 +106,12 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
           <div
             className={`px-6 py-5 border-b flex items-center justify-between ${
               isLight
-                ? 'bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white border-[#e2e8f0]'
-                : 'bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-[#18181b] border-[#27272a]'
+                ? 'bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white border-[#e2e8f0]'
+                : 'bg-gradient-to-r from-purple-900/30 via-indigo-900/20 to-[#18181b] border-[#27272a]'
             }`}
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
@@ -116,11 +119,11 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                   <h2 className="font-extrabold text-base tracking-tight">
                     Novidades da Versão
                   </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-blue-600 text-white shadow-xs">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-purple-600 text-white shadow-xs">
                     v{CURRENT_APP_VERSION}
                   </span>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                    Atualizado
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                    Versão 3.0
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
@@ -150,23 +153,35 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                 Versão:
               </span>
               <button
-                onClick={() => setActiveVersion('2.5.3')}
+                onClick={() => setActiveVersion('3.0.0')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeVersion === '2.5.3'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                  activeVersion === '3.0.0'
+                    ? 'bg-purple-600 text-white shadow-xs'
                     : isLight
                       ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
                       : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
                 }`}
               >
-                <span>v2.5.3 (Atual)</span>
-                {activeVersion === '2.5.3' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                <span>v3.0.0 (Atual)</span>
+                {activeVersion === '3.0.0' && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+              </button>
+              <button
+                onClick={() => setActiveVersion('2.5.3')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeVersion === '2.5.3'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : isLight
+                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
+                }`}
+              >
+                <span>v2.5.3</span>
               </button>
               <button
                 onClick={() => setActiveVersion('2.5.2')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeVersion === '2.5.2'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-purple-600 text-white shadow-xs'
                     : isLight
                       ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
                       : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
@@ -174,27 +189,104 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
               >
                 <span>v2.5.2</span>
               </button>
-              <button
-                onClick={() => setActiveVersion('2.5.1')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeVersion === '2.5.1'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : isLight
-                      ? 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
-                }`}
-              >
-                <span>v2.5.1</span>
-              </button>
             </div>
             <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
-              {activeVersion === '2.5.3' ? 'Lançamento mais recente' : 'Versão anterior'}
+              {activeVersion === '3.0.0' ? 'Lançamento mais recente' : 'Versão anterior'}
             </span>
           </div>
 
           {/* Cards Body */}
           <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-            {activeVersion === '2.5.3' ? (
+            {activeVersion === '3.0.0' ? (
+              <>
+                {/* 1. Módulo Buscador NF */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Novo Módulo: Buscador NF (Consulta e Distribuição SEFAZ)</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Novo Módulo</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Integração nativa e inteligente com os Web Services oficiais da SEFAZ para consulta e sincronização de notas fiscais eletrônicas:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Distribuição Automatizada:</b> Consulta e distribuição em lote de NF-e e CT-e emitidas para o CNPJ cadastrado.</li>
+                        <li><b>Controle Inteligente de NSU:</b> Persistência rigorosa do último NSU e maxNSU, respeitando os limites para prevenir bloqueios de consumo indevido (cStat 656).</li>
+                        <li><b>Ambientes SEFAZ:</b> Suporte transparente para alternância entre ambientes de Produção e Homologação.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Certificados Digitais A1 */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Certificados Digitais ICP-Brasil (A1) e Segurança Local</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Segurança</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Gerenciamento local e criptografado de credenciais e certificados A1 (.pfx / .p12):
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Criptografia e Chaves Locais:</b> Extração segura em memória com senha protegida, sem expor chaves privadas fora da sua máquina.</li>
+                        <li><b>Validação de Validade:</b> Verificação instantânea de vencimento, dados do titular e autoridade certificadora emissora.</li>
+                        <li><b>Multiempresa:</b> Suporte a certificados digitais independentes por empresa cadastrada.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Exportação ZIP e Central de Configurações */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Download em Lote, Exportação ZIP e Central de Configurações</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Produtividade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Integração harmônica com a experiência visual e a infraestrutura do Workspace Fiscal:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Exportação e Lotes ZIP:</b> Download de XMLs autorizados com descompactação gzip automática e geração de lotes em .zip.</li>
+                        <li><b>Central de Configurações Unificada:</b> Nova aba dedicada "Buscador NF" nas Configurações para gerenciar pastas de destino e certificados.</li>
+                        <li><b>Layout Unificado em 3 Módulos:</b> Tela inicial com NF View, Depreciação e Buscador NF distribuídos horizontalmente com tema Claro/Escuro completo.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : activeVersion === '2.5.3' ? (
               <>
                 {/* 1. Auto-atualização Integrada */}
                 <div
@@ -456,7 +548,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
             </div>
             <button
               onClick={handleClose}
-              className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
             >
               <Check className="w-4 h-4" /> Entendido, vamos começar
             </button>

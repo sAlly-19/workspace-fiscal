@@ -9,6 +9,8 @@ import { createApp } from '../src/api/app';
 import { backupService } from '../src/api/services/backup.service';
 import { updateService } from '../src/api/services/update.service';
 import { appUpdater } from './updater';
+import { initializeServices, ApplicationContext } from './buscador/services';
+import { registerAllIpcHandlers } from './buscador/ipc';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1';
 
@@ -20,6 +22,7 @@ if (!isDev && process.env.NODE_ENV !== 'production') {
 
 let apiServer: { port: number; close: () => void } | null = null;
 let mainWindow: BrowserWindow | null = null;
+let fiscalServices: ApplicationContext | null = null;
 
 function resolveIconPath(): string | undefined {
   const candidates = [
@@ -425,6 +428,14 @@ app.whenReady().then(async () => {
   const apiPort = await startApiServer();
   const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
   registerIpcHandlers(apiBaseUrl);
+
+  try {
+    fiscalServices = await initializeServices(app.getPath('userData'));
+    registerAllIpcHandlers(fiscalServices, () => mainWindow);
+  } catch (err) {
+    console.error('[Buscador] Failed to initialize services:', err);
+  }
+
   await createWindow(apiBaseUrl);
   if (mainWindow) {
     appUpdater.init(mainWindow);
@@ -465,6 +476,13 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (fiscalServices?.db) {
+    try {
+      fiscalServices.db.close();
+    } catch (err) {
+      console.error('[Buscador] Database close failed:', err);
+    }
+  }
   if (apiServer) {
     try {
       apiServer.close();

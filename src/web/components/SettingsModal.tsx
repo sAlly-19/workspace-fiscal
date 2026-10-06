@@ -17,10 +17,12 @@ import { GeneralSettingsTab } from './settings/GeneralSettingsTab';
 import { NfViewSettingsTab, DedupePolicy } from './settings/NfViewSettingsTab';
 import { DepreciationSettingsTab } from './settings/DepreciationSettingsTab';
 import { BackupSettingsTab } from './settings/BackupSettingsTab';
+import { BuscadorSettingsTab } from './settings/BuscadorSettingsTab';
+import { Search } from 'lucide-react';
 
-export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'backup';
+export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'buscador' | 'backup';
 
-export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () => void } = {}) {
+export function SettingsModal({ open, onClose, initialTab = 'general' }: { open?: boolean; onClose?: () => void; initialTab?: SettingsTabType } = {}) {
   const {
     isSettingsOpen: storeIsSettingsOpen,
     setIsSettingsOpen,
@@ -40,7 +42,13 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
   const currentTheme = settings.theme || 'dark';
   const isLight = currentTheme === 'light';
 
-  const [activeTab, setActiveTab] = useState<SettingsTabType>('general');
+  const [activeTab, setActiveTab] = useState<SettingsTabType>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Reset database state
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -154,6 +162,7 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
     { id: 'general', label: 'Geral', icon: Sparkles },
     { id: 'nfview', label: 'NF View', icon: LayoutTemplate },
     { id: 'depreciation', label: 'Depreciação', icon: TrendingDown },
+    { id: 'buscador', label: 'Buscador NF', icon: Search },
     { id: 'backup', label: 'Backup & Restauração', icon: HardDrive },
   ];
 
@@ -265,6 +274,10 @@ export function SettingsModal({ open, onClose }: { open?: boolean; onClose?: () 
 
               {activeTab === 'depreciation' && (
                 <DepreciationSettingsTab isLight={isLight} />
+              )}
+
+              {activeTab === 'buscador' && (
+                <BuscadorSettingsTab isLight={isLight} />
               )}
 
               {activeTab === 'backup' && (

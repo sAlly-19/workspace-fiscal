@@ -160,7 +160,7 @@ export function UpdatePromptModal({
                 <div>
                   <h4 className="font-bold text-sm">Tudo em dia!</h4>
                   <p className={`text-xs mt-1 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                    Você está rodando a versão <b>v{updateInfo?.currentVersion || '2.5.3'}</b> do Workspace Fiscal.
+                    Você está rodando a versão <b>v{updateInfo?.currentVersion || '3.0.0'}</b> do Workspace Fiscal.
                   </p>
                 </div>
               </div>

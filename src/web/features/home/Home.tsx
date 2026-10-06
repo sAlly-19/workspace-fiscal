@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Sparkles, ArrowRight, Wand2, Zap, Shield, Layers, Clock, TrendingDown, Building2, Package } from 'lucide-react';
+import { FileText, Sparkles, ArrowRight, Wand2, Zap, Shield, Layers, Clock, TrendingDown, Building2, Package, Search } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/workspace.store';
 import { useDepreciationStore } from '../../stores/depreciation.store';
 import { TitleBar } from '../../components/TitleBar';
@@ -8,9 +8,10 @@ import { TitleBar } from '../../components/TitleBar';
 interface HomeProps {
   onOpenNFView: () => void;
   onOpenDepreciation: () => void;
+  onOpenBuscador: () => void;
 }
 
-export function Home({ onOpenNFView, onOpenDepreciation }: HomeProps) {
+export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeProps) {
   const { settings, documents, folders } = useWorkspaceStore();
   const dep = useDepreciationStore();
   const currentTheme = settings.theme || 'dark';
@@ -84,7 +85,7 @@ export function Home({ onOpenNFView, onOpenDepreciation }: HomeProps) {
           <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-violet-600 bg-clip-text text-transparent"> Hub Fiscal</span>
         </h1>
         <p className={`mt-3 max-w-2xl text-sm md:text-[15px] leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-          Duas ferramentas fiscais em um só hub: <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>NF View</b> para DANFE e <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Depreciação</b> para controle patrimonial com CSV contábil.
+          Três ferramentas fiscais em um só hub: <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>NF View</b> para DANFE, <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Depreciação</b> para controle patrimonial e <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Buscador NF</b> para consulta e distribuição na SEFAZ.
         </p>
 
         {/* Stats pill */}
@@ -106,7 +107,7 @@ export function Home({ onOpenNFView, onOpenDepreciation }: HomeProps) {
       </motion.div>
 
       {/* Cards Grid */}
-      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-7">
+      <div className="relative z-10 w-full max-w-7xl grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
         {/* Card NF View - Ativo */}
         <motion.button
           onClick={onOpenNFView}
@@ -252,6 +253,71 @@ export function Home({ onOpenNFView, onOpenDepreciation }: HomeProps) {
             </div>
           </div>
         </motion.button>
+
+        {/* Card Buscador NF - Terceiro Módulo */}
+        <motion.button
+          onClick={onOpenBuscador}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.5, ease: 'easeOut' }}
+          whileHover={{ y: -6, scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          className="group text-left relative overflow-hidden rounded-[24px] p-[1px] cursor-pointer"
+          style={{
+            background: 'linear-gradient(135deg, #7c3aed, #9333ea, #c026d3)',
+          }}
+        >
+          <div className={`relative h-full rounded-[23px] p-6 md:p-7 flex flex-col overflow-hidden transition-colors ${isLight ? 'bg-white' : 'bg-[#120f17]'}`}>
+            <div className="absolute -top-24 -right-24 w-72 h-72 bg-gradient-to-br from-purple-500/15 via-fuchsia-500/10 to-violet-500/15 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+            <div className="relative flex items-center justify-between mb-5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold tracking-widest uppercase shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                Disponível
+              </span>
+              <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${isLight ? 'bg-[#faf5ff] border-purple-200 text-purple-700' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'}`}>
+                SEFAZ • NF-e • CT-e
+              </span>
+            </div>
+
+            <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/25 mb-5 group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
+              <Search className="w-7 h-7" strokeWidth={2.2} />
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-md">
+                <Building2 className="w-3.5 h-3.5 text-purple-600" />
+              </div>
+            </div>
+
+            <h3 className={`relative text-xl font-black tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+              Buscador NF
+              <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded bg-purple-600 text-white align-middle">SEFAZ</span>
+            </h3>
+            <p className={`relative mt-2 text-sm leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+              Consulte e sincronize documentos fiscais diretamente da <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>SEFAZ Nacional</b> com certificados A1 e controle inteligente de NSU.
+            </p>
+
+            <div className="relative mt-4 flex flex-wrap gap-1.5">
+              {[
+                { icon: Shield, label: 'Certificados A1' },
+                { icon: Layers, label: 'NF-e e CT-e' },
+                { icon: Clock, label: 'Controle NSU' },
+              ].map((f) => (
+                <span key={f.label} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isLight ? 'bg-[#faf5ff] border-purple-200 text-purple-800' : 'bg-purple-500/10 border-purple-500/20 text-purple-300'}`}>
+                  <f.icon className="w-3 h-3" />
+                  {f.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="relative mt-6 flex items-center gap-2 text-sm font-bold text-purple-600 group-hover:text-purple-500 transition-colors">
+              <span>Abrir Buscador NF</span>
+              <span className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center group-hover:translate-x-1 group-hover:bg-purple-500 transition-all">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+              <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>Consulta SEFAZ →</span>
+            </div>
+          </div>
+        </motion.button>
       </div>
 
       {/* Footer */}
@@ -264,7 +330,7 @@ export function Home({ onOpenNFView, onOpenDepreciation }: HomeProps) {
         <div className="flex items-center gap-2">
           <span>Desenvolvido por</span>
           <span className={`font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Café — Sistemas & Softwares</span>
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${isLight ? 'bg-white border-[#e2e8f0] text-[#475569]' : 'bg-white/5 border-white/10 text-[#a1a1aa]'}`}>v2.5</span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${isLight ? 'bg-white border-[#e2e8f0] text-[#475569]' : 'bg-white/5 border-white/10 text-[#a1a1aa]'}`}>v3.0</span>
         </div>
         <div className={`text-[11px] ${isLight ? 'text-[#cbd5e1]' : 'text-[#52525b]'}`}>
           Dica: use <b>Ctrl+K</b> para busca rápida • Arraste XMLs para importar

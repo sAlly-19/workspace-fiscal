@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **2.5.4**
+Versão: **3.0.0**
 
 ---
 
@@ -15,9 +15,10 @@ Versão: **2.5.4**
   - [1. Hub Principal Unificado](#1-hub-principal-unificado)
   - [2. NF View (Documentos Fiscais Eletrônicos)](#2-nf-view-documentos-fiscais-eletrônicos)
   - [3. Depreciação Fiscal & Ativo Imobilizado](#3-depreciação-fiscal--ativo-imobilizado)
-  - [4. Central de Configurações Modular](#4-central-de-configurações-modular)
-  - [5. Sistema de Backup Estruturado e Restauração Segura (.wfb)](#5-sistema-de-backup-estruturado-e-restauração-segura-wfb)
-  - [6. Sistema de Atualização Integrada](#6-sistema-de-atualização-integrada)
+  - [4. Buscador NF (Consulta e Distribuição SEFAZ)](#4-buscador-nf-consulta-e-distribuição-sefaz)
+  - [5. Central de Configurações Modular](#5-central-de-configurações-modular)
+  - [6. Sistema de Backup Estruturado e Restauração Segura (.wfb)](#6-sistema-de-backup-estruturado-e-restauração-segura-wfb)
+  - [7. Sistema de Atualização Integrada](#7-sistema-de-atualização-integrada)
 - [Formatos e Modelos Suportados](#formatos-e-modelos-suportados)
 - [Arquitetura e Tecnologias](#arquitetura-e-tecnologias)
 - [Estrutura do Projeto](#estrutura-do-projeto)
@@ -35,7 +36,7 @@ Versão: **2.5.4**
 
 ## Visão Geral
 
-O **Workspace Fiscal** é uma aplicação desktop de alta performance construída para escritórios de contabilidade, setores fiscais e departamentos financeiros. A solução combina a leitura e organização de arquivos fiscais XML com um motor contábil para o controle e quotas de depreciação do ativo permanente, funcionando 100% offline com banco de dados local.
+O **Workspace Fiscal** é uma aplicação desktop corporativa de alta performance construída para escritórios de contabilidade, setores fiscais e departamentos financeiros. A solução unifica a leitura e organização de arquivos fiscais XML, um motor contábil para controle de quotas de depreciação do ativo permanente, e a consulta e sincronização automatizada de NF-e e CT-e diretamente com a SEFAZ Nacional via certificados digitais ICP-Brasil (A1), funcionando com banco de dados local SQLite de alta velocidade.
 
 ---
 
@@ -114,7 +115,7 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
 ## Principais Módulos
 
 ### 1. Hub Principal Unificado
-- Interface inicial com alternância rápida entre os módulos **NF View** e **Depreciação Fiscal**.
+- Interface inicial com alternância ágil entre os 3 módulos: **NF View**, **Depreciação Fiscal** e **Buscador NF** (apresentados horizontalmente na tela de módulos).
 - Contadores em tempo real da quantidade de documentos armazenados, pastas ativas, bens imobilizados e empresas cadastradas.
 - Atalhos universais pelo teclado (`Ctrl+K` para busca e navegação global).
 
@@ -162,16 +163,38 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
 
 ---
 
-### 4. Central de Configurações Modular
-Organizada em 4 abas especializadas:
+### 4. Buscador NF (Consulta e Distribuição SEFAZ)
+- **Consulta e Distribuição Oficial SEFAZ:**
+  - Comunicação nativa com os Web Services oficiais de Distribuição de DF-e de Interesse dos Atores (NF-e e CT-e).
+  - Consulta incremental baseada em NSU (Número Seqüencial Único), registrando o `ultNSU` e o `maxNSU` por empresa.
+  - Prevenção automática e inteligente contra consumo indevido (*cStat 656*), respeitando as diretrizes e intervalos de requisições da SEFAZ.
+- **Certificados Digitais ICP-Brasil (A1):**
+  - Suporte completo a certificados digitais modelo A1 (`.pfx` / `.p12`) com senha protegida.
+  - Leitura segura em memória e armazenamento protegido de chaves e cadeias criptográficas no banco local.
+  - Validação instantânea de vigência, titularidade e CNPJ vinculado ao certificado.
+- **Download e Organização de Arquivos XML:**
+  - Descompactação automática de documentos em `gzip` retornados no lote da SEFAZ.
+  - Armazenamento físico automático no diretório configurado pelo usuário.
+  - Exportação em lote de XMLs com geração de arquivos `.zip` organizados.
+- **Ambientes de Operação:**
+  - Alternância facilitada entre ambientes de **Produção** e **Homologação**.
+- **Histórico e Consulta Local:**
+  - Tabela interativa com busca, filtros por status, data, emitente e chave de acesso.
+  - Ações rápidas para download individual do XML, visualização e conferência.
+
+---
+
+### 5. Central de Configurações Modular
+Organizada em 5 abas especializadas:
 - **Geral:** Gestão de tema visual (Claro, Escuro e Sistema), mapa de atalhos de teclado e informações de versão.
 - **NF View:** Preferências visuais da DANFE, políticas de desduplicação de arquivos repetidos na importação, e manutenção da base de documentos fiscais.
 - **Depreciação:** Regra padrão de início de depreciação da empresa ativa, padrões de formatação numérica e monetária para exportações CSV e atalho ao configurador de colunas.
+- **Buscador NF:** Configuração do diretório de salvamento dos XMLs baixados, gerenciamento de certificados digitais A1 e alternância de ambiente (Produção / Homologação).
 - **Backup & Restauração:** Criação de cópias sob demanda, restauração assistida com inspeção prévia e agendamento periódico com regras de retenção.
 
 ---
 
-### 5. Sistema de Backup Estruturado e Restauração Segura (.wfb)
+### 6. Sistema de Backup Estruturado e Restauração Segura (.wfb)
 - **Pacote Autocontido `.wfb`:**
   - Arquivo compactado contendo metadados completos (`manifest.json`), base de dados SQLite consistente e todos os arquivos XML físicos do NF View.
 - **Inspeção Prévia com Contadores Reais:**
@@ -189,7 +212,7 @@ Organizada em 4 abas especializadas:
 
 ---
 
-### 6. Sistema de Atualização Integrada
+### 7. Sistema de Atualização Integrada
 - **Download Interno no Aplicativo:** O instalador é transferido diretamente dentro do Workspace Fiscal, sem necessidade de download manual pelo navegador.
 - **Barra de Progresso Real:** Monitoramento em tempo real do percentual e velocidade do download.
 - **Instalação e Reinício:** Notificação quando o pacote estiver pronto, aplicando o update e reiniciando a aplicação com um clique.
@@ -266,6 +289,7 @@ workspace-fiscal/
 ├── docs/                       # Documentação técnica e capturas de tela do sistema
 │   └── screenshots/            # Imagens em alta resolução utilizadas no repositório
 ├── electron/                   # Processo principal do Electron
+│   ├── buscador/               # Handlers IPC exclusivos do módulo Buscador NF
 │   ├── main.ts                 # Inicialização da janela, servidor Express e handlers de IPC
 │   ├── preload.ts              # Script de contexto seguro exposto ao frontend
 │   └── tsconfig.json           # Configuração de compilação do Electron
@@ -275,6 +299,7 @@ workspace-fiscal/
 │   │   ├── services/           # Serviços de negócio (importação, cálculo, exportação, backup)
 │   │   └── app.ts              # Configuração dos middlewares e rotas Express
 │   ├── core/                   # Domínio e regras de negócio
+│   │   ├── buscador/           # Motor SEFAZ (distribuição DF-e, certificados A1, NSU e storage)
 │   │   ├── parsers/            # Extratores de NF-e, NFC-e, NFS-e e CT-e
 │   │   ├── danfe/              # Formatadores de moeda, CNPJ/CPF, chaves e datas
 │   │   ├── depreciation/       # Motor linear de cálculo de depreciação em centavos
@@ -284,14 +309,15 @@ workspace-fiscal/
 │   │   └── index.ts            # Inicialização, pragmas do SQLite e migrações automáticas
 │   └── web/                    # Interface gráfica do usuário (React)
 │       ├── components/         # Componentes compartilhados e modais do sistema
-│       │   └── settings/       # Abas modulares da Central de Configurações
+│       │   └── settings/       # Abas modulares da Central de Configurações (Geral, NF, Deprec, Buscador)
 │       ├── features/           # Módulos funcionais da aplicação
+│       │   ├── buscador/       # Módulo Buscador NF (consultas SEFAZ, histórico, splash screen e ações)
 │       │   ├── documents/      # Visualizadores DANFE, DANFSE, DACTE e lista de documentos
 │       │   ├── depreciation/   # Gestão de bens, cronograma, categorias e exportador CSV
-│       │   ├── home/           # Hub inicial do sistema
+│       │   ├── home/           # Hub inicial do sistema (3 módulos horizontais)
 │       │   └── workspace/      # Gerenciador da árvore de pastas fiscais
 │       ├── layouts/            # Layout principal e barras de navegação
-│       ├── stores/             # Stores Zustand (workspace e depreciação)
+│       ├── stores/             # Stores Zustand (workspace, depreciação e buscador)
 │       └── main.tsx            # Ponto de entrada da aplicação React
 ├── storage/                    # Diretório local para armazenamento físico de XMLs importados
 ├── scripts/                    # Scripts utilitários de execução e inicialização
