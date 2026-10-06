@@ -38,6 +38,16 @@
       "dist-electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "src/core/buscador/certificates/windows-bridge.ps1",
+        "to": "src/core/buscador/certificates/windows-bridge.ps1"
+      },
+      {
+        "from": "src/core/buscador/certificates/windows-bridge.ps1",
+        "to": "windows-bridge.ps1"
+      }
+    ],
     "win": {
       "target": [
         "nsis",
