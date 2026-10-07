@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, AlertCircle } from 'lucide-react';
+import { X, Building2, AlertCircle, Trash2 } from 'lucide-react';
 import { Company } from '@/core/buscador/domain/types';
 import { formatCNPJ, isValidCNPJ, sanitizeCNPJ } from '@/core/buscador/domain/cnpj';
 import { BRAZILIAN_UFS, getUfAcronym } from '@/core/buscador/domain/uf';
@@ -15,6 +15,7 @@ interface CompanyModalProps {
     folder_path?: string;
   }) => Promise<void>;
   editingCompany?: Company | null;
+  onDelete?: (company: Company) => void;
 }
 
 export const CompanyModal: React.FC<CompanyModalProps> = ({
@@ -22,6 +23,7 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
   onClose,
   onSave,
   editingCompany,
+  onDelete,
 }) => {
   const [name, setName] = useState('');
   const [cnpj, setCnpj] = useState('');
@@ -196,21 +198,34 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-2 font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded bg-[var(--primary)] px-4 py-2 font-semibold text-white shadow-xs transition hover:bg-[var(--primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-50"
-          >
-            {isSubmitting ? 'Salvando...' : 'Salvar Empresa'}
-          </button>
+        <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+          {editingCompany && onDelete ? (
+            <button
+              type="button"
+              onClick={() => onDelete(editingCompany)}
+              className="inline-flex items-center gap-1.5 rounded border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-500/20 focus:outline-none cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Excluir Empresa</span>
+            </button>
+          ) : <div />}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-2 font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded bg-[var(--primary)] px-4 py-2 font-semibold text-white shadow-xs transition hover:bg-[var(--primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] disabled:opacity-50 cursor-pointer"
+            >
+              {isSubmitting ? 'Salvando...' : 'Salvar Empresa'}
+            </button>
+          </div>
         </div>
       </form>
     </DialogShell>

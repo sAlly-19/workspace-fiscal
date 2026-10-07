@@ -22,6 +22,9 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = (props) => {
         onSearchQueryChange={props.onSearchQueryChange}
         onSearchLocal={props.onSearchLocal}
         onResetNSU={props.onResetNSU}
+        onSynchronize={props.onSynchronize}
+        isSynchronizing={props.isSynchronizing}
+        hasActiveCompany={props.hasActiveCompany}
       />
       <DocumentTable
         documents={props.documents}

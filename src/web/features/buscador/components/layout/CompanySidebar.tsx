@@ -9,9 +9,13 @@ export interface CompanySidebarProps {
   companyCert: CertificateInfo | null;
   onSelectCompany: (id: number) => void;
   onNewCompany: () => void;
+  onEditCompany?: (company: Company) => void;
+  onDeleteCompany?: (company: Company) => void;
   onFilterNFeOnly: (id: number) => void;
   onFilterCTeOnly: (id: number) => void;
+  onFilterNFSeOnly: (id: number) => void;
   onFilterAllTypes: (id: number) => void;
+  activeFilter?: 'NFE' | 'CTE' | 'NFSE' | 'ALL';
   onOpenCertModal: () => void;
 }
 
@@ -21,9 +25,13 @@ export const CompanySidebar: React.FC<CompanySidebarProps> = ({
   companyCert,
   onSelectCompany,
   onNewCompany,
+  onEditCompany,
+  onDeleteCompany,
   onFilterNFeOnly,
   onFilterCTeOnly,
+  onFilterNFSeOnly,
   onFilterAllTypes,
+  activeFilter,
   onOpenCertModal,
 }) => {
   return (
@@ -36,9 +44,13 @@ export const CompanySidebar: React.FC<CompanySidebarProps> = ({
         activeCompany={activeCompany}
         onSelectCompany={onSelectCompany}
         onNewCompany={onNewCompany}
+        onEditCompany={onEditCompany}
+        onDeleteCompany={onDeleteCompany}
         onFilterNFeOnly={onFilterNFeOnly}
         onFilterCTeOnly={onFilterCTeOnly}
+        onFilterNFSeOnly={onFilterNFSeOnly}
         onFilterAllTypes={onFilterAllTypes}
+        activeFilter={activeFilter}
       />
       <CertificateCard
         activeCompany={activeCompany}

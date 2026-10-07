@@ -75,11 +75,15 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedDocIds, setSelectedDocIds] = useState<number[]>([]);
+  const [selectedNfseDocIds, setSelectedNfseDocIds] = useState<number[]>([]);
+  const [nfseDocuments, setNfseDocuments] = useState<FiscalDocument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
   // Modais
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCertModalOpen, setIsCertModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
@@ -145,6 +149,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       if (selected) {
         setActiveCompany(selected);
         setSelectedDocIds([]);
+        setSelectedNfseDocIds([]);
         loadCompanyContext(selected);
       }
     } catch (err: any) {
@@ -209,6 +214,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const handleWorkspaceModeChange = (newMode: BuscadorWorkspaceMode) => {
     setWorkspaceMode(newMode);
     setSelectedDocIds([]);
+    setSelectedNfseDocIds([]);
     setCurrentPage(1);
     if (activeCompany) {
       searchLocalDocuments(activeCompany.id, 1, undefined, undefined, newMode);
@@ -322,6 +328,25 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     }
   };
 
+  const handleConfirmDeleteCompany = async () => {
+    if (!companyToDelete) return;
+    setIsDeletingCompany(true);
+    try {
+      await window.fiscalApi.companies.delete(companyToDelete.id);
+      pushFeedback({
+        kind: 'success',
+        title: 'Empresa removida',
+        message: `Empresa "${companyToDelete.name}" foi excluída com sucesso.`,
+      });
+      setCompanyToDelete(null);
+      await loadInitialData();
+    } catch (err: any) {
+      pushFeedback(feedbackFromError('Falha ao excluir empresa', err, 'Não foi possível excluir a empresa.'));
+    } finally {
+      setIsDeletingCompany(false);
+    }
+  };
+
   // Downloads Individuais
   const handleDownloadXml = async (docId: number) => {
     if (!activeCompany) return;
@@ -398,6 +423,15 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     }
   };
 
+  const activeFilter: 'ALL' | 'NFE' | 'CTE' | 'NFSE' =
+    workspaceMode === 'NFSE'
+      ? 'NFSE'
+      : selectedDocTypes.nfe && !selectedDocTypes.cte
+      ? 'NFE'
+      : !selectedDocTypes.nfe && selectedDocTypes.cte
+      ? 'CTE'
+      : 'ALL';
+
   return (
     <AppShell
       header={(
@@ -426,25 +460,44 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           companies={companies}
           activeCompany={activeCompany}
           companyCert={companyCert}
+          activeFilter={activeFilter}
           onSelectCompany={handleSelectCompany}
           onNewCompany={() => {
             setEditingCompany(null);
             setIsCompanyModalOpen(true);
           }}
+          onEditCompany={(comp) => {
+            setEditingCompany(comp);
+            setIsCompanyModalOpen(true);
+          }}
+          onDeleteCompany={(comp) => {
+            setCompanyToDelete(comp);
+          }}
           onFilterNFeOnly={(id) => {
+            if (workspaceMode !== 'SEFAZ') setWorkspaceMode('SEFAZ');
             const types = { nfe: true, cte: false };
             setSelectedDocTypes(types);
-            searchLocalDocuments(id, 1, types);
+            searchLocalDocuments(id, 1, types, undefined, 'SEFAZ');
           }}
           onFilterCTeOnly={(id) => {
+            if (workspaceMode !== 'SEFAZ') setWorkspaceMode('SEFAZ');
             const types = { nfe: false, cte: true };
             setSelectedDocTypes(types);
-            searchLocalDocuments(id, 1, types);
+            searchLocalDocuments(id, 1, types, undefined, 'SEFAZ');
           }}
           onFilterAllTypes={(id) => {
+            if (workspaceMode !== 'SEFAZ') setWorkspaceMode('SEFAZ');
             const types = { nfe: true, cte: true };
             setSelectedDocTypes(types);
-            searchLocalDocuments(id, 1, types);
+            searchLocalDocuments(id, 1, types, undefined, 'SEFAZ');
+          }}
+          onFilterNFSeOnly={(id) => {
+            if (activeCompany?.id !== id) {
+              handleSelectCompany(id);
+            }
+            if (workspaceMode !== 'NFSE') {
+              handleWorkspaceModeChange('NFSE');
+            }
           }}
           onOpenCertModal={() => setIsCertModalOpen(true)}
         />
@@ -459,6 +512,18 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onOpenFileFolder={handleOpenFolder}
           onSyncStateChange={setIsNfseSyncing}
           registerSyncTrigger={(fn) => { nfseSyncTriggerRef.current = fn; }}
+          selectedDocIds={selectedNfseDocIds}
+          onToggleSelectDoc={(id) => {
+            setSelectedNfseDocIds((prev) =>
+              prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+            );
+          }}
+          onToggleSelectAll={(allIds) => {
+            setSelectedNfseDocIds((prev) =>
+              prev.length === (allIds?.length ?? 0) ? [] : (allIds ?? [])
+            );
+          }}
+          onDocumentsChange={setNfseDocuments}
         />
       ) : (
         <DocumentWorkspace
@@ -473,6 +538,9 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onSearchQueryChange={setSearchQuery}
           onSearchLocal={() => searchLocalDocuments()}
           onResetNSU={handleResetNSU}
+          onSynchronize={handleConsultSefaz}
+          isSynchronizing={isSefazModalOpen}
+          hasActiveCompany={Boolean(activeCompany)}
           documents={documents}
           totalDocs={totalDocs}
           currentPage={currentPage}
@@ -492,8 +560,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
 
       footer={(
         <FooterDownloadBar
-          selectedCount={selectedDocIds.length}
-          totalOnPage={documents.length}
+          selectedCount={workspaceMode === 'NFSE' ? selectedNfseDocIds.length : selectedDocIds.length}
+          totalOnPage={workspaceMode === 'NFSE' ? nfseDocuments.length : documents.length}
           defaultStoragePath={settings?.default_storage_path}
           onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
         />
@@ -514,6 +582,10 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
             await window.fiscalApi.companies.create(data);
           }
           loadInitialData();
+        }}
+        onDelete={(company) => {
+          setIsCompanyModalOpen(false);
+          setCompanyToDelete(company);
         }}
       />
 
@@ -540,16 +612,21 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           isOpen={isDownloadModalOpen}
           onClose={() => setIsDownloadModalOpen(false)}
           companyId={activeCompany.id}
-          selectedCount={selectedDocIds.length}
-          selectedDocIds={selectedDocIds}
+          selectedCount={workspaceMode === 'NFSE' ? selectedNfseDocIds.length : selectedDocIds.length}
+          selectedDocIds={workspaceMode === 'NFSE' ? selectedNfseDocIds : selectedDocIds}
           defaultFolder={settings?.default_storage_path}
+          isNfse={workspaceMode === 'NFSE'}
           onSuccess={(res: DownloadBatchResult) => {
             pushFeedback({
               kind: 'success',
               title: 'Lote exportado',
               message: `Arquivo ZIP com ${res.copied_files_count} documento(s) gerado com sucesso em: ${res.zip_path}`,
             });
-            setSelectedDocIds([]);
+            if (workspaceMode === 'NFSE') {
+              setSelectedNfseDocIds([]);
+            } else {
+              setSelectedDocIds([]);
+            }
           }}
         />
       )}
@@ -582,6 +659,18 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
         onConfirm={() => void handleConfirmResetNSU()}
         onCancel={() => {
           if (!isResettingNsu) setPendingNsuReset(null);
+        }}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(companyToDelete)}
+        title="Excluir Empresa"
+        description={`Tem certeza que deseja excluir a empresa "${companyToDelete?.name || ''}" (${companyToDelete?.cnpj || ''})? Todos os documentos e configurações associados serão removidos localmente. Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir Empresa"
+        variant="danger"
+        isBusy={isDeletingCompany}
+        onConfirm={() => void handleConfirmDeleteCompany()}
+        onCancel={() => {
+          if (!isDeletingCompany) setCompanyToDelete(null);
         }}
       />
       <FeedbackModalHost />

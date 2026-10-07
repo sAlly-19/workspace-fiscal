@@ -18,6 +18,10 @@ export interface NfseWorkspaceProps {
   onOpenFileFolder: (filePath: string) => void;
   onSyncStateChange?: (syncing: boolean) => void;
   registerSyncTrigger?: (trigger: () => Promise<void>) => void;
+  selectedDocIds?: number[];
+  onToggleSelectDoc?: (id: number) => void;
+  onToggleSelectAll?: (allDocIds?: number[]) => void;
+  onDocumentsChange?: (docs: FiscalDocument[]) => void;
 }
 
 export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
@@ -27,9 +31,14 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
   onOpenFileFolder,
   onSyncStateChange,
   registerSyncTrigger,
+  selectedDocIds: propSelectedDocIds,
+  onToggleSelectDoc: propOnToggleSelectDoc,
+  onToggleSelectAll: propOnToggleSelectAll,
+  onDocumentsChange,
 }) => {
   const pushFeedback = useUiStore((state) => state.pushFeedback);
-  const [selectedDocIds, setSelectedDocIds] = useState<number[]>([]);
+  const [internalSelectedDocIds, setInternalSelectedDocIds] = useState<number[]>([]);
+  const selectedDocIds = propSelectedDocIds ?? internalSelectedDocIds;
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const api: NfseViewModelApi = useMemo(() => ({
@@ -119,17 +128,29 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
     }
   };
 
+  useEffect(() => {
+    onDocumentsChange?.(state.documents);
+  }, [state.documents, onDocumentsChange]);
+
   const handleToggleSelectDoc = useCallback((id: number) => {
-    setSelectedDocIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  }, []);
+    if (propOnToggleSelectDoc) {
+      propOnToggleSelectDoc(id);
+    } else {
+      setInternalSelectedDocIds((prev) =>
+        prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      );
+    }
+  }, [propOnToggleSelectDoc]);
 
   const handleToggleSelectAll = useCallback(() => {
-    setSelectedDocIds((prev) =>
-      prev.length === state.documents.length ? [] : state.documents.map((d) => d.id)
-    );
-  }, [state.documents]);
+    if (propOnToggleSelectAll) {
+      propOnToggleSelectAll(state.documents.map((d) => d.id));
+    } else {
+      setInternalSelectedDocIds((prev) =>
+        prev.length === state.documents.length ? [] : state.documents.map((d) => d.id)
+      );
+    }
+  }, [propOnToggleSelectAll, state.documents]);
 
   const handleViewDetails = async (doc: FiscalDocument) => {
     await vm.selectDocumentForDetails(doc);

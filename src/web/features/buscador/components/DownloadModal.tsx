@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Download, Folder, AlertCircle } from 'lucide-react';
 import { DownloadBatchResult } from '@/core/buscador/domain/types';
 import { DialogShell } from './ui/DialogShell';
@@ -10,6 +10,7 @@ interface DownloadModalProps {
   selectedCount: number;
   selectedDocIds: number[];
   defaultFolder?: string;
+  isNfse?: boolean;
   onSuccess: (result: DownloadBatchResult) => void;
 }
 
@@ -20,13 +21,21 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   selectedCount,
   selectedDocIds,
   defaultFolder,
+  isNfse = false,
   onSuccess,
 }) => {
   const [includeXml, setIncludeXml] = useState(true);
-  const [includePdf, setIncludePdf] = useState(true);
+  const [includePdf, setIncludePdf] = useState(!isNfse);
   const [destinationFolder, setDestinationFolder] = useState(defaultFolder || 'C:\\Documentos Fiscais');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isNfse) {
+      setIncludeXml(true);
+      setIncludePdf(false);
+    }
+  }, [isNfse]);
 
   const handleSelectFolder = async () => {
     try {
@@ -40,7 +49,10 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
   };
 
   const handleStartDownload = async () => {
-    if (!includeXml && !includePdf) {
+    const finalIncludeXml = isNfse ? true : includeXml;
+    const finalIncludePdf = isNfse ? false : includePdf;
+
+    if (!finalIncludeXml && !finalIncludePdf) {
       setError('Selecione pelo menos um formato (XML ou PDF).');
       return;
     }
@@ -56,8 +68,8 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
       const result = await window.fiscalApi?.documents.downloadBatch({
         company_id: companyId,
         document_ids: selectedDocIds,
-        include_xml: includeXml,
-        include_pdf: includePdf,
+        include_xml: finalIncludeXml,
+        include_pdf: finalIncludePdf,
         destination_folder: destinationFolder.trim(),
       });
 
@@ -129,21 +141,26 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             </label>
 
             <label
-              className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 transition ${
-                includePdf
-                  ? 'border-[var(--primary)] bg-[var(--surface-selected)] text-[var(--text-primary)]'
-                  : 'border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--text-secondary)]'
+              className={`flex items-center gap-2.5 rounded-lg border p-3 transition ${
+                isNfse
+                  ? 'cursor-not-allowed border-[var(--border-subtle)] bg-[var(--surface-subtle)] opacity-60'
+                  : includePdf
+                  ? 'cursor-pointer border-[var(--primary)] bg-[var(--surface-selected)] text-[var(--text-primary)]'
+                  : 'cursor-pointer border-[var(--border-subtle)] bg-[var(--surface-card)] text-[var(--text-secondary)]'
               }`}
             >
               <input
                 type="checkbox"
-                checked={includePdf}
+                checked={includePdf && !isNfse}
+                disabled={isNfse}
                 onChange={(e) => setIncludePdf(e.target.checked)}
-                className="rounded border-[var(--border-default)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                className="rounded border-[var(--border-default)] text-[var(--primary)] focus:ring-[var(--primary)] disabled:cursor-not-allowed"
               />
               <div>
                 <span className="font-bold">Documentos PDF</span>
-                <span className="block text-[10px] text-[var(--text-muted)]">DANFE e DACTE gerados</span>
+                <span className="block text-[10px] text-[var(--text-muted)]">
+                  {isNfse ? 'Indisponível para NFS-e Nacional' : 'DANFE e DACTE gerados'}
+                </span>
               </div>
             </label>
           </div>

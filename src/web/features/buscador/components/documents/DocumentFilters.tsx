@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw, Search } from 'lucide-react';
+import { RefreshCw, RotateCcw, Search } from 'lucide-react';
 
 export interface DocumentFiltersProps {
   nsuStatus: { nfeLastNSU: string; cteLastNSU: string };
@@ -13,6 +13,9 @@ export interface DocumentFiltersProps {
   onSearchQueryChange: (value: string) => void;
   onSearchLocal: () => void;
   onResetNSU: (type: 'NFE' | 'CTE') => void;
+  onSynchronize?: () => void;
+  isSynchronizing?: boolean;
+  hasActiveCompany?: boolean;
 }
 
 export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
@@ -27,6 +30,9 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onSearchQueryChange,
   onSearchLocal,
   onResetNSU,
+  onSynchronize,
+  isSynchronizing,
+  hasActiveCompany,
 }) => (
   <section
     data-testid="document-filters"
@@ -107,13 +113,13 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         CT-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.cteLastNSU}</b>
       </span>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5 ml-auto">
         <button
           type="button"
           onClick={() => onResetNSU('NFE')}
           title="Resetar NSU de NF-e"
           aria-label="Resetar NSU de NF-e"
-          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none"
+          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
         >
           <RotateCcw className="h-3 w-3" />
           <span className="text-[10px] font-medium">Reset NF-e</span>
@@ -124,11 +130,25 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           onClick={() => onResetNSU('CTE')}
           title="Resetar NSU de CT-e"
           aria-label="Resetar NSU de CT-e"
-          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none"
+          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
         >
           <RotateCcw className="h-3 w-3" />
           <span className="text-[10px] font-medium">Reset CT-e</span>
         </button>
+
+        {onSynchronize && (
+          <button
+            type="button"
+            onClick={onSynchronize}
+            disabled={isSynchronizing || !hasActiveCompany}
+            title="Sincronizar documentos com a SEFAZ"
+            aria-label="Sincronizar documentos com a SEFAZ"
+            className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[var(--primary-hover)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+          >
+            <RefreshCw className={`h-3 w-3 ${isSynchronizing ? 'animate-spin' : ''}`} />
+            <span>Sincronizar</span>
+          </button>
+        )}
       </div>
     </div>
   </section>

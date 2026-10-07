@@ -15,7 +15,7 @@ interface AppHeaderProps {
   onToggleTheme?: () => void;
   onThemeChange?: (theme: 'dark' | 'light') => void;
   onOpenSettings: () => void;
-  onSynchronize: () => void;
+  onSynchronize?: () => void;
   isSynchronizing?: boolean;
 }
 
@@ -81,17 +81,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         ? 'Produção'
         : (workspaceMode === 'NFSE' ? 'Produção Restrita' : 'Homologação')}
     </span>
-
-    <button
-      type="button"
-      onClick={onSynchronize}
-      disabled={isSynchronizing || !activeCompany}
-      aria-label={workspaceMode === 'NFSE' ? 'Sincronizar com o ADN NFS-e' : 'Sincronizar com a SEFAZ'}
-      className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-purple-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer shrink-0"
-    >
-      <RefreshCw className={`h-3.5 w-3.5 ${isSynchronizing ? 'animate-spin' : ''}`} />
-      <span>Sincronizar</span>
-    </button>
 
     {/* Quick Theme Switcher Pill */}
     <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-inset)] shrink-0">
