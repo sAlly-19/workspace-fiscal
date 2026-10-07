@@ -85,7 +85,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
           <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-violet-600 bg-clip-text text-transparent"> Hub Fiscal</span>
         </h1>
         <p className={`mt-3 max-w-2xl text-sm md:text-[15px] leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-          Três ferramentas fiscais em um só hub: <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>NF View</b> para DANFE, <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Depreciação</b> para controle patrimonial e <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Buscador NF</b> para consulta e distribuição na SEFAZ.
+          Três ferramentas fiscais em um só hub: <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>NF View</b> para DANFE, <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Depreciação</b> para controle patrimonial e <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>Buscador NF</b> para consulta e distribuição na SEFAZ e ADN NFS-e.
         </p>
 
         {/* Stats pill */}
@@ -183,7 +183,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
               <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>
-                {docCount > 0 ? `${docCount} docs prontos` : 'Começar agora →'}
+                Visualizador DANFE →
               </span>
             </div>
           </div>
@@ -233,9 +233,9 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
 
             <div className="relative mt-4 flex flex-wrap gap-1.5">
               {[
-                { icon: Building2, label: `${companyCount || 0} empresas` },
-                { icon: Package, label: `${assetCount || 0} bens` },
-                { icon: Layers, label: 'Proporcional' },
+                { icon: Clock, label: 'Cálculo por Dia' },
+                { icon: FileText, label: 'CSV Contábil' },
+                { icon: Shield, label: 'Auditoria de Bens' },
               ].map((f) => (
                 <span key={f.label} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isLight ? 'bg-[#f0fdf4] border-emerald-200 text-emerald-800' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'}`}>
                   <f.icon className="w-3 h-3" />
@@ -249,7 +249,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
               <span className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center group-hover:translate-x-1 group-hover:bg-emerald-500 transition-all">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
-              <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>Controle mensal →</span>
+              <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>Controle patrimonial →</span>
             </div>
           </div>
         </motion.button>
@@ -277,7 +277,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
                 Disponível
               </span>
               <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${isLight ? 'bg-[#faf5ff] border-purple-200 text-purple-700' : 'bg-purple-500/10 border-purple-500/20 text-purple-400'}`}>
-                SEFAZ • NF-e • CT-e
+                SEFAZ • ADN • NFS-e
               </span>
             </div>
 
@@ -290,16 +290,16 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
 
             <h3 className={`relative text-xl font-black tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
               Buscador NF
-              <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded bg-purple-600 text-white align-middle">SEFAZ</span>
+              <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded bg-purple-600 text-white align-middle">SEFAZ & ADN</span>
             </h3>
             <p className={`relative mt-2 text-sm leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
-              Consulte e sincronize documentos fiscais diretamente da <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>SEFAZ Nacional</b> com certificados A1 e controle inteligente de NSU.
+              Consulte e sincronize documentos fiscais diretamente da <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>SEFAZ Nacional</b> e <b className={isLight ? 'text-[#0f172a]' : 'text-white'}>ADN / SEFIN (NFS-e)</b> com certificados A1 e controle inteligente de NSU.
             </p>
 
             <div className="relative mt-4 flex flex-wrap gap-1.5">
               {[
                 { icon: Shield, label: 'Certificados A1' },
-                { icon: Layers, label: 'NF-e e CT-e' },
+                { icon: Layers, label: 'NF-e, CT-e e NFS-e' },
                 { icon: Clock, label: 'Controle NSU' },
               ].map((f) => (
                 <span key={f.label} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border ${isLight ? 'bg-[#faf5ff] border-purple-200 text-purple-800' : 'bg-purple-500/10 border-purple-500/20 text-purple-300'}`}>
@@ -314,7 +314,7 @@ export function Home({ onOpenNFView, onOpenDepreciation, onOpenBuscador }: HomeP
               <span className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center group-hover:translate-x-1 group-hover:bg-purple-500 transition-all">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
-              <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>Consulta SEFAZ →</span>
+              <span className={`ml-auto text-xs font-medium ${isLight ? 'text-[#94a3b8]' : 'text-[#71717a]'}`}>Consulta SEFAZ & ADN →</span>
             </div>
           </div>
         </motion.button>
