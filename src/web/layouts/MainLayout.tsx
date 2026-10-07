@@ -905,44 +905,31 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
       )}
 
       {/* Top Header (Conteúdo — drag agora é na TitleBar) */}
-      <header
-        className={`h-13 border-b flex items-center px-4 justify-between z-20 shrink-0 print:hidden gap-4 ${
-          currentTheme === 'light'
-            ? 'bg-white border-[#e2e8f0]'
-            : 'bg-[#111114] border-[#27272a]'
-        }`}>
+      <header className="h-14 border-b border-[var(--border-subtle)] bg-[var(--surface-header)] flex items-center px-4 justify-between z-20 shrink-0 print:hidden gap-4 select-none shadow-xs">
         {/* Brand + Back to Home */}
         <div className="flex items-center gap-2.5 shrink-0 select-none">
           {onBackToHome && (
             <button
+              type="button"
               onClick={onBackToHome}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer active:scale-95 ${
-                currentTheme === 'light'
-                  ? 'bg-white border-[#e2e8f0] text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a] hover:border-[#cbd5e1]'
-                  : 'bg-[#18181b] border-[#27272a] text-[#d4d4d8] hover:bg-[#27272a] hover:text-white hover:border-[#3f3f46]'
-              }`}
-              title="Voltar para Home"
+              className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
+              title="Voltar ao Hub Fiscal"
+              aria-label="Voltar ao Hub Fiscal"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
           <div
-            className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs border shrink-0 ${
-              currentTheme === 'light'
-                ? 'bg-red-50 border-red-200 text-red-600'
-                : 'bg-red-500/10 border-red-500/25 text-red-400'
-            }`}
+            className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs shrink-0 bg-red-600 text-white"
             title="Visualizador DANFE / PDF"
           >
             <FileText className="w-4 h-4" strokeWidth={2.2} />
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`font-bold text-sm tracking-tight ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>
-              NFView
-            </span>
-            <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-semibold rounded border border-blue-500/20">
+          <div className="leading-tight">
+            <div className="text-sm font-bold tracking-tight text-[var(--text-primary)]">NFView</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               NF-e • NFC-e • CT-e
-            </span>
+            </div>
           </div>
         </div>
 
@@ -950,42 +937,31 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
         <div className="flex-1 max-w-md">
           <div className="relative">
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <Search className={`w-3.5 h-3.5 ${currentTheme === 'light' ? 'text-[#94a3b8]' : 'text-[#71717a]'}`} />
+              <Search className="w-4 h-4 text-[var(--text-muted)]" />
             </div>
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full border rounded-md py-1.5 pl-9 pr-14 text-xs focus:outline-none transition-colors ${
-                currentTheme === 'light'
-                  ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#0f172a] placeholder:text-[#94a3b8] focus:border-blue-500'
-                  : 'bg-[#18181b] border-[#27272a] text-[#fafafa] placeholder:text-[#71717a] focus:border-blue-500'
-              }`}
+              className="w-full h-9 border border-[var(--border-default)] bg-[var(--surface-input)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-lg py-1.5 pl-9 pr-16 text-xs focus:outline-none focus:border-blue-500 transition-colors"
               placeholder="Buscar notas fiscais... (Ctrl + F ou /)"
             />
             {!searchQuery && (
               <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none gap-1">
-                <kbd className={`text-[9px] px-1 py-0.5 rounded border font-mono ${
-                  currentTheme === 'light' 
-                    ? 'bg-white border-[#cbd5e1] text-[#64748b]' 
-                    : 'bg-[#27272a] border-[#3f3f46] text-[#a1a1aa]'
-                }`}>
+                <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
                   Ctrl+F
                 </kbd>
-                <kbd className={`text-[9px] px-1 py-0.5 rounded border font-mono ${
-                  currentTheme === 'light' 
-                    ? 'bg-white border-[#cbd5e1] text-[#64748b]' 
-                    : 'bg-[#27272a] border-[#3f3f46] text-[#a1a1aa]'
-                }`}>
+                <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
                   /
                 </kbd>
               </div>
             )}
             {searchQuery && (
               <button 
+                type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-2.5 flex items-center text-[#71717a] hover:text-white"
+                className="absolute inset-y-0 right-2.5 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -996,42 +972,43 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
         {/* Right Actions: Theme Selector, Primary Single Import & Settings */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Quick Theme Switcher Pill */}
-          <div className={`flex items-center p-0.5 rounded-lg border ${
-            currentTheme === 'light'
-              ? 'bg-[#f1f5f9] border-[#e2e8f0]'
-              : 'bg-[#18181b] border-[#27272a]'
-          }`}>
+          <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-inset)] shrink-0">
             <button
+              type="button"
               onClick={() => updateSettings({ theme: 'light' })}
               className={`p-1.5 rounded-md transition-all cursor-pointer ${
                 currentTheme === 'light'
                   ? 'bg-white text-amber-500 shadow-xs'
-                  : 'text-[#a1a1aa] hover:text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
-              title="Tema Light (Claro)"
+              title="Tema Claro"
+              aria-label="Ativar tema claro"
             >
               <Sun className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={() => updateSettings({ theme: 'dark' })}
               className={`p-1.5 rounded-md transition-all cursor-pointer ${
                 currentTheme === 'dark'
                   ? 'bg-[#27272a] text-blue-400 shadow-xs'
-                  : 'text-[#a1a1aa] hover:text-white'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
-              title="Tema Dark (Escuro Padrão)"
+              title="Tema Escuro"
+              aria-label="Ativar tema escuro"
             >
               <Moon className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <button
+            type="button"
             onClick={() => {
               setTargetUploadFolderId(selectedFolderId);
               fileInputRef.current?.click();
             }}
             disabled={isUploading}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-md shadow-sm transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-xs transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0"
             title={selectedFolderId ? `Importar XML na pasta "${selectedFolderName}"` : 'Importar arquivos XML'}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -1040,13 +1017,10 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
 
           {typeof window !== 'undefined' && (window as any).api?.openDirectory && (
             <button
+              type="button"
               onClick={handleImportDirectory}
               disabled={isUploading}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${
-                currentTheme === 'light'
-                  ? 'border border-[#cbd5e1] text-[#475569] bg-white hover:bg-[#f1f5f9]'
-                : 'border border-[#27272a] text-[#a1a1aa] bg-[#18181b] hover:bg-[#27272a] hover:text-white'
-              }`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0"
               title="Importar todos os XMLs de uma pasta"
             >
               <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
@@ -1055,16 +1029,13 @@ className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-
           )}
 
           <button
+            type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-xs font-medium transition-colors cursor-pointer ${
-              currentTheme === 'light'
-                ? 'bg-white hover:bg-[#f1f5f9] text-[#334155] border-[#cbd5e1]'
-                : 'bg-[#18181b] hover:bg-[#27272a] text-[#d4d4d8] hover:text-white border-[#27272a]'
-            }`}
+            className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
             title="Configurações do Sistema"
+            aria-label="Configurações do Sistema"
           >
-            <Settings className="w-3.5 h-3.5 text-[#a1a1aa]" />
-            <span>Configurações</span>
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </header>

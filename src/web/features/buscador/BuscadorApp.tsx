@@ -409,6 +409,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           theme={theme}
           onBackToHome={onBackToHome}
           onToggleTheme={toggleTheme}
+          onThemeChange={(nextTheme) => updateWfSettings({ theme: nextTheme })}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onSynchronize={() => {
             if (workspaceMode === 'NFSE') {

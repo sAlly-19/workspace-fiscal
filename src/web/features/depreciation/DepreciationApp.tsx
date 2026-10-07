@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { AnimatePresence } from 'motion/react';
 import {
-  Building2, Package, TrendingDown, ChevronLeft,
-  Settings2, BarChart3, Home, Tag, Sun, Moon,
+  Building2, Package, TrendingDown, ChevronLeft, ArrowLeft,
+  Settings, Settings2, BarChart3, Home, Tag, Sun, Moon,
   ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useWorkspaceStore } from '../../stores/workspace.store';
@@ -315,67 +315,96 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
   const isElectron = typeof window !== 'undefined' && (window as any).api;
 
   return (
-    <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans select-none ${isLight ? 'bg-[#f8fafc] text-[#0f172a]' : 'bg-[#09090b] text-white'}`} style={{ paddingTop: isElectron ? 36 : 0 }}>
+    <div className={`flex flex-col h-screen w-screen overflow-hidden font-sans select-none theme-${isLight ? 'light' : 'dark'} ${isLight ? 'bg-[#f8fafc] text-[#0f172a]' : 'bg-[#09090b] text-white'}`} style={{ paddingTop: isElectron ? 36 : 0 }}>
       <TitleBar />
       {showSplash && <DepreciationSplashScreen onFinish={() => setShowSplash(false)} />}
       
       {/* Top Bar Empresa Selecionada */}
-      <div className={`h-[52px] border-b flex items-center px-4 justify-between shrink-0 ${isLight ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'}`}>
-        <div className="flex items-center gap-3">
+      <header className="h-14 border-b border-[var(--border-subtle)] bg-[var(--surface-header)] flex items-center px-4 justify-between shrink-0 select-none shadow-xs gap-3">
+        <div className="flex items-center gap-2.5 shrink-0 select-none">
           {onBackToHome && (
-            <button onClick={onBackToHome} className={`p-1.5 rounded-lg border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#27272a] hover:bg-[#27272a] text-[#a1a1aa] hover:text-white'}`} title="Voltar">
-              <ChevronLeft className="w-4 h-4" />
+            <button
+              type="button"
+              onClick={onBackToHome}
+              className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
+              title="Voltar ao Hub Fiscal"
+              aria-label="Voltar ao Hub Fiscal"
+            >
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600 text-white shadow-xs shrink-0">
             <TrendingDown className="w-4 h-4" />
           </div>
-          <div>
-            <div className={`text-xs font-black tracking-widest uppercase ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Depreciação</div>
-            <div className={`text-sm font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Controle Patrimonial</div>
+          <div className="leading-tight">
+            <div className="text-sm font-bold tracking-tight text-[var(--text-primary)]">Controle Patrimonial</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              DEPRECIAÇÃO FISCAL
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {selectedCompany ? (
-            <div className={`flex items-center gap-3 px-3 py-1.5 rounded-xl border ${isLight ? 'bg-[#f1f5f9] border-[#e2e8f0]' : 'bg-[#18181b] border-[#27272a]'}`}>
-              <Building2 className="w-4 h-4 text-blue-500" />
-              <div className="text-left">
-                <div className={`text-xs font-bold leading-none ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{selectedCompany.name}</div>
-                <div className={`text-[11px] font-mono ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>CNPJ: {selectedCompany.cnpj ? cnpjMask(selectedCompany.cnpj) : selectedCompany.document || '—'}</div>
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-inset)]">
+              <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+              <div className="text-left min-w-0">
+                <div className="text-xs font-bold leading-none text-[var(--text-primary)] truncate max-w-[220px]">{selectedCompany.name}</div>
+                <div className="text-[11px] font-mono text-[var(--text-muted)]">CNPJ: {selectedCompany.cnpj ? cnpjMask(selectedCompany.cnpj) : selectedCompany.document || '—'}</div>
               </div>
               <select
                 value={selectedCompanyId || ''}
                 onChange={(e) => selectCompany(e.target.value || null)}
-                className={`ml-2 text-xs rounded-md px-2 py-1 border cursor-pointer ${isLight ? 'bg-white border-[#cbd5e1]' : 'bg-[#09090b] border-[#3f3f46] text-white'}`}
+                className="ml-2 text-xs rounded-md px-2 py-1 border border-[var(--border-default)] bg-[var(--surface-input)] text-[var(--text-primary)] cursor-pointer"
               >
                 {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           ) : (
-            <div className={`text-xs ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Nenhuma empresa selecionada</div>
+            <div className="text-xs text-[var(--text-muted)]">Nenhuma empresa selecionada</div>
           )}
-          <div className={`flex items-center p-0.5 rounded-lg border ${isLight ? 'bg-[#f1f5f9] border-[#e2e8f0]' : 'bg-[#18181b] border-[#27272a]'}`}>
+
+          {/* Quick Theme Switcher Pill */}
+          <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-inset)] shrink-0">
             <button
+              type="button"
               onClick={() => updateSettings({ theme: 'light' })}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${isLight ? 'bg-white text-amber-500 shadow-xs' : 'text-[#a1a1aa] hover:text-white'}`}
-              title="Light"
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                isLight
+                  ? 'bg-white text-amber-500 shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Tema Claro"
+              aria-label="Ativar tema claro"
             >
               <Sun className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={() => updateSettings({ theme: 'dark' })}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${!isLight ? 'bg-[#27272a] text-blue-400 shadow-xs' : 'text-[#a1a1aa] hover:text-[#0f172a]'}`}
-              title="Dark"
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                !isLight
+                  ? 'bg-[#27272a] text-blue-400 shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Tema Escuro"
+              aria-label="Ativar tema escuro"
             >
               <Moon className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button onClick={() => setIsSettingsOpen(true)} className={`p-2 rounded-lg border cursor-pointer ${isLight ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9]' : 'bg-[#18181b] border-[#27272a] hover:bg-[#27272a]'}`} title="Configurações do Sistema">
-            <Settings2 className="w-4 h-4 text-[#71717a]" />
+
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
+            title="Configurações do Sistema"
+            aria-label="Configurações do Sistema"
+          >
+            <Settings className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </header>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
