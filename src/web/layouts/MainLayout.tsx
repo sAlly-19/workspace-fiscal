@@ -1,45 +1,19 @@
-import {
-  Search,
-  FileText,
-  Plus,
-  ArrowUpToLine,
-  Trash2,
-  Printer,
-  ChevronLeft,
-  ChevronRight,
-  UploadCloud,
-  FileCheck,
-  X,
-  AlertCircle,
-  FolderOpen,
-  MoveRight,
-  Sparkles,
-  Settings,
-  CheckSquare,
-  Square,
-  Check,
-  RotateCw,
-  FolderPlus,
-  Sun,
-  Moon,
-  ArrowLeft
-} from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useWorkspaceStore, type FolderNode } from '../stores/workspace.store';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useWorkspaceStore } from '../stores/workspace.store';
 import { DocumentPreview } from '../features/documents/DocumentPreview';
 import { WorkspaceTree } from '../features/workspace/WorkspaceTree';
-import { SettingsModal } from '../components/SettingsModal';
-import { ConfirmModal } from '../components/ConfirmModal';
-import { SplashScreen } from '../components/SplashScreen';
-import { ImportProgressModal } from '../components/ImportProgressModal';
 import { TitleBar } from '../components/TitleBar';
 import { ToastHost, toast } from '../components/Toast';
-import { EmptyState } from '../components/EmptyState';
-import { DocumentCardSkeleton } from '../components/Skeleton';
 import { apiFetch } from '../lib/api';
+import { MainHeader } from './components/MainHeader';
+import { MainFooter } from './components/MainFooter';
+import { WorkspaceModals } from './components/WorkspaceModals';
+import { DocumentListPane } from '../features/documents/workspace/DocumentListPane';
+import { DocumentPreviewEmptyState } from '../features/documents/workspace/DocumentPreviewEmptyState';
 
 export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
-  const { 
+  const {
     folders,
     documents,
     selectedDocumentId,
@@ -55,13 +29,12 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     deleteDocument,
     bulkDeleteDocuments,
     bulkMoveDocuments,
-    clearAllDocuments,
     moveDocument,
     searchQuery,
     setSearchQuery,
     settings,
     updateSettings,
-    setIsSettingsOpen
+    setIsSettingsOpen,
   } = useWorkspaceStore();
 
   const currentTheme = settings.theme || 'dark';
@@ -69,7 +42,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   const [showSplash, setShowSplash] = useState(true);
   const [docDetails, setDocDetails] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ total: number; processed: number; percent: number } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ total: number; processed: number; percent: number } | null>(
+    null
+  );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isDocsLoading, setIsDocsLoading] = useState(false);
@@ -131,7 +106,6 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
-  // Refetch quando pasta muda (já faz fetch via selectFolder, mas garante)
   // Load selected document details
   useEffect(() => {
     if (selectedDocumentId) {
@@ -140,27 +114,15 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await apiFetch(`/api/documents/${selectedDocumentId}`);
-            if (!res.ok) {
-              if (attempt < 2) {
-                await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
-                continue;
-              }
-              if (isCurrent) setDocDetails(null);
-              return;
-            }
-            const contentType = res.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
+            if (res.ok) {
               const data = await res.json();
               if (isCurrent) setDocDetails(data);
               return;
             }
-          } catch (err) {
-            if (attempt < 2) {
-              await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
-              continue;
-            }
-            if (isCurrent) setDocDetails(null);
+          } catch {
+            // retry on connection reset
           }
+          await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
         }
       };
       loadDoc();
@@ -172,18 +134,15 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     }
   }, [selectedDocumentId]);
 
-
-  // Mouse drag handlers for workspace tree resizer
-  const startResizingTree = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
+  // Redimensionamento de painéis
+  const startResizingTree = useCallback(() => {
     isResizingTreeRef.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (!isResizingTreeRef.current) return;
-      const newWidth = Math.max(180, Math.min(450, moveEvent.clientX));
-      setTreeWidth(newWidth);
+      setTreeWidth(Math.max(180, Math.min(450, e.clientX)));
     };
 
     const onMouseUp = () => {
@@ -198,18 +157,16 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     window.addEventListener('mouseup', onMouseUp);
   }, []);
 
-  // Mouse drag handlers for document list resizer
-  const startResizingList = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
+  const startResizingList = useCallback(() => {
     isResizingListRef.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
+    const onMouseMove = (e: MouseEvent) => {
       if (!isResizingListRef.current) return;
-      const offset = isTreeCollapsed ? 0 : treeWidth;
-      const newWidth = Math.max(220, Math.min(500, moveEvent.clientX - offset));
-      setListWidth(newWidth);
+      const effectiveTreeWidth = isTreeCollapsed ? 0 : treeWidth;
+      const newWidth = e.clientX - effectiveTreeWidth;
+      setListWidth(Math.max(260, Math.min(600, newWidth)));
     };
 
     const onMouseUp = () => {
@@ -224,6 +181,24 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     window.addEventListener('mouseup', onMouseUp);
   }, [isTreeCollapsed, treeWidth]);
 
+  // Filter documents by search and by selected workspace folder
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesSearch =
+      !searchQuery ||
+      (doc.number && doc.number.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (doc.issuerName && doc.issuerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesFolder = selectedFolderId === null ? true : doc.batchId === selectedFolderId;
+
+    return matchesSearch && matchesFolder;
+  });
+
+  const allFilteredSelected =
+    filteredDocuments.length > 0 && filteredDocuments.every((d) => selectedDocIds.includes(d.id));
+
+  // Batch Print handler
   const handleBatchPrint = async (docIdsToPrint?: string[]) => {
     const ids = docIdsToPrint && docIdsToPrint.length > 0 ? docIdsToPrint : selectedDocIds;
     // Em Electron usa base URL dinâmica
@@ -240,15 +215,14 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     }
   };
 
+  // Upload handlers
   const processFiles = async (files: FileList | File[], folderId?: string | null) => {
     if (!files || files.length === 0) return;
-
     setUploadError(null);
     setIsUploading(true);
     setUploadProgress({ total: files.length, processed: 0, percent: 0 });
 
-    const targetFolder = folderId !== undefined ? folderId : (targetUploadFolderId || selectedFolderId);
-
+    const targetFolder = folderId !== undefined ? folderId : targetUploadFolderId || selectedFolderId;
     const formData = new FormData();
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i]);
@@ -258,13 +232,13 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     }
 
     try {
-      const res = await apiFetch('/api/import', {
+      const res = await apiFetch('/api/import/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       if (!res.ok) {
-        let errMsg = 'Erro ao processar envio dos arquivos.';
+        let errMsg = 'Erro ao fazer upload dos arquivos.';
         try {
           const errData = await res.json();
           if (errData?.error) errMsg = errData.error;
@@ -272,44 +246,32 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         setUploadError(errMsg);
         setIsUploading(false);
         setUploadProgress(null);
-        return;
-      }
-
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        setUploadError('Resposta inválida do servidor ao iniciar importação.');
-        setIsUploading(false);
-        setUploadProgress(null);
+        setTargetUploadFolderId(null);
+        toast.error('Falha ao importar', errMsg);
         return;
       }
 
       const data = await res.json();
-
       if (data && data.jobId) {
-        // Poll for completion and update real-time progress bar smoothly
         const poll = setInterval(async () => {
           try {
             const statusRes = await apiFetch(`/api/import/${data.jobId}`);
-            if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
-            const statusContentType = statusRes.headers.get('content-type') || '';
-            if (!statusContentType.includes('application/json')) return;
+            if (!statusRes.ok) return;
             const statusData = await statusRes.json();
-
             const processed = statusData.processed ?? 0;
-            const total = statusData.total ?? files.length;
-            const isCompleted = statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
+            const total = statusData.total ?? data.queued ?? files.length;
+            const isCompleted =
+              statusData.status === 'completed' ||
+              statusData.status === 'COMPLETED' ||
+              (total > 0 && processed >= total);
             const isFailed = statusData.status === 'error' || statusData.status === 'failed' || statusData.status === 'FAILED';
-            
-            const pct = isCompleted
-              ? 100 
-              : total > 0 
-              ? Math.min(99, Math.round((processed / total) * 100)) 
-              : 0;
+
+            const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
 
             setUploadProgress({
               total,
               processed: isCompleted ? total : processed,
-              percent: pct
+              percent: pct,
             });
 
             if (isCompleted || isFailed) {
@@ -319,11 +281,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
               await fetchWorkspace();
 
               if (isCompleted && statusData.results && statusData.results.length > 0) {
-                // Auto select first document
                 selectDocument(statusData.results[0].id);
               }
 
-              // Auto-close after brief delay so user sees full completion feedback
               setTimeout(() => {
                 setIsUploading(false);
                 setUploadProgress(null);
@@ -359,7 +319,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     setIsUploading(true);
     setUploadProgress({ total: paths.length, processed: 0, percent: 0 });
 
-    const targetFolder = folderId !== undefined ? folderId : (targetUploadFolderId || selectedFolderId);
+    const targetFolder = folderId !== undefined ? folderId : targetUploadFolderId || selectedFolderId;
 
     try {
       const res = await apiFetch('/api/import/paths', {
@@ -393,7 +353,10 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
             const statusData = await statusRes.json();
             const processed = statusData.processed ?? 0;
             const total = statusData.total ?? data.queued ?? paths.length;
-            const isCompleted = statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
+            const isCompleted =
+              statusData.status === 'completed' ||
+              statusData.status === 'COMPLETED' ||
+              (total > 0 && processed >= total);
             const isFailed = statusData.status === 'error' || statusData.status === 'failed';
             const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
             setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
@@ -477,7 +440,6 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     fileInputRef.current?.click();
   };
 
-  // F2: Importação por diretório (via Electron IPC `dialog:openDirectory`)
   const handleImportDirectory = async () => {
     try {
       const api = (window as any).api;
@@ -518,7 +480,6 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         'Importação de pasta iniciada',
         `${data.queued} arquivos serão processados${data.skipped ? ` (${data.skipped} ignorados)` : ''}.`
       );
-      // Poll para progresso usando jobId retornado
       const jobId = data.jobId;
       const poll = setInterval(async () => {
         try {
@@ -527,7 +488,8 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
           const statusData = await statusRes.json();
           const processed = statusData.processed ?? 0;
           const total = statusData.total ?? data.queued;
-          const isCompleted = statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
+          const isCompleted =
+            statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
           const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
           setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
           if (isCompleted) {
@@ -539,7 +501,10 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
               'Importação de pasta concluída',
               `${total} arquivos processados${statusData.duplicates ? `, ${statusData.duplicates} duplicados ignorados` : ''}.`
             );
-            setTimeout(() => { setIsUploading(false); setUploadProgress(null); }, 2200);
+            setTimeout(() => {
+              setIsUploading(false);
+              setUploadProgress(null);
+            }, 2200);
           }
         } catch {
           clearInterval(poll);
@@ -565,14 +530,14 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         setIsConfirmLoading(true);
         try {
           await deleteDocument(id);
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
           toast.success('Documento excluído', 'A nota fiscal foi removida do workspace.');
         } catch (err: any) {
           toast.error('Erro ao excluir', err?.message || 'Tente novamente.');
         } finally {
           setIsConfirmLoading(false);
         }
-      }
+      },
     });
   };
 
@@ -588,57 +553,34 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         setIsConfirmLoading(true);
         try {
           await bulkDeleteDocuments(selectedDocIds);
-          setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
           toast.success(`${selectedDocIds.length} documento(s) excluído(s)`, 'Remoção em lote concluída.');
         } catch (err: any) {
           toast.error('Erro ao excluir em lote', err?.message || 'Tente novamente.');
         } finally {
           setIsConfirmLoading(false);
         }
-      }
+      },
     });
   };
 
-  // Filter documents by search and by selected workspace folder
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      !searchQuery ||
-      (doc.number && doc.number.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.issuerName && doc.issuerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesFolder =
-      selectedFolderId === null ? true : doc.batchId === selectedFolderId;
-
-    return matchesSearch && matchesFolder;
-  });
-
-  const allFilteredSelected =
-    filteredDocuments.length > 0 &&
-    filteredDocuments.every((d) => selectedDocIds.includes(d.id));
-
-  // Flatten folders tree for quick folder move picker
-  const getFlatFolders = (nodes: FolderNode[], depth = 0): { id: string; name: string; depth: number }[] => {
-    let result: { id: string; name: string; depth: number }[] = [];
-    for (const n of nodes) {
-      result.push({ id: n.id, name: n.name, depth });
-      if (n.children && n.children.length > 0) {
-        result = result.concat(getFlatFolders(n.children, depth + 1));
-      }
+  const handleMoveToFolder = async (folderId: string | null) => {
+    if (isBulkMoveOpen) {
+      await bulkMoveDocuments(selectedDocIds, folderId);
+    } else if (movingDocId) {
+      await moveDocument(movingDocId, folderId);
     }
-    return result;
+    setMovingDocId(null);
+    setIsBulkMoveOpen(false);
   };
 
-  // Power User Keyboard Shortcuts
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeElement = document.activeElement as HTMLElement | null;
-      const isInputActive = activeElement && (
-        activeElement.tagName === 'INPUT' ||
-        activeElement.tagName === 'TEXTAREA' ||
-        activeElement.isContentEditable
-      );
+      const isInputActive =
+        activeElement &&
+        (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
       const isSearchInput = activeElement === searchInputRef.current;
 
       // 1. Ctrl + F / Cmd + F / / -> Focar campo de busca
@@ -661,17 +603,15 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         return;
       }
 
-      // If user is typing in another input (e.g. folder name, settings), don't intercept navigation or deletion
       if (isInputActive && !isSearchInput) {
         return;
       }
 
-      // 3. Setas Cima / Baixo (ArrowUp / ArrowDown) -> Navegar entre as notas na lista
+      // 3. Setas Cima / Baixo -> Navegar entre as notas na lista
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         if (filteredDocuments.length === 0) return;
         e.preventDefault();
 
-        // If inside search input, blur search to transition focus to the list
         if (isSearchInput) {
           searchInputRef.current?.blur();
         }
@@ -703,7 +643,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
           handleTriggerBulkDelete();
         } else if (selectedDocumentId) {
           e.preventDefault();
-          const activeDoc = filteredDocuments.find((d) => d.id === selectedDocumentId) || documents.find((d) => d.id === selectedDocumentId);
+          const activeDoc =
+            filteredDocuments.find((d) => d.id === selectedDocumentId) ||
+            documents.find((d) => d.id === selectedDocumentId);
           if (activeDoc) {
             handleTriggerSingleDelete(activeDoc.id, `Nº ${activeDoc.number || 'S/N'}`);
           }
@@ -723,347 +665,84 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     isBulkMoveOpen,
     movingDocId,
     selectDocument,
-    documents
+    documents,
   ]);
 
   return (
     <div
       className={`flex flex-col h-screen w-screen overflow-hidden font-sans select-none relative transition-colors duration-200 theme-${currentTheme} ${
-        currentTheme === 'light'
-          ? 'bg-[#f8fafc] text-[#0f172a]'
-          : 'bg-[#09090b] text-[#fafafa]'
+        currentTheme === 'light' ? 'bg-[#f8fafc] text-[#0f172a]' : 'bg-[#09090b] text-[#fafafa]'
       } ${typeof window !== 'undefined' && (window as any).api ? 'electron-app' : ''}`}
       style={{ paddingTop: typeof window !== 'undefined' && (window as any).api ? 36 : 0 }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Splash Screen on Initial Startup */}
-      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-
-      {/* Custom Title Bar (Electron only) — drag area + min/max/close */}
+      {/* Title Bar (Electron only) */}
       <TitleBar />
 
       {/* Toast Notifications */}
       <ToastHost />
 
-      {/* Settings Modal */}
-      <SettingsModal
-/>
-
-      {/* Confirmation Modal */}
-      <ConfirmModal
-        isOpen={confirmConfig.isOpen}
-        title={confirmConfig.title}
-        description={confirmConfig.description}
-        confirmLabel={confirmConfig.confirmLabel}
-        confirmVariant="danger"
-        isLoading={isConfirmLoading}
-        onConfirm={confirmConfig.onConfirm}
-        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-/>
-
-      {/* Import Progress Modal (with Minimizable Bubble) */}
-      <ImportProgressModal
-        isOpen={isUploading}
-        total={uploadProgress?.total || 0}
-        processed={uploadProgress?.processed || 0}
-        percent={uploadProgress?.percent || 0}
-        targetFolderName={selectedFolderName}
-        onClose={() => {
+      {/* Workspace Modals (Confirmation, Import Progress, Move picker, Splash, Settings) */}
+      <WorkspaceModals
+        showSplash={showSplash}
+        onFinishSplash={() => setShowSplash(false)}
+        confirmConfig={confirmConfig}
+        isConfirmLoading={isConfirmLoading}
+        onCancelConfirm={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
+        selectedFolderName={selectedFolderName}
+        onCloseImportProgress={() => {
           setIsUploading(false);
           setUploadProgress(null);
         }}
-/>
-
-      {/* Full-screen Drag & Drop Overlay */}
-      {isDraggingOver && (
-        <div
-className="absolute inset-0 bg-blue-600/30 backdrop-blur-xs z-50 flex flex-col items-center justify-center border-4 border-dashed border-blue-400 m-4 rounded-2xl pointer-events-none animate-in fade-in zoom-in-95">
-          <UploadCloud className="w-16 h-16 text-white mb-2 animate-bounce" />
-          <h2 className="text-xl font-bold text-white shadow-xs">
-            Solte seus arquivos XML, ZIP ou pastas para importar
-          </h2>
-          <p className="text-sm text-blue-100 mt-1">
-            {selectedFolderId
-              ? `Serão organizados diretamente na pasta "${selectedFolderName}"`
-              : 'Serão salvos no workspace geral'}
-          </p>
-        </div>
-      )}
-
-      {/* Hidden File Input for XML/ZIP Uploads */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept=".xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed"
-        onChange={handleFileUpload}
-        className="hidden"
+        isDraggingOver={isDraggingOver}
+        selectedFolderId={selectedFolderId}
+        fileInputRef={fileInputRef}
+        onFileUpload={handleFileUpload}
+        movingDocId={movingDocId}
+        isBulkMoveOpen={isBulkMoveOpen}
+        selectedDocIds={selectedDocIds}
+        currentTheme={currentTheme}
+        folders={folders}
+        onMoveToFolder={handleMoveToFolder}
+        onCloseFolderPicker={() => {
+          setMovingDocId(null);
+          setIsBulkMoveOpen(false);
+        }}
       />
 
-      {/* Folder Picker Modal for Moving Document(s) */}
-      {(movingDocId || isBulkMoveOpen) && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 select-none ${
-          'bg-black/75 backdrop-blur-xs'
-        }`}>
-          <div
-className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 ${
-            currentTheme === 'light'
-              ? 'bg-white border border-[#cbd5e1] text-[#0f172a] shadow-2xl'
-              : 'bg-[#18181b] border border-[#3f3f46] text-white shadow-2xl'
-          }`}>
-            <div className={`p-4 border-b flex items-center justify-between ${
-              currentTheme === 'light' ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#141418] border-[#27272a]'
-            }`}>
-              <div className="flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-blue-400" />
-                <h3 className="text-xs font-bold">
-                  {isBulkMoveOpen ? `Mover ${selectedDocIds.length} Documentos para Pasta` : 'Mover Documento para Pasta'}
-                </h3>
-              </div>
-              <button
-                onClick={() => {
-                  setMovingDocId(null);
-                  setIsBulkMoveOpen(false);
-                }}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  currentTheme === 'light' ? 'hover:bg-[#e2e8f0] text-[#64748b]' : 'text-slate-300 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-3 max-h-72 overflow-y-auto space-y-1">
-              <button
-                onClick={async () => {
-                  if (isBulkMoveOpen) {
-                    await bulkMoveDocuments(selectedDocIds, null);
-                  } else if (movingDocId) {
-                    await moveDocument(movingDocId, null);
-                  }
-                  setMovingDocId(null);
-                  setIsBulkMoveOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer ${
-                  currentTheme === 'light'
-                    ? 'hover:bg-blue-600 hover:text-white text-[#334155]'
-                    : 'hover:bg-blue-600 hover:text-white text-[#d4d4d8]'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-blue-400" />
-                <span>Sem Pasta (Raiz / Geral)</span>
-              </button>
-
-              <div className={`border-t my-1 ${currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`} />
-
-              {getFlatFolders(folders).map((f) => (
-                <button
-                  key={f.id}
-                  onClick={async () => {
-                    if (isBulkMoveOpen) {
-                      await bulkMoveDocuments(selectedDocIds, f.id);
-                    } else if (movingDocId) {
-                      await moveDocument(movingDocId, f.id);
-                    }
-                    setMovingDocId(null);
-                    setIsBulkMoveOpen(false);
-                  }}
-                  style={{ paddingLeft: `${f.depth * 14 + 12}px` }}
-                  className={`w-full text-left py-1.5 pr-2 rounded-xl text-xs flex items-center gap-2 truncate transition-colors cursor-pointer ${
-                    currentTheme === 'light' 
-                      ? 'hover:bg-blue-600 hover:text-white text-[#334155]' 
-                      : 'hover:bg-blue-600 hover:text-white text-[#d4d4d8]'
-                  }`}
-                >
-                  <FolderOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="truncate">{f.name}</span>
-                </button>
-              ))}
-
-              {folders.length === 0 && (
-                <p className="text-xs text-[#71717a] p-3 text-center">Nenhuma pasta criada ainda no workspace.</p>
-              )}
-            </div>
-            <div className={`p-3 border-t flex justify-end ${
-              currentTheme === 'light' ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
-            }`}>
-              <button
-                onClick={() => {
-                  setMovingDocId(null);
-                  setIsBulkMoveOpen(false);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-                  currentTheme === 'light' ? 'bg-[#e2e8f0] text-[#0f172a] hover:bg-[#cbd5e1]' : 'bg-[#27272a] hover:bg-[#3f3f46] text-white'
-                }`}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top Header (Conteúdo — drag agora é na TitleBar) */}
-      <header className="h-14 border-b border-[var(--border-subtle)] bg-[var(--surface-header)] flex items-center px-4 justify-between z-20 shrink-0 print:hidden gap-4 select-none shadow-xs">
-        {/* Brand + Back to Home */}
-        <div className="flex items-center gap-2.5 shrink-0 select-none">
-          {onBackToHome && (
-            <button
-              type="button"
-              onClick={onBackToHome}
-              className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
-              title="Voltar ao Hub Fiscal"
-              aria-label="Voltar ao Hub Fiscal"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shadow-xs shrink-0 bg-red-600 text-white"
-            title="Visualizador DANFE / PDF"
-          >
-            <FileText className="w-4 h-4" strokeWidth={2.2} />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-bold tracking-tight text-[var(--text-primary)]">NFView</div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              NF-e • NFC-e • CT-e
-            </div>
-          </div>
-        </div>
-
-        {/* Search Input */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <Search className="w-4 h-4 text-[var(--text-muted)]" />
-            </div>
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 border border-[var(--border-default)] bg-[var(--surface-input)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-lg py-1.5 pl-9 pr-16 text-xs focus:outline-none focus:border-blue-500 transition-colors"
-              placeholder="Buscar notas fiscais... (Ctrl + F ou /)"
-            />
-            {!searchQuery && (
-              <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none gap-1">
-                <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
-                  Ctrl+F
-                </kbd>
-                <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
-                  /
-                </kbd>
-              </div>
-            )}
-            {searchQuery && (
-              <button 
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-2.5 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Right Actions: Theme Selector, Primary Single Import & Settings */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Quick Theme Switcher Pill */}
-          <div className="flex items-center p-0.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-inset)] shrink-0">
-            <button
-              type="button"
-              onClick={() => updateSettings({ theme: 'light' })}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${
-                currentTheme === 'light'
-                  ? 'bg-white text-amber-500 shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Tema Claro"
-              aria-label="Ativar tema claro"
-            >
-              <Sun className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSettings({ theme: 'dark' })}
-              className={`p-1.5 rounded-md transition-all cursor-pointer ${
-                currentTheme === 'dark'
-                  ? 'bg-[#27272a] text-blue-400 shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Tema Escuro"
-              aria-label="Ativar tema escuro"
-            >
-              <Moon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTargetUploadFolderId(selectedFolderId);
-              fileInputRef.current?.click();
-            }}
-            disabled={isUploading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-xs transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0"
-            title={selectedFolderId ? `Importar XML na pasta "${selectedFolderName}"` : 'Importar arquivos XML'}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Importar XML</span>
-          </button>
-
-          {typeof window !== 'undefined' && (window as any).api?.openDirectory && (
-            <button
-              type="button"
-              onClick={handleImportDirectory}
-              disabled={isUploading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0"
-              title="Importar todos os XMLs de uma pasta"
-            >
-              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>Importar Pasta</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-2 rounded-lg border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-95 transition cursor-pointer shrink-0"
-            title="Configurações do Sistema"
-            aria-label="Configurações do Sistema"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* Error alert if any */}
-      {uploadError && (
-        <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 flex items-center justify-between text-xs text-red-300 shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-400" />
-            <span>{uploadError}</span>
-          </div>
-          <button onClick={() => setUploadError(null)} className="text-red-400 hover:text-white">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {/* Top Header */}
+      <MainHeader
+        onBackToHome={onBackToHome}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchInputRef={searchInputRef}
+        currentTheme={currentTheme}
+        onUpdateTheme={(theme) => updateSettings({ theme })}
+        selectedFolderId={selectedFolderId}
+        selectedFolderName={selectedFolderName}
+        isUploading={isUploading}
+        onTriggerUploadXml={() => {
+          setTargetUploadFolderId(selectedFolderId);
+          fileInputRef.current?.click();
+        }}
+        onImportDirectory={handleImportDirectory}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        uploadError={uploadError}
+        onDismissUploadError={() => setUploadError(null)}
+      />
 
       {/* Main 3-Column Body (Workspace Tree | Documents List | DANFE Preview) */}
       <div className="flex-1 flex overflow-hidden relative print:overflow-visible">
-        
         {/* Column 1: Workspace Hierarchy Tree */}
         {!isTreeCollapsed && (
           <aside
-style={{ width: `${treeWidth}px` }} 
+            style={{ width: `${treeWidth}px` }}
             className={`h-full flex flex-col shrink-0 print:hidden overflow-hidden border-r ${
-              currentTheme === 'light'
-                ? 'bg-[#f1f5f9] border-[#e2e8f0]'
-                : 'bg-[#0d0d10] border-[#27272a]'
+              currentTheme === 'light' ? 'bg-[#f1f5f9] border-[#e2e8f0]' : 'bg-[#0d0d10] border-[#27272a]'
             }`}
           >
             <WorkspaceTree onImportToFolder={handleImportToSpecificFolder} />
@@ -1071,12 +750,10 @@ style={{ width: `${treeWidth}px` }}
         )}
 
         {/* Tree Resizer Handle & Collapse Toggle */}
-        <div 
+        <div
           onMouseDown={startResizingTree}
           className={`w-1.5 hover:bg-blue-500/80 active:bg-blue-600 transition-colors cursor-col-resize flex items-center justify-center relative z-10 shrink-0 group print:hidden select-none ${
-            currentTheme === 'light'
-              ? 'bg-[#e2e8f0]'
-              : 'bg-[#18181b]'
+            currentTheme === 'light' ? 'bg-[#e2e8f0]' : 'bg-[#18181b]'
           }`}
           title="Arraste para redimensionar o Workspace"
         >
@@ -1092,284 +769,41 @@ style={{ width: `${treeWidth}px` }}
             }`}
             title={isTreeCollapsed ? 'Expandir pastas' : 'Ocultar pastas'}
           >
-            {isTreeCollapsed ? (
-              <ChevronRight className="w-3 h-3" />
-            ) : (
-              <ChevronLeft className="w-3 h-3" />
-            )}
+            {isTreeCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
           </button>
         </div>
 
         {/* Column 2: Documents List with Bulk Selection and Actions */}
-        <div
-style={{ width: `${listWidth}px` }} 
-          className={`h-full flex flex-col shrink-0 print:hidden overflow-hidden relative border-r ${
-            currentTheme === 'light'
-              ? 'bg-[#f8fafc] border-[#e2e8f0]'
-              : 'bg-[#111114] border-[#27272a]'
-          }`}
-        >
-          {/* List Header with Multi-Select Controls */}
-          <div className={`h-11 px-3 border-b flex items-center justify-between shrink-0 ${
-            currentTheme === 'light'
-              ? 'bg-white border-[#e2e8f0]'
-              : 'bg-[#141418] border-[#27272a]'
-          }`}>
-            <div className="flex items-center gap-2 min-w-0 pr-1">
-              {filteredDocuments.length > 0 && (
-                <button
-                  onClick={() => selectAllDocs(!allFilteredSelected)}
-                  className={`transition-colors cursor-pointer ${
-                    currentTheme === 'light' ? 'text-[#64748b] hover:text-[#0f172a]' : 'text-[#71717a] hover:text-white'
-                  }`}
-                  title={allFilteredSelected ? 'Desmarcar todos' : 'Selecionar todos os documentos'}
-                >
-                  {allFilteredSelected ? (
-                    <CheckSquare className="w-4 h-4 text-blue-500" />
-                  ) : (
-                    <Square className="w-4 h-4" />
-                  )}
-                </button>
-              )}
-              <FolderOpen className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className={`text-xs font-bold truncate ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`} title={selectedFolderName}>
-                {selectedFolderName}
-              </span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-semibold shrink-0 ${
-                currentTheme === 'light' ? 'bg-[#e2e8f0] text-[#475569]' : 'bg-[#27272a] text-[#a1a1aa]'
-              }`}>
-                {filteredDocuments.length}
-              </span>
-            </div>
-
-            {/* Quick batch export button & selection counter */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {filteredDocuments.length > 0 && (
-                <button
-                  onClick={() => handleBatchPrint()}
-                  className={`p-1.5 rounded text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer ${
-                    currentTheme === 'light'
-                      ? 'text-[#475569] hover:text-blue-600 hover:bg-blue-50'
-                      : 'text-[#a1a1aa] hover:text-white hover:bg-white/10'
-                  }`}
-                  title="Exportar todas as notas em PDF / Imprimir em Lote"
-                >
-                  <Printer className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="hidden xl:inline">Exportar Lote</span>
-                </button>
-              )}
-              {selectedDocIds.length > 0 && (
-                <span className="text-[11px] font-semibold text-blue-500 shrink-0">
-                  {selectedDocIds.length} sel.
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Floating Bulk Actions Toolbar when documents are selected */}
-          {selectedDocIds.length > 0 && (
-            <div className="p-2 bg-blue-950/90 border-b border-blue-500/30 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1">
-              <span className="font-semibold text-white">
-                {selectedDocIds.length} {selectedDocIds.length === 1 ? 'selecionado' : 'selecionados'}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => handleBatchPrint(selectedDocIds)}
-                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Exportar e imprimir notas fiscais selecionadas em PDF"
-                >
-                  <Printer className="w-3 h-3" />
-                  Exportar PDF ({selectedDocIds.length})
-                </button>
-                <button
-                  onClick={() => setIsBulkMoveOpen(true)}
-                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Mover selecionados para outra pasta"
-                >
-                  <MoveRight className="w-3 h-3" />
-                  Mover
-                </button>
-                <button
-                  onClick={handleTriggerBulkDelete}
-                  className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Excluir documentos selecionados"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Excluir
-                </button>
-                <button
-                  onClick={clearDocSelection}
-                  className="p-1 text-blue-300 hover:text-white cursor-pointer"
-                  title="Limpar seleção"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Document Cards List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-            {isDocsLoading && filteredDocuments.length === 0 ? (
-              <>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <DocumentCardSkeleton key={i} />
-                ))}
-              </>
-            ) : (
-              filteredDocuments.map(doc => {
-              const isSelected = selectedDocumentId === doc.id;
-              const isChecked = selectedDocIds.includes(doc.id);
-
-              return (
-                <div
-                  key={doc.id}
-                  data-doc-id={doc.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/fiscal-document-id', doc.id);
-                  }}
-                  onClick={() => selectDocument(doc.id, `${doc.type} ${doc.number || ''}`)}
-                  className={`p-2.5 rounded-lg border transition-all cursor-pointer relative group ${
-                    isSelected 
-                      ? currentTheme === 'light'
-                        ? 'bg-blue-50 border-blue-500 shadow-xs ring-1 ring-blue-500/30'
-                        : 'bg-[#1e1e24] border-blue-500 shadow-xs' 
-                      : isChecked
-                      ? currentTheme === 'light'
-                        ? 'bg-blue-50/70 border-blue-300'
-                        : 'bg-blue-950/20 border-blue-500/50'
-                      : currentTheme === 'light'
-                      ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9] hover:border-[#cbd5e1]'
-                      : 'bg-[#141418] border-[#27272a] hover:bg-[#18181f] hover:border-[#3f3f46]'
-                  }`}
-                  title="Clique para visualizar o DANFE ou arraste para uma pasta do workspace"
-                >
-                  {/* Top Row: Multi-select Checkbox + Type & Date */}
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleDocSelection(doc.id);
-                        }}
-                        className={`transition-colors cursor-pointer ${
-                          currentTheme === 'light' ? 'text-[#94a3b8] hover:text-[#0f172a]' : 'text-[#71717a] hover:text-white'
-                        }`}
-                      >
-                        {isChecked ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        isSelected 
-                          ? 'bg-blue-600 text-white' 
-                          : currentTheme === 'light'
-                          ? 'bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0]'
-                          : 'bg-[#27272a] text-[#a1a1aa]'
-                      }`}>
-                        {doc.type || 'NF-e'}
-                      </span>
-                    </div>
-                    <span className={`text-[11px] ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
-                      {doc.issueDate ? new Date(doc.issueDate).toLocaleDateString('pt-BR') : '-'}
-                    </span>
-                  </div>
-
-                  {/* Number & Series */}
-                  <div className={`text-xs font-bold mb-0.5 flex items-center justify-between pl-5 ${
-                    currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'
-                  }`}>
-                    <span>Nº {doc.number || 'S/N'}</span>
-                    {doc.series && (
-                      <span className={`text-[10px] font-normal ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Série {doc.series}</span>
-                    )}
-                  </div>
-
-                  {/* Issuer Name */}
-                  <div className={`text-[11px] truncate mb-2 font-medium pl-5 ${
-                    currentTheme === 'light' ? 'text-[#475569]' : 'text-[#a1a1aa]'
-                  }`} title={doc.issuerName || 'Não Informado'}>
-                    {doc.issuerName || 'Não Informado'}
-                  </div>
-
-                  {/* Bottom Row: Total & Actions */}
-                  <div className={`flex items-center justify-between pt-1.5 pl-5 border-t ${
-                    currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]/70'
-                  }`}>
-                    <span className={`text-xs font-bold ${currentTheme === 'light' ? 'text-green-600' : 'text-green-400'}`}>
-                      {doc.totalAmount ? `R$ ${doc.totalAmount.toFixed(2)}` : 'R$ 0,00'}
-                    </span>
-                    
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMovingDocId(doc.id);
-                        }}
-                        className={`p-1 rounded transition-all cursor-pointer ${
-                          currentTheme === 'light' ? 'hover:bg-blue-600 hover:text-white text-[#64748b]' : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
-                        }`}
-                        title="Mover para outra pasta"
-                      >
-                        <MoveRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectDocument(doc.id);
-                          setTimeout(() => window.print(), 150);
-                        }}
-                        className={`p-1 rounded transition-all cursor-pointer ${
-                          currentTheme === 'light' ? 'hover:bg-blue-600 hover:text-white text-[#64748b]' : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
-                        }`}
-                        title="Imprimir DANFE"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTriggerSingleDelete(doc.id, `Nº ${doc.number || 'S/N'}`);
-                        }}
-                        className="p-1 rounded hover:bg-red-500/20 hover:text-red-500 text-[#71717a] transition-all cursor-pointer"
-                        title="Remover documento"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-              })
-            )}
-
-            {/* Empty state for documents list */}
-            {filteredDocuments.length === 0 && !isDocsLoading && (
-              <EmptyState
-                icon="file"
-                title="Nenhum XML nesta pasta"
-                description={searchQuery ? 'Tente outra busca ou remova os filtros.' : 'Arraste arquivos aqui ou clique em Importar XML no topo.'}
-                ctaLabel="Importar XML"
-                ctaIcon={<UploadCloud className="w-3.5 h-3.5" />}
-                onCta={() => {
-                  setTargetUploadFolderId(selectedFolderId);
-                  fileInputRef.current?.click();
-                }}
-              />
-            )}
-          </div>
-        </div>
+        <DocumentListPane
+          listWidth={listWidth}
+          currentTheme={currentTheme}
+          filteredDocuments={filteredDocuments}
+          selectedDocumentId={selectedDocumentId}
+          selectedDocIds={selectedDocIds}
+          selectedFolderName={selectedFolderName}
+          allFilteredSelected={allFilteredSelected}
+          isDocsLoading={isDocsLoading}
+          searchQuery={searchQuery}
+          onSelectAllDocs={(checked) => selectAllDocs(checked)}
+          onSelectDocument={selectDocument}
+          onToggleDocSelection={toggleDocSelection}
+          onBatchPrint={handleBatchPrint}
+          onOpenBulkMove={() => setIsBulkMoveOpen(true)}
+          onTriggerBulkDelete={handleTriggerBulkDelete}
+          onClearDocSelection={clearDocSelection}
+          onSetMovingDocId={setMovingDocId}
+          onTriggerSingleDelete={handleTriggerSingleDelete}
+          onTriggerUploadXml={() => {
+            setTargetUploadFolderId(selectedFolderId);
+            fileInputRef.current?.click();
+          }}
+        />
 
         {/* Document List Resizer Handle */}
-        <div 
+        <div
           onMouseDown={startResizingList}
           className={`w-1.5 hover:bg-blue-500/80 active:bg-blue-600 transition-colors cursor-col-resize flex items-center justify-center relative z-10 shrink-0 group print:hidden select-none ${
-            currentTheme === 'light'
-              ? 'bg-[#e2e8f0]'
-              : 'bg-[#18181b]'
+            currentTheme === 'light' ? 'bg-[#e2e8f0]' : 'bg-[#18181b]'
           }`}
           title="Arraste para redimensionar a lista de documentos"
         />
@@ -1377,90 +811,24 @@ style={{ width: `${listWidth}px` }}
         {/* Column 3: DANFE / PDF Viewer & Converter Area */}
         <main
           className={`flex-1 flex flex-col overflow-hidden select-text print:overflow-visible print:bg-white ${
-            currentTheme === 'light'
-              ? 'bg-[#e2e8f0]'
-              : 'bg-[#18181b]'
+            currentTheme === 'light' ? 'bg-[#e2e8f0]' : 'bg-[#18181b]'
           }`}
         >
           {docDetails ? (
             <DocumentPreview docDetails={docDetails} />
           ) : (
-            /* Clean Minimalist Welcome / Dropzone state when no file selected */
-            <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center overflow-y-auto ${
-              currentTheme === 'light' ? 'bg-[#f1f5f9]' : 'bg-[#131317]'
-            }`}>
-              <div className={`max-w-md w-full p-8 border-2 border-dashed rounded-2xl shadow-xl transition-all flex flex-col items-center ${
-                currentTheme === 'light'
-                  ? 'border-[#cbd5e1] hover:border-blue-500 bg-white'
-                  : 'border-[#27272a] hover:border-blue-500/60 bg-[#0d0d10]'
-              }`}>
-                <div className="w-14 h-14 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-500 mb-4 shadow-inner">
-                  <UploadCloud className="w-7 h-7" />
-                </div>
-
-                <h3 className={`text-base font-bold mb-1 ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>
-                  Visualizador e Conversor DANFE (PDF)
-                </h3>
-                
-                <p className={`text-xs leading-relaxed mb-6 ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                  Selecione uma nota fiscal na lista ou arraste arquivos XML para visualizar o DANFE em PDF no padrão A4 oficial com impressão direta.
-                </p>
-
-                <div className={`grid grid-cols-3 gap-3 w-full pt-4 border-t text-left ${
-                  currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]'
-                }`}>
-                  <div className={`p-2.5 rounded-lg border ${
-                    currentTheme === 'light' ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#18181b] border-[#27272a]'
-                  }`}>
-                    <Sparkles className="w-4 h-4 text-amber-500 mb-1" />
-                    <div className={`text-[11px] font-bold ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>Workspaces</div>
-                    <div className={`text-[10px] ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Pastas livres</div>
-                  </div>
-                  <div className={`p-2.5 rounded-lg border ${
-                    currentTheme === 'light' ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#18181b] border-[#27272a]'
-                  }`}>
-                    <FileCheck className="w-4 h-4 text-blue-500 mb-1" />
-                    <div className={`text-[11px] font-bold ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>DANFE A4</div>
-                    <div className={`text-[10px] ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'}`}>Padrão SEFAZ</div>
-                  </div>
-                  <div className={`p-2.5 rounded-lg border ${
-                    currentTheme === 'light' ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#18181b] border-[#27272a]'
-                  }`}>
-                    <Printer className="w-4 h-4 text-green-500 mb-1" />
-                    <div className={`text-[11px] font-bold ${currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}`}>Impressão</div>
-                    <div className={`text-[10px] ${currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'}`}>PDF Direto</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DocumentPreviewEmptyState currentTheme={currentTheme} />
           )}
         </main>
       </div>
 
       {/* Footer */}
-      <footer className={`h-6 border-t flex items-center px-4 justify-between text-[11px] z-20 shrink-0 print:hidden ${
-        currentTheme === 'light'
-          ? 'bg-white border-[#e2e8f0] text-[#64748b]'
-          : 'bg-[#09090b] border-[#27272a] text-[#71717a]'
-      }`}>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-blue-500 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-            Pasta ativa: <strong className={currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'}>{selectedFolderName}</strong>
-          </span>
-          <span>•</span>
-          <span>{documents.length} {documents.length === 1 ? 'documento' : 'documentos'}</span>
-          {selectedDocIds.length > 0 && (
-            <>
-              <span>•</span>
-              <span className="text-blue-500 font-semibold">{selectedDocIds.length} selecionados</span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span>Arraste documentos para pastas ou crie qualquer estrutura hierárquica</span>
-        </div>
-      </footer>
+      <MainFooter
+        currentTheme={currentTheme}
+        selectedFolderName={selectedFolderName}
+        documentsCount={documents.length}
+        selectedCount={selectedDocIds.length}
+      />
     </div>
   );
 }
