@@ -61,6 +61,20 @@ export interface FiscalDesktopAPI {
     update: (settings: Partial<AppSettings>) => Promise<AppSettings>;
     selectFolder: (title?: string) => Promise<string | null>;
   };
+  logs: {
+    list: (filter?: any) => Promise<{ logs: any[]; total: number }>;
+    getStats: () => Promise<{
+      total: number;
+      successCount: number;
+      errorCount: number;
+      warnCount: number;
+      infoCount: number;
+    }>;
+    clearOld: (days?: number) => Promise<{ deletedCount: number }>;
+    exportCsv: (filter?: any) => Promise<string>;
+    exportJson: (filter?: any) => Promise<string>;
+    record: (input: any) => Promise<any>;
+  };
 }
 
 declare global {

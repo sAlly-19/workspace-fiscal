@@ -162,6 +162,14 @@ const fiscalApi = {
     update: (settings: any) => ipcRenderer.invoke('settings:update', settings),
     selectFolder: (title?: string) => ipcRenderer.invoke('settings:selectFolder', title),
   },
+  logs: {
+    list: (filter?: any) => ipcRenderer.invoke('logs:list', filter),
+    getStats: () => ipcRenderer.invoke('logs:getStats'),
+    clearOld: (days?: number) => ipcRenderer.invoke('logs:clearOld', days),
+    exportCsv: (filter?: any) => ipcRenderer.invoke('logs:exportCsv', filter),
+    exportJson: (filter?: any) => ipcRenderer.invoke('logs:exportJson', filter),
+    record: (input: any) => ipcRenderer.invoke('logs:record', input),
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

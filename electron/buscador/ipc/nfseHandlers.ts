@@ -14,6 +14,8 @@ function parseNfseEnvironment(value: unknown, defaultEnv: NfseEnvironment = 'hom
   return value;
 }
 
+import { activityLogService } from '../../../src/api/services/activity-log.service';
+
 export function registerNfseHandlers(
   services: ApplicationContext,
   getMainWindow: () => BrowserWindow | null
@@ -26,17 +28,43 @@ export function registerNfseHandlers(
 
     const defaultEnv = (services.settingsRepo.getSettings().nfse_environment as NfseEnvironment) || 'homologation';
     const environment = parseNfseEnvironment(rawEnv, defaultEnv);
+    const startTime = Date.now();
 
-    return services.nfseSynchronizer.sync({
-      companyId,
-      environment,
-      onProgress: (progress) => {
-        const win = getMainWindow();
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('nfse:progress', { companyId, ...progress });
-        }
-      },
-    });
+    try {
+      const result = await services.nfseSynchronizer.sync({
+        companyId,
+        environment,
+        onProgress: (progress) => {
+          const win = getMainWindow();
+          if (win && !win.isDestroyed()) {
+            win.webContents.send('nfse:progress', { companyId, ...progress });
+          }
+        },
+      });
+
+      await activityLogService.record({
+        level: result.success ? 'SUCCESS' : 'ERROR',
+        module: 'BUSCADOR',
+        action: 'NFSE_SYNC',
+        message: result.success
+          ? `Sincronização NFS-e ADN concluída para ${company.name}. ${result.documentsCount} documentos recebidos.`
+          : `Sincronização NFS-e ADN finalizada para ${company.name}: ${result.error || 'Falha na sincronizacao'}`,
+        details: { companyId, companyName: company.name, environment, result },
+        durationMs: Date.now() - startTime,
+      });
+
+      return result;
+    } catch (err: any) {
+      await activityLogService.record({
+        level: 'ERROR',
+        module: 'BUSCADOR',
+        action: 'NFSE_SYNC_ERROR',
+        message: `Falha na sincronização NFS-e ADN para ${company.name}: ${err.message}`,
+        details: { companyId, companyName: company.name, error: err.message },
+        durationMs: Date.now() - startTime,
+      });
+      throw err;
+    }
   });
 
   registerSecureHandler('nfse:getStatus', getMainWindow, (_event, rawCompanyId, rawEnv) => {

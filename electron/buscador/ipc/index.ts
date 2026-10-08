@@ -6,6 +6,7 @@ import { registerDocumentHandlers } from './documentHandlers';
 import { registerSefazHandlers } from './sefazHandlers';
 import { registerSettingsHandlers } from './settingsHandlers';
 import { registerNfseHandlers } from './nfseHandlers';
+import { registerActivityLogHandlers } from './activityLogHandlers';
 
 export function registerAllIpcHandlers(services: ApplicationContext, getMainWindow: () => BrowserWindow | null): void {
   registerCompanyHandlers(services, getMainWindow);
@@ -14,4 +15,5 @@ export function registerAllIpcHandlers(services: ApplicationContext, getMainWind
   registerSefazHandlers(services, getMainWindow);
   registerSettingsHandlers(services, getMainWindow);
   registerNfseHandlers(services, getMainWindow);
+  registerActivityLogHandlers(services, getMainWindow);
 }

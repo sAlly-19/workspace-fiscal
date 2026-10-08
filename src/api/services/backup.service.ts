@@ -21,6 +21,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { storageService } from './storage.service';
 import { logger } from '../utils/logger';
+import { activityLogService } from './activity-log.service';
 
 export type BackupModule = 'NF_VIEW' | 'DEPRECIATION' | 'SETTINGS';
 
@@ -423,6 +424,15 @@ export class BackupService {
     }
 
     logger.info({ filename: finalFilename, sizeBytes: stat.size, fullDestPath, modules }, 'backup_wfb_created');
+    activityLogService
+      .record({
+        level: 'SUCCESS',
+        module: 'BACKUP',
+        action: 'BACKUP_CREATE',
+        message: `Backup ${finalFilename} gerado com sucesso (${(stat.size / 1024).toFixed(1)} KB).`,
+        details: { filename: finalFilename, sizeBytes: stat.size, path: fullDestPath, modules },
+      })
+      .catch(() => {});
     return {
       filename: finalFilename,
       path: fullDestPath,
@@ -930,6 +940,15 @@ export class BackupService {
 
       await rawClient.execute('COMMIT;');
       logger.info({ modules, safetyBackup: safety.filename }, 'restore_completed_successfully');
+      activityLogService
+        .record({
+          level: 'SUCCESS',
+          module: 'BACKUP',
+          action: 'BACKUP_RESTORE',
+          message: `Restauração concluída com sucesso para os módulos: ${modules.join(', ')}.`,
+          details: { modules, safetyBackup: safety.filename },
+        })
+        .catch(() => {});
 
       return {
         success: true,
@@ -940,6 +959,15 @@ export class BackupService {
     } catch (restoreErr) {
       await rawClient.execute('ROLLBACK;').catch(() => {});
       logger.error({ err: (restoreErr as Error).message }, 'restore_transaction_failed_rolled_back');
+      activityLogService
+        .record({
+          level: 'ERROR',
+          module: 'BACKUP',
+          action: 'BACKUP_RESTORE_ERROR',
+          message: `Falha na restauração do backup: ${(restoreErr as Error).message}`,
+          details: { error: (restoreErr as Error).message },
+        })
+        .catch(() => {});
       throw new Error(`Falha na restauração: ${(restoreErr as Error).message}. Nenhuma alteração foi gravada.`);
     }
   }

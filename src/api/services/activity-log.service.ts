@@ -1,4 +1,4 @@
-import { desc, eq, and, sql, or, like, gte, lte } from 'drizzle-orm';
+import { desc, eq, and, sql, or, like, gte, lte, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { activityLogs, LogLevel, LogModule } from '../../db/schema';
 import crypto from 'crypto';
@@ -96,7 +96,7 @@ export class ActivityLogService {
    * Lista logs aplicando filtros de busca, nível, módulo e paginação.
    */
   async list(filter: ActivityLogFilter = {}): Promise<{ logs: ActivityLogItem[]; total: number }> {
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     if (filter.level && filter.level !== 'ALL') {
       conditions.push(eq(activityLogs.level, filter.level));
@@ -122,14 +122,15 @@ export class ActivityLogService {
 
     if (filter.search && filter.search.trim()) {
       const term = `%${filter.search.trim()}%`;
-      conditions.push(
-        or(
-          like(activityLogs.message, term),
-          like(activityLogs.action, term),
-          like(activityLogs.module, term),
-          like(activityLogs.details, term)
-        )
+      const searchCond = or(
+        like(activityLogs.message, term),
+        like(activityLogs.action, term),
+        like(activityLogs.module, term),
+        like(activityLogs.details, term)
       );
+      if (searchCond) {
+        conditions.push(searchCond);
+      }
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

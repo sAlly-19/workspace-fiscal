@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { ApplicationContext } from '../services';
 import { registerSecureHandler, requirePositiveInteger, requireString } from './security';
+import { activityLogService } from '../../../src/api/services/activity-log.service';
 
 export function registerCertificateHandlers(services: ApplicationContext, getMainWindow: () => BrowserWindow | null): void {
   registerSecureHandler('certificates:listAvailable', getMainWindow, () => services.certProvider.listCertificates());
@@ -20,6 +21,15 @@ export function registerCertificateHandlers(services: ApplicationContext, getMai
       throw new Error('O CNPJ-base do certificado não corresponde ao CNPJ da empresa.');
     }
     services.certRepo.associate(companyId, cert);
+
+    await activityLogService.record({
+      level: 'SUCCESS',
+      module: 'CERTIFICATES',
+      action: 'CERT_ASSOCIATE',
+      message: `Certificado ${cert.subject || cert.thumbprint.slice(0, 8)} associado a ${company.name}.`,
+      details: { companyId, companyName: company.name, thumbprint: cert.thumbprint, validTo: cert.valid_to },
+    });
+
     return true;
   });
 }
