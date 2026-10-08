@@ -17,14 +17,17 @@ import {
   FolderTree,
   FileText,
   Archive,
+  Building2,
+  Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { apiFetch } from '../lib/api';
 
-export const CURRENT_APP_VERSION = '3.0.0';
+export const CURRENT_APP_VERSION = '3.5.0';
 const SEEN_VERSION_KEY = 'workspace_fiscal_seen_version';
 
-export type AppVersion = '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
+export type AppVersion = '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
 interface WhatsNewModalProps {
   open?: boolean;
@@ -36,7 +39,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState<AppVersion>('3.0.0');
+  const [activeVersion, setActiveVersion] = useState<AppVersion>('3.5.0');
 
   useEffect(() => {
     if (open !== undefined) {
@@ -128,7 +131,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                     v{CURRENT_APP_VERSION}
                   </span>
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                    Versão 3.0
+                    Versão 3.5
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
@@ -158,7 +161,8 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                 Versão:
               </span>
               {[
-                { id: '3.0.0' as const, label: 'v3.0.0 (Atual)', isCurrent: true },
+                { id: '3.5.0' as const, label: 'v3.5.0 (Atual)', isCurrent: true },
+                { id: '3.0.0' as const, label: 'v3.0.0' },
                 { id: '2.5.3' as const, label: 'v2.5.3' },
                 { id: '2.5.2' as const, label: 'v2.5.2' },
                 { id: '2.5.1' as const, label: 'v2.5.1' },
@@ -176,14 +180,14 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                   }`}
                 >
                   <span>{v.label}</span>
-                  {v.isCurrent && activeVersion === '3.0.0' && (
+                  {v.isCurrent && activeVersion === '3.5.0' && (
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   )}
                 </button>
               ))}
             </div>
             <span className={`text-[11px] shrink-0 hidden sm:inline ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
-              {activeVersion === '3.0.0'
+              {activeVersion === '3.5.0'
                 ? 'Lançamento mais recente'
                 : activeVersion === '2.5.0'
                   ? 'Lançamento do Hub Fiscal'
@@ -193,7 +197,95 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
 
           {/* Cards Body */}
           <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
-            {activeVersion === '3.0.0' ? (
+            {activeVersion === '3.5.0' ? (
+              <>
+                {/* 1. Buscador NF: Filtro rápido NFS-e e Gestão de Empresas */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Filtro Rápido de NFS-e & Gestão Completa de Empresas</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Interface & UX</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Aprimoramentos de navegação e controles no módulo Buscador NF:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Filtro Rápido por Modelo no Card:</b> O card da empresa ativa conta agora com grade de 4 botões (NF-e, CT-e, NFS-e e Todos) com indicador do filtro ativo e alternância imediata para o workspace ADN NFS-e.</li>
+                        <li><b>Edição e Exclusão Segura:</b> Botões de ação para editar ou excluir empresas diretamente pela barra lateral ou pelo rodapé do modal de edição, com confirmação e remoção atômica local.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Sincronização na Toolbar e Download em Lote NFS-e */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Sincronização na Toolbar e Download em Lote para NFS-e</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Produtividade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Operações em lote unificadas e maior ergonomia no fluxo de consulta fiscal:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Sincronização Reposicionada:</b> O botão Sincronizar foi integrado diretamente à barra de filtros/NSU do workspace, ao lado dos botões Reset NF-e e Reset CT-e.</li>
+                        <li><b>Download em Lote para NFS-e Nacional:</b> Seleção de notas no módulo NFS-e conectada à barra inferior fixa para geração de pacotes compactados em ZIP com os XMLs oficiais.</li>
+                        <li><b>Indicação de Formatos:</b> Desabilitação automática e aviso orientador sobre a indisponibilidade de PDF para o padrão NFS-e Nacional.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Certificados Digitais & Mensagens Humanizadas */}
+                <div
+                  className={`p-4 rounded-xl border transition-all ${
+                    isLight
+                      ? 'bg-[#f8fafc] border-[#e2e8f0] hover:border-purple-300'
+                      : 'bg-[#111114] border-[#27272a] hover:border-purple-500/30'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <h3 className="font-bold text-sm flex items-center justify-between">
+                        <span>Filtro de Certificados Válidos e Diagnóstico Amigável</span>
+                        <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Estabilidade</span>
+                      </h3>
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        Maior clareza e facilidade na gestão de certificados digitais do Windows:
+                      </p>
+                      <ul className={`list-disc list-inside text-[11px] space-y-1 ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
+                        <li><b>Certificados Válidos por Padrão:</b> O modal de vinculação exibe apenas certificados dentro do prazo de vigência, com alternância para "Mostrar expirados".</li>
+                        <li><b>Mensagens Humanizadas de Erro:</b> Substituição de logs técnicos brutos de PowerShell por explicações claras com orientação para ativação em gerenciadores de certificados digitais externos.</li>
+                        <li><b>Detalhes Técnicos Preservados:</b> Caixa dedicada de detalhes técnicos com botão "Copiar erro" para suporte e auditoria.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : activeVersion === '3.0.0' ? (
               <>
                 {/* 1. Módulo Buscador NF */}
                 <div

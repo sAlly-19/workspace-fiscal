@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **3.0.0**
+Versão: **3.5.0**
 
 ---
 
@@ -165,10 +165,13 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
 ---
 
 ### 4. Buscador NF (Consulta e Distribuição SEFAZ & NFS-e Nacional)
-- **Seleção e Sincronização Inteligente de Workspace Fiscal:**
+- **Seleção e Sincronização Integrada de Workspace Fiscal:**
   - Alternância intuitiva no cabeçalho entre o ecossistema **SEFAZ (NF-e e CT-e)** e o **NFS-e Nacional (ADN / SEFIN)**.
-  - O botão universal **Sincronizar** no cabeçalho identifica automaticamente o modo de workspace ativo: consulta a SEFAZ quando em DF-e e o ADN Nacional quando em NFS-e.
+  - Botão **Sincronizar** integrado diretamente na barra de filtros/NSU do workspace, ao lado dos botões `Reset NF-e` e `Reset CT-e`, adaptando-se dinamicamente ao contexto ativo.
   - Preservação da empresa ativa, certificados associados e filtros temporais durante a alternância.
+- **Filtros Rápidos e Gestão de Empresas no Card:**
+  - Card da empresa na barra lateral com grade de 4 botões para filtro instantâneo por modelo (**NF-e**, **CT-e**, **NFS-e** e **Todos**), com destaque do filtro ativo.
+  - Ações diretas para **Editar** dados cadastrais e **Excluir Empresa** com confirmação de segurança e remoção atômica local.
 - **Consulta e Distribuição Oficial SEFAZ:**
   - Comunicação nativa com os Web Services oficiais de Distribuição de DF-e de Interesse dos Atores (NF-e e CT-e).
   - Consulta incremental baseada em NSU (Número Seqüencial Único), registrando o `ultNSU` e o `maxNSU` por empresa.
@@ -180,14 +183,15 @@ Seleção modular de dados para backup, inspeção prévia com contadores reais 
   - Tratamento nativo e resiliente de respostas HTTP 404 do ADN como conclusão com zero novos documentos (`NO_DOCUMENTS`), mantendo o estado `IDLE` e prevenindo falso-positivos de erro.
   - Consulta direta por chave de acesso via Secretaria de Finanças Nacional (SEFIN) sem afetar o cursor de distribuição.
   - Acompanhamento, decodificação e vinculação atômica de eventos fiscais (suporte completo a `<pedRegEvento>`, `<infPedReg>`, extração recursiva de `<chNFSe>` e eventos de cancelamento).
-- **Certificados Digitais ICP-Brasil (A1):**
+- **Certificados Digitais ICP-Brasil & Diagnóstico Amigável:**
   - Integração nativa com o Windows Certificate Store (`CurrentUser\My`) e suporte completo a certificados modelo A1 (.pfx / .p12).
+  - Exibição de certificados válidos por padrão na vinculação, com alternância para "Mostrar expirados".
+  - Mensagens claras e orientadoras em falhas de certificado no Windows, com suporte para ativação em gerenciadores externos de certificados digitais (tokens/cloud) e campo de detalhes técnicos copiável.
   - Criptografia e chaves privadas estritamente mantidas em memória local segura, sem envio a terceiros.
-  - Validação instantânea de vigência, titularidade e CNPJ vinculado ao certificado.
 - **Download e Organização de Arquivos XML:**
   - Descompactação automática de documentos retornados nos lotes oficiais.
   - Armazenamento físico atômico estruturado por empresa, tipo de documento e ambiente.
-  - Exportação em lote de XMLs com geração de arquivos `.zip` organizados.
+  - Exportação em lote de XMLs com geração de arquivos `.zip` organizados para NF-e, CT-e e NFS-e Nacional (com aviso orientador sobre PDF).
 - **Ambientes de Operação Independentes:**
   - Alternância facilitada entre **Produção** e **Homologação** (para SEFAZ) e **Produção** e **Produção Restrita** (para NFS-e Nacional), com cursores NSU estritamente isolados.
 - **Histórico e Consulta Local:**
@@ -409,7 +413,19 @@ npm run lint
 
 O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
 
-### Versão 3.0.0 (Atual)
+### Versão 3.5.0 (Atual)
+- **Buscador NF — Filtros Rápidos no Card e Gestão de Empresas:**
+  - Grade de filtros rápidos no card da empresa ativa com botões para NF-e, CT-e, NFS-e e Todos com destaque de seleção ativa e alternância imediata de workspace.
+  - Ações diretas para edição e exclusão segura de empresas na barra lateral e modal de edição, com confirmação e remoção atômica.
+- **Sincronização na Barra de Ferramentas & Lote ZIP para NFS-e:**
+  - Reposicionamento do botão Sincronizar na barra de filtros/NSU do workspace ao lado dos controles de reset.
+  - Suporte a seleção e download em lote de documentos NFS-e com geração de arquivo ZIP e aviso automático sobre indisponibilidade de PDF para o padrão nacional.
+- **Certificados Digitais & Tratamento Humanizado de Diagnósticos:**
+  - Exibição de certificados válidos por padrão no Windows Certificate Store com alternância de exibição de certificados expirados.
+  - Mensagens claras e orientadoras em falhas de certificado no Windows, com suporte e instrução para ativação em gerenciadores externos de certificados digitais (tokens/cloud).
+  - Área dedicada de detalhes técnicos com botão "Copiar erro" para auditoria e suporte.
+
+### Versão 3.0.0
 - **Módulo Buscador NF:**
   - Consulta e distribuição incremental direta com a SEFAZ Nacional para NF-e (Modelo 55) e CT-e (Modelo 57).
   - Suporte completo ao ecossistema da NFS-e Nacional via Ambiente de Dados Nacional (ADN) e consulta direta na Secretaria de Finanças Nacional (SEFIN), com contratos baseados nos schemas Swagger oficiais.
