@@ -19,6 +19,7 @@ import { NfViewSettingsTab, DedupePolicy } from './settings/NfViewSettingsTab';
 import { DepreciationSettingsTab } from './settings/DepreciationSettingsTab';
 import { BackupSettingsTab } from './settings/BackupSettingsTab';
 import { BuscadorSettingsTab } from './settings/BuscadorSettingsTab';
+import { ActivityLogsTab } from './settings/ActivityLogsTab';
 import { Search } from 'lucide-react';
 
 export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'buscador' | 'backup' | 'logs';
@@ -172,7 +173,7 @@ export function SettingsModal({ open, onClose, initialTab = 'general' }: { open?
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs">
         <div
-          className={`w-full max-w-3xl rounded-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150 ${
+          className={`w-full ${activeTab === 'logs' ? 'max-w-4xl' : 'max-w-3xl'} rounded-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all duration-150 animate-in fade-in zoom-in-95 ${
             isLight
               ? 'bg-white border border-[#cbd5e1] text-[#0f172a] shadow-2xl'
               : 'bg-[#18181b] border border-[#3f3f46] text-white shadow-2xl'
@@ -284,6 +285,10 @@ export function SettingsModal({ open, onClose, initialTab = 'general' }: { open?
 
               {activeTab === 'backup' && (
                 <BackupSettingsTab isLight={isLight} />
+              )}
+
+              {activeTab === 'logs' && (
+                <ActivityLogsTab isLight={isLight} />
               )}
             </div>
           </div>
