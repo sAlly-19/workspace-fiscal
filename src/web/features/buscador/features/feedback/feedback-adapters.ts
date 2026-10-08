@@ -1,4 +1,4 @@
-import { describeCombinedSyncResult } from '@/core/buscador/domain/sync-result';
+import { describeCombinedSyncResult, simplifySyncErrorMessage } from '@/core/buscador/domain/sync-result';
 import type { CombinedSefazQueryResult } from '@/core/buscador/domain/types';
 import type { FeedbackInput } from '../../stores/ui.store';
 
@@ -14,11 +14,13 @@ function technicalText(error: unknown): string | undefined {
 }
 
 export function feedbackFromError(title: string, error: unknown, fallback: string): FeedbackInput {
+  const tech = technicalText(error);
+  const friendly = tech ? simplifySyncErrorMessage(tech) : fallback;
   return {
     kind: 'error',
     title,
-    message: fallback,
-    technicalDetails: technicalText(error),
+    message: friendly || fallback,
+    technicalDetails: tech,
   };
 }
 
@@ -33,7 +35,7 @@ export function feedbackFromSyncResult(result: CombinedSefazQueryResult): Feedba
   const technicalDetails = [
     result.nfe.error ? `NF-e: ${result.nfe.error}` : null,
     result.cte.error ? `CT-e: ${result.cte.error}` : null,
-  ].filter((value): value is string => Boolean(value)).join('\n') || undefined;
+  ].filter((value): value is string => Boolean(value)).join('\n\n') || undefined;
 
   return {
     kind: presentation.type,

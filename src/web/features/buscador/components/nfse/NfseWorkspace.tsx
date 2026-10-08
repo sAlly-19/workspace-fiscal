@@ -9,6 +9,7 @@ import { NfseDetailsModal } from './NfseDetailsModal';
 import { DocumentTable } from '../DocumentTable/DocumentTable';
 import { useUiStore } from '../../stores/ui.store';
 import { normalizePageSize, type PageSize } from '@/core/buscador/domain/page-size';
+import { simplifySyncErrorMessage } from '@/core/buscador/domain/sync-result';
 
 export interface NfseWorkspaceProps {
   company: Company | null;
@@ -79,10 +80,13 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
         message: `${res.documentsCount} documento(s) e ${res.eventsCount} evento(s) recebidos.`,
       });
     } else if (res.error) {
+      const isContractWarning = res.error.includes('OpenAPI') || res.error.includes('wire contract');
+      const simplified = simplifySyncErrorMessage(res.error);
       pushFeedback({
-        kind: res.error.includes('OpenAPI') || res.error.includes('wire contract') ? 'warning' : 'error',
+        kind: isContractWarning ? 'warning' : 'error',
         title: 'Resultado da sincronização NFS-e',
-        message: res.error,
+        message: simplified,
+        technicalDetails: res.error !== simplified ? res.error : undefined,
       });
     }
   }, [vm, pushFeedback]);
@@ -120,10 +124,13 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
         message: `Documento nº ${res.document?.document_number || ''} localizado e armazenado.`,
       });
     } else if (res.error) {
+      const isContractWarning = res.error.includes('OpenAPI') || res.error.includes('wire contract');
+      const simplified = simplifySyncErrorMessage(res.error);
       pushFeedback({
-        kind: res.error.includes('OpenAPI') || res.error.includes('wire contract') ? 'warning' : 'error',
+        kind: isContractWarning ? 'warning' : 'error',
         title: 'Falha na consulta direta da NFS-e',
-        message: res.error,
+        message: simplified,
+        technicalDetails: res.error !== simplified ? res.error : undefined,
       });
     }
   };
