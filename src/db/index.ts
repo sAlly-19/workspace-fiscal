@@ -423,7 +423,25 @@ export async function initDatabase(customPath?: string) {
       logger.warn({ err: (e as Error).message }, 'database_categories_seed_note');
     }
 
+    await rawClient.execute(`
+      CREATE TABLE IF NOT EXISTS "activity_logs" (
+        "id" TEXT PRIMARY KEY NOT NULL,
+        "timestamp" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL,
+        "level" TEXT NOT NULL,
+        "module" TEXT NOT NULL,
+        "action" TEXT NOT NULL,
+        "message" TEXT NOT NULL,
+        "details" TEXT,
+        "duration_ms" INTEGER,
+        "created_at" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL
+      );
+    `);
+
     // 4. Create indexes
+    await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_activity_logs_timestamp" ON "activity_logs"("timestamp");');
+    await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_activity_logs_module" ON "activity_logs"("module");');
+    await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_activity_logs_level" ON "activity_logs"("level");');
+    await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_activity_logs_action" ON "activity_logs"("action");');
     await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_folders_parent" ON "folders"("parent_id");');
     await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_batches_folder" ON "batches"("folder_id");');
     await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_docs_batch" ON "documents"("batch_id");');

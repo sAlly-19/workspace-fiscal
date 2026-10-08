@@ -301,3 +301,43 @@ export const importJobsRelations = relations(importJobs, ({ many }) => ({
   documents: many(documents),
 }));
 
+export const logLevels = ['SUCCESS', 'ERROR', 'WARN', 'INFO'] as const;
+export type LogLevel = (typeof logLevels)[number];
+
+export const logModules = [
+  'BUSCADOR',
+  'NFVIEW',
+  'DEPRECIATION',
+  'BACKUP',
+  'CERTIFICATES',
+  'COMPANIES',
+  'SYSTEM',
+] as const;
+export type LogModule = (typeof logModules)[number];
+
+export const activityLogs = sqliteTable(
+  'activity_logs',
+  {
+    id: text('id').primaryKey(),
+    timestamp: integer('timestamp', { mode: 'timestamp' })
+      .default(sql`(strftime('%s', 'now'))`)
+      .notNull(),
+    level: text('level').notNull(),
+    module: text('module').notNull(),
+    action: text('action').notNull(),
+    message: text('message').notNull(),
+    details: text('details'),
+    durationMs: integer('duration_ms'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`(strftime('%s', 'now'))`)
+      .notNull(),
+  },
+  (table) => ({
+    timestampIdx: index('idx_activity_logs_timestamp').on(table.timestamp),
+    moduleIdx: index('idx_activity_logs_module').on(table.module),
+    levelIdx: index('idx_activity_logs_level').on(table.level),
+    actionIdx: index('idx_activity_logs_action').on(table.action),
+  })
+);
+
+
