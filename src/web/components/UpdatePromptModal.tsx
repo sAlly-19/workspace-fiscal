@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { UpdaterState } from '../hooks/useAutoUpdate';
+import { ReleaseNotesRenderer } from './ReleaseNotesRenderer';
 
 export interface UpdatePromptModalProps {
   isOpen: boolean;
@@ -226,11 +227,11 @@ export function UpdatePromptModal({
                       O que há de novo:
                     </label>
                     <div
-                      className={`p-3.5 rounded-xl border font-mono text-[11px] leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap ${
-                        isLight ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#334155]' : 'bg-[#09090b] border-[#27272a] text-[#d4d4d8]'
+                      className={`p-3.5 rounded-xl border max-h-52 overflow-y-auto ${
+                        isLight ? 'bg-[#f8fafc] border-[#cbd5e1]' : 'bg-[#09090b] border-[#27272a]'
                       }`}
                     >
-                      {updateInfo.releaseNotes}
+                      <ReleaseNotesRenderer content={updateInfo.releaseNotes} isLight={isLight} />
                     </div>
                   </div>
                 )}
