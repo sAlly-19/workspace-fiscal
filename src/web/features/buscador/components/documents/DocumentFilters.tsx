@@ -13,8 +13,11 @@ export interface DocumentFiltersProps {
   onSearchQueryChange: (value: string) => void;
   onSearchLocal: () => void;
   onResetNSU: (type: 'NFE' | 'CTE') => void;
-  onSynchronize?: () => void;
+  onSynchronize?: (docType?: 'NFE' | 'CTE') => void;
+  onSynchronizeNfe?: () => void;
+  onSynchronizeCte?: () => void;
   isSynchronizing?: boolean;
+  synchronizingType?: 'NFE' | 'CTE' | null;
   hasActiveCompany?: boolean;
 }
 
@@ -31,7 +34,10 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   onSearchLocal,
   onResetNSU,
   onSynchronize,
+  onSynchronizeNfe,
+  onSynchronizeCte,
   isSynchronizing,
+  synchronizingType,
   hasActiveCompany,
 }) => (
   <section
@@ -113,42 +119,68 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         CT-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.cteLastNSU}</b>
       </span>
 
-      <div className="flex items-center gap-1.5 ml-auto">
-        <button
-          type="button"
-          onClick={() => onResetNSU('NFE')}
-          title="Resetar NSU de NF-e"
-          aria-label="Resetar NSU de NF-e"
-          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
-        >
-          <RotateCcw className="h-3 w-3" />
-          <span className="text-[10px] font-medium">Reset NF-e</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onResetNSU('CTE')}
-          title="Resetar NSU de CT-e"
-          aria-label="Resetar NSU de CT-e"
-          className="flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1 text-[var(--text-secondary)] transition hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
-        >
-          <RotateCcw className="h-3 w-3" />
-          <span className="text-[10px] font-medium">Reset CT-e</span>
-        </button>
-
-        {onSynchronize && (
+      <div className="flex flex-wrap items-center gap-2 ml-auto">
+        {/* Bloco NF-e */}
+        <div className="flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-0.5">
           <button
             type="button"
-            onClick={onSynchronize}
-            disabled={isSynchronizing || !hasActiveCompany}
-            title="Sincronizar documentos com a SEFAZ"
-            aria-label="Sincronizar documentos com a SEFAZ"
-            className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-[var(--primary-hover)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+            onClick={() => onResetNSU('NFE')}
+            title="Resetar NSU de NF-e"
+            aria-label="Resetar NSU de NF-e"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
           >
-            <RefreshCw className={`h-3 w-3 ${isSynchronizing ? 'animate-spin' : ''}`} />
-            <span>Sincronizar</span>
+            <RotateCcw className="h-3 w-3" />
+            <span className="text-[10px] font-medium">Reset NF-e</span>
           </button>
-        )}
+          {(onSynchronizeNfe || onSynchronize) && (
+            <button
+              type="button"
+              onClick={() => (onSynchronizeNfe ? onSynchronizeNfe() : onSynchronize?.('NFE'))}
+              disabled={isSynchronizing || !hasActiveCompany}
+              title="Sincronizar apenas NF-e com a SEFAZ"
+              aria-label="Sincronizar apenas NF-e com a SEFAZ"
+              className="flex items-center gap-1 rounded bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+            >
+              <RefreshCw
+                className={`h-3 w-3 ${
+                  isSynchronizing && (!synchronizingType || synchronizingType === 'NFE') ? 'animate-spin' : ''
+                }`}
+              />
+              <span>Sincronizar NF-e</span>
+            </button>
+          )}
+        </div>
+
+        {/* Bloco CT-e */}
+        <div className="flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-0.5">
+          <button
+            type="button"
+            onClick={() => onResetNSU('CTE')}
+            title="Resetar NSU de CT-e"
+            aria-label="Resetar NSU de CT-e"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span className="text-[10px] font-medium">Reset CT-e</span>
+          </button>
+          {(onSynchronizeCte || onSynchronize) && (
+            <button
+              type="button"
+              onClick={() => (onSynchronizeCte ? onSynchronizeCte() : onSynchronize?.('CTE'))}
+              disabled={isSynchronizing || !hasActiveCompany}
+              title="Sincronizar apenas CT-e com a SEFAZ"
+              aria-label="Sincronizar apenas CT-e com a SEFAZ"
+              className="flex items-center gap-1 rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+            >
+              <RefreshCw
+                className={`h-3 w-3 ${
+                  isSynchronizing && (!synchronizingType || synchronizingType === 'CTE') ? 'animate-spin' : ''
+                }`}
+              />
+              <span>Sincronizar CT-e</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   </section>

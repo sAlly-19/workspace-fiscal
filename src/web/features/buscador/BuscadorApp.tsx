@@ -98,6 +98,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [sefazProgressNSU, setSefazProgressNSU] = useState('');
   const [sefazReceivedCount, setSefazReceivedCount] = useState<number | undefined>(undefined);
   const [activeConsultType, setActiveConsultType] = useState<'NF-e' | 'CT-e'>('NF-e');
+  const [synchronizingType, setSynchronizingType] = useState<'NFE' | 'CTE' | null>(null);
   const nfseSyncTriggerRef = useRef<(() => Promise<void>) | null>(null);
   const [isNfseSyncing, setIsNfseSyncing] = useState(false);
 
@@ -222,7 +223,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   };
 
   // Consulta SEFAZ Real
-  const handleConsultSefaz = async () => {
+  const handleConsultSefaz = async (targetType?: 'NFE' | 'CTE') => {
     if (!activeCompany) return;
     if (!companyCert) {
       pushFeedback({
@@ -242,9 +243,11 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       return;
     }
 
-    setActiveConsultType('NF-e');
+    const initialStage = targetType === 'CTE' ? 'CT-e' : 'NF-e';
+    setActiveConsultType(initialStage);
+    setSynchronizingType(targetType || null);
     setIsSefazModalOpen(true);
-    setSefazProgressMsg('Iniciando comunicação com a SEFAZ...');
+    setSefazProgressMsg(`Iniciando comunicação com a SEFAZ (${initialStage})...`);
     setSefazProgressNSU('');
     setSefazReceivedCount(undefined);
 
@@ -262,7 +265,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     let finalFeedback: FeedbackInput;
 
     try {
-      const result = await window.fiscalApi?.sefaz.consultDocuments(activeCompany.id);
+      const result = await window.fiscalApi?.sefaz.consultDocuments(activeCompany.id, targetType);
 
       if (result) {
         finalFeedback = feedbackFromSyncResult(result);
@@ -281,6 +284,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       );
     } finally {
       unsubscribe?.();
+      setSynchronizingType(null);
       setIsSefazModalOpen(false);
       // Sempre atualiza o contexto da empresa (NSU, status e documentos) mesmo em caso de erro ou bloqueio
       await presentAfterRefresh(
@@ -539,7 +543,10 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onSearchLocal={() => searchLocalDocuments()}
           onResetNSU={handleResetNSU}
           onSynchronize={handleConsultSefaz}
+          onSynchronizeNfe={() => handleConsultSefaz('NFE')}
+          onSynchronizeCte={() => handleConsultSefaz('CTE')}
           isSynchronizing={isSefazModalOpen}
+          synchronizingType={synchronizingType}
           hasActiveCompany={Boolean(activeCompany)}
           documents={documents}
           totalDocs={totalDocs}

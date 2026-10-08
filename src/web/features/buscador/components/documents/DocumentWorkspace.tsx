@@ -23,7 +23,10 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = (props) => {
         onSearchLocal={props.onSearchLocal}
         onResetNSU={props.onResetNSU}
         onSynchronize={props.onSynchronize}
+        onSynchronizeNfe={props.onSynchronizeNfe}
+        onSynchronizeCte={props.onSynchronizeCte}
         isSynchronizing={props.isSynchronizing}
+        synchronizingType={props.synchronizingType}
         hasActiveCompany={props.hasActiveCompany}
       />
       <DocumentTable

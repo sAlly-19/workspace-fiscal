@@ -114,7 +114,8 @@ const fiscalApi = {
     openFileFolder: (request: any) => ipcRenderer.invoke('documents:openFileFolder', request),
   },
   sefaz: {
-    consultDocuments: (companyId: number) => ipcRenderer.invoke('sefaz:consultDocuments', companyId),
+    consultDocuments: (companyId: number, docType?: 'NFE' | 'CTE') =>
+      ipcRenderer.invoke('sefaz:consultDocuments', companyId, docType),
     getStatus: (companyId: number) => ipcRenderer.invoke('sefaz:getStatus', companyId),
     cancelQuery: (companyId: number, docType?: 'NFE' | 'CTE') => ipcRenderer.invoke('sefaz:cancelQuery', companyId, docType),
     resetNSU: (companyId: number, docType: 'NFE' | 'CTE') => ipcRenderer.invoke('sefaz:resetNSU', companyId, docType),

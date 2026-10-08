@@ -9,12 +9,17 @@ function parseDocumentType(value: unknown): DocumentType {
 }
 
 export function registerSefazHandlers(services: ApplicationContext, getMainWindow: () => BrowserWindow | null): void {
-  registerSecureHandler('sefaz:consultDocuments', getMainWindow, (_event, rawId) => {
+  registerSecureHandler('sefaz:consultDocuments', getMainWindow, (_event, rawId, rawType) => {
     const companyId = requirePositiveInteger(rawId, 'ID da empresa');
-    return services.distributionEngine.syncCompanyDocuments(companyId, (progress) => {
-      const win = getMainWindow();
-      if (win && !win.isDestroyed()) win.webContents.send('sefaz:progress', { companyId, ...progress });
-    });
+    const docType = rawType ? parseDocumentType(rawType) : undefined;
+    return services.distributionEngine.syncCompanyDocuments(
+      companyId,
+      (progress) => {
+        const win = getMainWindow();
+        if (win && !win.isDestroyed()) win.webContents.send('sefaz:progress', { companyId, ...progress });
+      },
+      { documentType: docType }
+    );
   });
   registerSecureHandler('sefaz:getStatus', getMainWindow, (_event, id) => {
     const companyId = requirePositiveInteger(id, 'ID da empresa');

@@ -45,8 +45,9 @@ export class DistributionEngine {
   public async syncCompanyDocuments(
     companyId: number,
     onProgress?: CombinedProgressCallback,
-    options?: { maxBatches?: number }
+    options?: { maxBatches?: number; documentType?: DocumentType }
   ): Promise<CombinedSefazQueryResult> {
+    const environment = this.settingsRepo.getSettings().sefaz_environment;
     const run = async (documentType: DocumentType): Promise<SefazQueryResult> => {
       try {
         return await this.syncCompany(
@@ -56,7 +57,6 @@ export class DistributionEngine {
           options
         );
       } catch (error) {
-        const environment = this.settingsRepo.getSettings().sefaz_environment;
         const state = this.distStateRepo.getOrCreate(companyId, documentType, environment);
         const message = error instanceof Error ? error.message : String(error);
         return {
@@ -72,10 +72,40 @@ export class DistributionEngine {
       }
     };
 
-    const nfe = await run('NFE');
-    const cte = !nfe.success && nfe.cStat === 0 && /cancelada/i.test(nfe.xMotivo)
-      ? this.cancelledResult(companyId, 'CTE')
-      : await run('CTE');
+    const targetType = options?.documentType;
+    let nfe: SefazQueryResult;
+    let cte: SefazQueryResult;
+
+    if (targetType === 'NFE') {
+      nfe = await run('NFE');
+      const cteState = this.distStateRepo.getOrCreate(companyId, 'CTE', environment);
+      cte = {
+        success: true,
+        cStat: cteState.last_cstat || 100,
+        xMotivo: 'Não consultado (filtro exclusivo NF-e)',
+        ultNSU: cteState.last_nsu,
+        maxNSU: cteState.max_nsu,
+        documentsCount: 0,
+        isComplete: true,
+      };
+    } else if (targetType === 'CTE') {
+      const nfeState = this.distStateRepo.getOrCreate(companyId, 'NFE', environment);
+      nfe = {
+        success: true,
+        cStat: nfeState.last_cstat || 100,
+        xMotivo: 'Não consultado (filtro exclusivo CT-e)',
+        ultNSU: nfeState.last_nsu,
+        maxNSU: nfeState.max_nsu,
+        documentsCount: 0,
+        isComplete: true,
+      };
+      cte = await run('CTE');
+    } else {
+      nfe = await run('NFE');
+      cte = !nfe.success && nfe.cStat === 0 && /cancelada/i.test(nfe.xMotivo)
+        ? this.cancelledResult(companyId, 'CTE')
+        : await run('CTE');
+    }
 
     return {
       success: nfe.success && cte.success,

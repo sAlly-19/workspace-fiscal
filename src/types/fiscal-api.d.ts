@@ -41,7 +41,7 @@ export interface FiscalDesktopAPI {
     openFileFolder: (request: DocumentStoragePathRequest) => Promise<boolean>;
   };
   sefaz: {
-    consultDocuments: (companyId: number) => Promise<CombinedSefazQueryResult>;
+    consultDocuments: (companyId: number, docType?: 'NFE' | 'CTE') => Promise<CombinedSefazQueryResult>;
     getStatus: (companyId: number) => Promise<{ nfeLastNSU: string; cteLastNSU: string; isRunning: boolean }>;
     cancelQuery: (companyId: number, docType?: 'NFE' | 'CTE') => Promise<boolean>;
     resetNSU: (companyId: number, docType: 'NFE' | 'CTE') => Promise<boolean>;

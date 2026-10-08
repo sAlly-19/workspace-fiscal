@@ -7,6 +7,7 @@ import {
   TrendingDown,
   HardDrive,
   Check,
+  ClipboardListIcon,
 } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { ConfirmModal } from './ConfirmModal';
@@ -20,7 +21,7 @@ import { BackupSettingsTab } from './settings/BackupSettingsTab';
 import { BuscadorSettingsTab } from './settings/BuscadorSettingsTab';
 import { Search } from 'lucide-react';
 
-export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'buscador' | 'backup';
+export type SettingsTabType = 'general' | 'nfview' | 'depreciation' | 'buscador' | 'backup' | 'logs';
 
 export function SettingsModal({ open, onClose, initialTab = 'general' }: { open?: boolean; onClose?: () => void; initialTab?: SettingsTabType } = {}) {
   const {
@@ -164,6 +165,7 @@ export function SettingsModal({ open, onClose, initialTab = 'general' }: { open?
     { id: 'depreciation', label: 'Depreciação', icon: TrendingDown },
     { id: 'buscador', label: 'Buscador NF', icon: Search },
     { id: 'backup', label: 'Backup & Restauração', icon: HardDrive },
+    { id: 'logs', label: 'Registros de Atividade', icon: ClipboardListIcon },
   ];
 
   return (
