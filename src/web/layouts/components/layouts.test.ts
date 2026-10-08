@@ -90,7 +90,7 @@ describe('Layout Components Contracts & Props', () => {
       const onConfirm = vi.fn().mockResolvedValue(undefined);
       const onCancelConfirm = vi.fn();
 
-      const element = React.createElement(WorkspaceModals, {
+      const props = {
         showSplash: false,
         onFinishSplash: () => {},
         confirmConfig: {
@@ -116,7 +116,8 @@ describe('Layout Components Contracts & Props', () => {
         folders: [],
         onMoveToFolder: vi.fn().mockResolvedValue(undefined),
         onCloseFolderPicker: () => {},
-      });
+      };
+      const element = React.createElement(WorkspaceModals, props);
 
       expect(element).toBeDefined();
       expect(element.props.confirmConfig.isOpen).toBe(true);
@@ -124,7 +125,7 @@ describe('Layout Components Contracts & Props', () => {
     });
 
     it('handles bulk move modal configuration', () => {
-      const element = React.createElement(WorkspaceModals, {
+      const props = {
         showSplash: false,
         onFinishSplash: () => {},
         confirmConfig: {
@@ -147,10 +148,11 @@ describe('Layout Components Contracts & Props', () => {
         isBulkMoveOpen: true,
         selectedDocIds: ['doc-1', 'doc-2'],
         currentTheme: 'light',
-        folders: [{ id: 'f-1', name: 'Destino', parentId: null, order: 0 }],
+        folders: [{ id: 'f-1', name: 'Destino', parentId: null, createdAt: '', updatedAt: '', children: [] }],
         onMoveToFolder: vi.fn().mockResolvedValue(undefined),
         onCloseFolderPicker: () => {},
-      });
+      };
+      const element = React.createElement(WorkspaceModals, props);
 
       expect(element).toBeDefined();
       expect(element.props.isBulkMoveOpen).toBe(true);

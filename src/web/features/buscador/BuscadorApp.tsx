@@ -9,25 +9,17 @@ import {
 } from '@/core/buscador/domain/types';
 import { AppShell } from './components/layout/AppShell';
 import { AppHeader } from './components/layout/AppHeader';
-import { FeedbackModalHost } from './components/feedback/FeedbackModalHost';
-import { ConfirmDialog } from './components/feedback/ConfirmDialog';
 import { CompanySidebar } from './components/layout/CompanySidebar';
 import { DocumentWorkspace } from './components/documents/DocumentWorkspace';
 import { NfseWorkspace } from './components/nfse/NfseWorkspace';
 import { FooterDownloadBar } from './components/FooterDownloadBar';
-import { CompanyModal } from './components/CompanyModal';
-import { CertificateModal } from './components/CertificateModal';
-import { SettingsModal } from '@/web/components/SettingsModal';
+import { BuscadorModals } from './components/BuscadorModals';
+import { useSefazSync } from './hooks/useSefazSync';
 import { useWorkspaceStore } from '@/web/stores/workspace.store';
-import { BuscadorSplashScreen } from './BuscadorSplashScreen';
-import { DownloadModal } from './components/DownloadModal';
-import { SefazProgressModal } from './components/SefazProgressModal';
-import { DocumentDetailsModal } from './components/DocumentDetailsModal';
-import { presentAfterRefresh } from '@/core/buscador/domain/sync-result';
 import { normalizePageSize, PageSize } from '@/core/buscador/domain/page-size';
 import { changePageSize } from './features/documents/page-size-controller';
-import { FeedbackInput, useUiStore } from './stores/ui.store';
-import { feedbackFromError, feedbackFromSyncResult } from './features/feedback/feedback-adapters';
+import { useUiStore } from './stores/ui.store';
+import { feedbackFromError } from './features/feedback/feedback-adapters';
 import type { BuscadorWorkspaceMode } from './features/workspace/workspace-controller';
 
 function formatLocalDate(date: Date): string {
@@ -48,6 +40,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const pushFeedback = useUiStore((state) => state.pushFeedback);
   const companyContextRequest = useRef(0);
   const documentSearchRequest = useRef(0);
+
   // Estados principais
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompany] = useState<Company | null>(null);
@@ -79,7 +72,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [nfseDocuments, setNfseDocuments] = useState<FiscalDocument[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
 
-  // Modais
+  // Modais de Empresa, Certificado, Configurações e Detalhes
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
@@ -88,17 +81,9 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [selectedDetailsDoc, setSelectedDetailsDoc] = useState<FiscalDocument | null>(null);
-  const [pendingNsuReset, setPendingNsuReset] = useState<'NFE' | 'CTE' | null>(null);
-  const [isResettingNsu, setIsResettingNsu] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
-  // Consulta SEFAZ e Feedback
-  const [isSefazModalOpen, setIsSefazModalOpen] = useState(false);
-  const [sefazProgressMsg, setSefazProgressMsg] = useState('');
-  const [sefazProgressNSU, setSefazProgressNSU] = useState('');
-  const [sefazReceivedCount, setSefazReceivedCount] = useState<number | undefined>(undefined);
-  const [activeConsultType, setActiveConsultType] = useState<'NF-e' | 'CT-e'>('NF-e');
-  const [synchronizingType, setSynchronizingType] = useState<'NFE' | 'CTE' | null>(null);
+  // Sincronização NFS-e
   const nfseSyncTriggerRef = useRef<(() => Promise<void>) | null>(null);
   const [isNfseSyncing, setIsNfseSyncing] = useState(false);
 
@@ -222,115 +207,27 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     }
   };
 
-  // Consulta SEFAZ Real
-  const handleConsultSefaz = async (targetType?: 'NFE' | 'CTE') => {
-    if (!activeCompany) return;
-    if (!companyCert) {
-      pushFeedback({
-        kind: 'error',
-        title: 'Certificado digital ausente',
-        message: 'Nenhum certificado associado a esta empresa. Por favor, vincule um certificado na barra lateral.',
-      });
-      setIsCertModalOpen(true);
-      return;
-    }
-    if (companyCert.is_expired) {
-      pushFeedback({
-        kind: 'error',
-        title: 'Certificado digital expirado',
-        message: 'O certificado associado a esta empresa está expirado. Selecione um certificado válido.',
-      });
-      return;
-    }
-
-    const initialStage = targetType === 'CTE' ? 'CT-e' : 'NF-e';
-    setActiveConsultType(initialStage);
-    setSynchronizingType(targetType || null);
-    setIsSefazModalOpen(true);
-    setSefazProgressMsg(`Iniciando comunicação com a SEFAZ (${initialStage})...`);
-    setSefazProgressNSU('');
-    setSefazReceivedCount(undefined);
-
-    // Escuta progresso do main process
-    const unsubscribe = window.fiscalApi?.sefaz.onProgress((data) => {
-      if (data.companyId === activeCompany.id) {
-        const stage = data.documentType === 'NFE' ? 'NF-e' : 'CT-e';
-        setActiveConsultType(stage);
-        setSefazProgressMsg(`${stage}: ${data.message}`);
-        if (data.currentNSU) setSefazProgressNSU(data.currentNSU);
-        if (data.count !== undefined) setSefazReceivedCount(data.count);
-      }
-    });
-
-    let finalFeedback: FeedbackInput;
-
-    try {
-      const result = await window.fiscalApi?.sefaz.consultDocuments(activeCompany.id, targetType);
-
-      if (result) {
-        finalFeedback = feedbackFromSyncResult(result);
-      } else {
-        finalFeedback = {
-          kind: 'info',
-          title: 'Sincronização finalizada',
-          message: 'Consulta finalizada sem resultado.',
-        };
-      }
-    } catch (err: any) {
-      finalFeedback = feedbackFromError(
-        'Erro na sincronização',
-        err,
-        'Falha na comunicação com a SEFAZ.',
-      );
-    } finally {
-      unsubscribe?.();
-      setSynchronizingType(null);
-      setIsSefazModalOpen(false);
-      // Sempre atualiza o contexto da empresa (NSU, status e documentos) mesmo em caso de erro ou bloqueio
-      await presentAfterRefresh(
-        () => loadCompanyContext(activeCompany),
-        finalFeedback!,
-        pushFeedback
-      );
-    }
-  };
-
-  const handleCancelSefaz = async () => {
-    if (activeCompany) {
-      await window.fiscalApi?.sefaz.cancelQuery(activeCompany.id);
-      setIsSefazModalOpen(false);
-      pushFeedback({
-        kind: 'info',
-        title: 'Cancelamento solicitado',
-        message: 'Solicitação de cancelamento enviada à SEFAZ.',
-      });
-    }
-  };
-
-  const handleResetNSU = (docType: 'NFE' | 'CTE') => {
-    if (activeCompany) setPendingNsuReset(docType);
-  };
-
-  const handleConfirmResetNSU = async () => {
-    if (!activeCompany || !pendingNsuReset) return;
-    const docType = pendingNsuReset;
-    const label = docType === 'NFE' ? 'NF-e' : 'CT-e';
-    setIsResettingNsu(true);
-    try {
-      await window.fiscalApi?.sefaz.resetNSU(activeCompany.id, docType);
-      await loadCompanyContext(activeCompany);
-      pushFeedback({
-        kind: 'success',
-        title: `NSU de ${label} resetado`,
-        message: `NSU de ${label} resetado com sucesso para 000000000000000. Agora você pode clicar em Sincronizar para nova busca.`,
-      });
-    } catch (err: any) {
-      pushFeedback(feedbackFromError('Falha ao resetar NSU', err, 'Falha ao resetar NSU.'));
-    } finally {
-      setIsResettingNsu(false);
-      setPendingNsuReset(null);
-    }
-  };
+  // Hook de Sincronização e NSU SEFAZ
+  const {
+    isSefazModalOpen,
+    sefazProgressMsg,
+    sefazProgressNSU,
+    sefazReceivedCount,
+    activeConsultType,
+    synchronizingType,
+    pendingNsuReset,
+    setPendingNsuReset,
+    isResettingNsu,
+    handleConsultSefaz,
+    handleCancelSefaz,
+    handleResetNSU,
+    handleConfirmResetNSU,
+  } = useSefazSync({
+    activeCompany,
+    companyCert,
+    loadCompanyContext: (comp) => loadCompanyContext(comp),
+    onOpenCertModal: () => setIsCertModalOpen(true),
+  });
 
   const handleConfirmDeleteCompany = async () => {
     if (!companyToDelete) return;
@@ -574,56 +471,42 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
         />
       )}
       overlays={(
-        <>
-          {showSplash && <BuscadorSplashScreen onFinish={() => setShowSplash(false)} />}
-
-      {/* MODAIS DA APLICAÇÃO */}
-      <CompanyModal
-        isOpen={isCompanyModalOpen}
-        onClose={() => setIsCompanyModalOpen(false)}
-        editingCompany={editingCompany}
-        onSave={async (data) => {
-          if (editingCompany) {
-            await window.fiscalApi.companies.update({ id: editingCompany.id, ...data });
-          } else {
-            await window.fiscalApi.companies.create(data);
-          }
-          loadInitialData();
-        }}
-        onDelete={(company) => {
-          setIsCompanyModalOpen(false);
-          setCompanyToDelete(company);
-        }}
-      />
-
-      <CertificateModal
-        isOpen={isCertModalOpen}
-        onClose={() => setIsCertModalOpen(false)}
-        company={activeCompany}
-        onAssociated={() => {
-          if (activeCompany) loadCompanyContext(activeCompany);
-        }}
-      />
-
-      <SettingsModal
-        open={isSettingsModalOpen}
-        onClose={() => {
-          setIsSettingsModalOpen(false);
-          loadInitialData();
-        }}
-        initialTab="buscador"
-      />
-
-      {activeCompany && (
-        <DownloadModal
-          isOpen={isDownloadModalOpen}
-          onClose={() => setIsDownloadModalOpen(false)}
-          companyId={activeCompany.id}
-          selectedCount={workspaceMode === 'NFSE' ? selectedNfseDocIds.length : selectedDocIds.length}
-          selectedDocIds={workspaceMode === 'NFSE' ? selectedNfseDocIds : selectedDocIds}
-          defaultFolder={settings?.default_storage_path}
-          isNfse={workspaceMode === 'NFSE'}
-          onSuccess={(res: DownloadBatchResult) => {
+        <BuscadorModals
+          showSplash={showSplash}
+          onFinishSplash={() => setShowSplash(false)}
+          isCompanyModalOpen={isCompanyModalOpen}
+          onCloseCompanyModal={() => setIsCompanyModalOpen(false)}
+          editingCompany={editingCompany}
+          onSaveCompany={async (data) => {
+            if (editingCompany) {
+              await window.fiscalApi.companies.update({ id: editingCompany.id, ...data });
+            } else {
+              await window.fiscalApi.companies.create(data);
+            }
+            loadInitialData();
+          }}
+          onTriggerDeleteCompany={(company) => {
+            setIsCompanyModalOpen(false);
+            setCompanyToDelete(company);
+          }}
+          isCertModalOpen={isCertModalOpen}
+          onCloseCertModal={() => setIsCertModalOpen(false)}
+          activeCompany={activeCompany}
+          onCertAssociated={() => {
+            if (activeCompany) loadCompanyContext(activeCompany);
+          }}
+          isSettingsModalOpen={isSettingsModalOpen}
+          onCloseSettingsModal={() => {
+            setIsSettingsModalOpen(false);
+            loadInitialData();
+          }}
+          isDownloadModalOpen={isDownloadModalOpen}
+          onCloseDownloadModal={() => setIsDownloadModalOpen(false)}
+          workspaceMode={workspaceMode}
+          selectedDocIds={selectedDocIds}
+          selectedNfseDocIds={selectedNfseDocIds}
+          settings={settings}
+          onDownloadBatchSuccess={(res: DownloadBatchResult) => {
             pushFeedback({
               kind: 'success',
               title: 'Lote exportado',
@@ -635,53 +518,30 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
               setSelectedDocIds([]);
             }
           }}
+          isSefazModalOpen={isSefazModalOpen}
+          activeConsultType={activeConsultType}
+          sefazProgressNSU={sefazProgressNSU}
+          sefazProgressMsg={sefazProgressMsg}
+          sefazReceivedCount={sefazReceivedCount}
+          onCancelSefaz={handleCancelSefaz}
+          selectedDetailsDoc={selectedDetailsDoc}
+          onCloseDetailsDoc={() => setSelectedDetailsDoc(null)}
+          onDownloadXml={handleDownloadXml}
+          onDownloadPdf={handleDownloadPdf}
+          onOpenFolder={handleOpenFolder}
+          pendingNsuReset={pendingNsuReset}
+          isResettingNsu={isResettingNsu}
+          onConfirmResetNSU={() => void handleConfirmResetNSU()}
+          onCancelResetNSU={() => {
+            if (!isResettingNsu) setPendingNsuReset(null);
+          }}
+          companyToDelete={companyToDelete}
+          isDeletingCompany={isDeletingCompany}
+          onConfirmDeleteCompany={() => void handleConfirmDeleteCompany()}
+          onCancelDeleteCompany={() => {
+            if (!isDeletingCompany) setCompanyToDelete(null);
+          }}
         />
-      )}
-
-      <SefazProgressModal
-        isOpen={isSefazModalOpen}
-        companyName={activeCompany?.name || ''}
-        docType={`NF-e e CT-e · etapa ${activeConsultType}`}
-        currentNSU={sefazProgressNSU}
-        message={sefazProgressMsg}
-        receivedCount={sefazReceivedCount}
-        onCancel={handleCancelSefaz}
-      />
-
-      <DocumentDetailsModal
-        isOpen={Boolean(selectedDetailsDoc)}
-        onClose={() => setSelectedDetailsDoc(null)}
-        document={selectedDetailsDoc}
-        onDownloadXml={handleDownloadXml}
-        onDownloadPdf={handleDownloadPdf}
-        onOpenFolder={handleOpenFolder}
-      />
-      <ConfirmDialog
-        isOpen={Boolean(pendingNsuReset)}
-        title={`Resetar NSU de ${pendingNsuReset === 'CTE' ? 'CT-e' : 'NF-e'}`}
-        description={`Deseja resetar o contador de NSU de ${pendingNsuReset === 'CTE' ? 'CT-e' : 'NF-e'} para 000000000000000? Os documentos já salvos localmente serão preservados e a próxima consulta à SEFAZ buscará todo o histórico disponível desde o início.`}
-        confirmLabel="Resetar NSU"
-        variant="danger"
-        isBusy={isResettingNsu}
-        onConfirm={() => void handleConfirmResetNSU()}
-        onCancel={() => {
-          if (!isResettingNsu) setPendingNsuReset(null);
-        }}
-      />
-      <ConfirmDialog
-        isOpen={Boolean(companyToDelete)}
-        title="Excluir Empresa"
-        description={`Tem certeza que deseja excluir a empresa "${companyToDelete?.name || ''}" (${companyToDelete?.cnpj || ''})? Todos os documentos e configurações associados serão removidos localmente. Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir Empresa"
-        variant="danger"
-        isBusy={isDeletingCompany}
-        onConfirm={() => void handleConfirmDeleteCompany()}
-        onCancel={() => {
-          if (!isDeletingCompany) setCompanyToDelete(null);
-        }}
-      />
-      <FeedbackModalHost />
-        </>
       )}
     />
   );
