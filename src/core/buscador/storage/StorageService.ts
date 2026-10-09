@@ -120,7 +120,10 @@ export class StorageService {
     const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
     const contentHash = createHash('sha256').update(contentBuffer).digest('hex');
     const previous = fs.existsSync(filePath) ? fs.readFileSync(filePath) : undefined;
-    const tempPath = path.join(targetDir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
+    const tempPath = path.join(
+      targetDir,
+      `.${path.basename(filePath)}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`
+    );
     const fd = fs.openSync(tempPath, 'wx');
     try {
       fs.writeFileSync(fd, contentBuffer);
@@ -128,7 +131,17 @@ export class StorageService {
     } finally {
       fs.closeSync(fd);
     }
-    fs.renameSync(tempPath, filePath);
+
+    try {
+      safeReplaceFileSync(tempPath, filePath);
+    } catch (err) {
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch {
+        /* ignora se o temporário ainda estiver travado por antivírus */
+      }
+      throw err;
+    }
 
     let finished = false;
     return {
@@ -138,13 +151,90 @@ export class StorageService {
       rollback: () => {
         if (finished) return;
         if (previous === undefined) {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          if (fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch {
+              /* ignora */
+            }
+          }
           return;
         }
-        const restore = `${filePath}.${process.pid}.${Date.now()}.restore`;
+        const restore = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.restore`;
         fs.writeFileSync(restore, previous);
-        fs.renameSync(restore, filePath);
+        try {
+          safeReplaceFileSync(restore, filePath);
+        } catch {
+          /* preserva erro de restauração */
+        }
       },
     };
   }
 }
+
+function sleepSync(ms: number): void {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      /* busy-wait fallback */
+    }
+  }
+}
+
+/**
+ * Substitui o arquivo de destino de forma segura e atômica.
+ * No Windows, operações de rename podem falhar temporariamente com EPERM, EBUSY ou EACCES
+ * devido a scanners de antivírus (Windows Defender), Search Indexer ou concorrência de handles.
+ * Esta função aplica retentativas com backoff exponencial e fallback para copy + unlink.
+ */
+export function safeReplaceFileSync(sourcePath: string, targetPath: string): void {
+  try {
+    fs.renameSync(sourcePath, targetPath);
+    return;
+  } catch (err: any) {
+    const isWindowsTransient =
+      process.platform === 'win32' ||
+      err.code === 'EPERM' ||
+      err.code === 'EBUSY' ||
+      err.code === 'EACCES' ||
+      err.code === 'EMFILE';
+
+    if (!isWindowsTransient) {
+      throw err;
+    }
+
+    // Retentativas com backoff exponencial para liberar travas transitórias do Windows Defender / Indexer
+    const delays = [10, 25, 50, 100, 150, 250, 400];
+    for (const delay of delays) {
+      sleepSync(delay);
+      try {
+        if (fs.existsSync(targetPath)) {
+          try {
+            fs.chmodSync(targetPath, 0o666);
+          } catch {
+            /* ignora se não for possível alterar permissões */
+          }
+        }
+        fs.renameSync(sourcePath, targetPath);
+        return;
+      } catch {
+        /* continua tentando */
+      }
+    }
+
+    // Se rename ainda falhar após todas as retentativas, fallback para cópia e deleção da fonte
+    try {
+      fs.copyFileSync(sourcePath, targetPath);
+      try {
+        fs.unlinkSync(sourcePath);
+      } catch {
+        /* se a fonte temporária ainda estiver presa por scanner, será limpa pelo SO */
+      }
+    } catch {
+      throw err; // lança o erro original do rename
+    }
+  }
+}
+
