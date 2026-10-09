@@ -4,13 +4,22 @@ import { CertificateRepository } from '../../database/repositories/CertificateRe
 import { DistributionStateRepository } from '../../database/repositories/DistributionStateRepository';
 import { DocumentRepository } from '../../database/repositories/DocumentRepository';
 import { SettingsRepository } from '../../database/repositories/SettingsRepository';
-import { PendingFileWrite, StorageService } from '../../storage/StorageService';
+import { StorageService } from '../../storage/StorageService';
 import { IFiscalDistributionProvider } from '../providers/IFiscalDistributionProvider';
 import { NFeParser } from '../nfe/NFeParser';
 import { CTeParser } from '../cte/CTeParser';
-import { CombinedSefazQueryResult, DocumentType, SefazEnvironment, SefazQueryResult } from '../../domain/types';
+import { CombinedSefazQueryResult, DocumentType, SefazQueryResult } from '../../domain/types';
 import { compareNSU } from '../../domain/nsu';
-import { ParsedFiscalDocumentInfo } from '../types';
+import {
+  formatDate,
+  formatDateTime,
+  delayWithAbort,
+  throwIfAborted,
+  persistBatchDocuments,
+  recordQueryHistory,
+} from './distribution';
+
+export * from './distribution';
 
 type ProgressCallback = (data: { message: string; currentNSU?: string; count?: number }) => void;
 type CombinedProgressCallback = (data: {
@@ -134,7 +143,7 @@ export class DistributionEngine {
     if (!cert) throw new Error(`Nenhum certificado digital associado à empresa '${company.name}'.`);
     if (!cert.has_private_key) throw new Error('O certificado associado não possui chave privada acessível.');
     if (cert.is_expired || new Date(cert.valid_to).getTime() <= Date.now()) {
-      throw new Error(`O certificado associado à empresa expirou em ${this.formatDate(cert.valid_to)}.`);
+      throw new Error(`O certificado associado à empresa expirou em ${formatDate(cert.valid_to)}.`);
     }
 
     const state = this.distStateRepo.getOrCreate(companyId, docType, environment);
@@ -146,7 +155,7 @@ export class DistributionEngine {
       return {
         success: false,
         cStat: state.last_cstat || 0,
-        xMotivo: `${prefix} Nenhuma nova chamada foi enviada. Tente novamente em ${remaining} minuto(s), às ${this.formatDateTime(state.next_query_at)}.`,
+        xMotivo: `${prefix} Nenhuma nova chamada foi enviada. Tente novamente em ${remaining} minuto(s), às ${formatDateTime(state.next_query_at)}.`,
         ultNSU: state.last_nsu,
         maxNSU: state.max_nsu,
         documentsCount: 0,
@@ -171,7 +180,7 @@ export class DistributionEngine {
     this.distStateRepo.updateStatus(companyId, docType, 'RUNNING', undefined, environment);
     try {
       for (let batchCount = 0; batchCount < maxBatches; batchCount++) {
-        this.throwIfAborted(controller.signal);
+        throwIfAborted(controller.signal);
         onProgress?.({
           message: batchCount === 0
             ? `Iniciando consulta à SEFAZ no NSU ${currentNSU}...`
@@ -191,7 +200,7 @@ export class DistributionEngine {
         const response = docType === 'NFE'
           ? await this.fiscalProvider.distributeNFe(request)
           : await this.fiscalProvider.distributeCTe(request);
-        this.throwIfAborted(controller.signal);
+        throwIfAborted(controller.signal);
 
         lastCStat = response.cStat;
         lastReason = response.xMotivo;
@@ -207,8 +216,20 @@ export class DistributionEngine {
             return parsed;
           });
 
-          this.persistBatch(companyId, docType, environment, company, parsedDocs, response.ultNSU,
-            response.maxNSU, settings.default_storage_path);
+          persistBatchDocuments(
+            this.db,
+            this.storageService,
+            this.docRepo,
+            this.distStateRepo,
+            companyId,
+            docType,
+            environment,
+            company,
+            parsedDocs,
+            response.ultNSU,
+            response.maxNSU,
+            settings.default_storage_path
+          );
           const previousNSU = currentNSU;
           currentNSU = response.ultNSU;
           totalDocsReceived += parsedDocs.length;
@@ -219,7 +240,7 @@ export class DistributionEngine {
             count: totalDocsReceived,
           });
           if (compareNSU(currentNSU, maxNSU) >= 0 || compareNSU(currentNSU, previousNSU) <= 0) break;
-          if (batchCount + 1 < maxBatches) await this.delay(1200, controller.signal);
+          if (batchCount + 1 < maxBatches) await delayWithAbort(1200, controller.signal);
           continue;
         }
 
@@ -247,7 +268,7 @@ export class DistributionEngine {
           return {
             success: false,
             cStat: 656,
-            xMotivo: `SEFAZ retornou Consumo Indevido: ${response.xMotivo}. O NSU local foi preservado. Esse limite vale para o CNPJ, inclusive consultas feitas por outros sistemas. Tente novamente após ${this.formatDateTime(nextQueryAt)}.`,
+            xMotivo: `SEFAZ retornou Consumo Indevido: ${response.xMotivo}. O NSU local foi preservado. Esse limite vale para o CNPJ, inclusive consultas feitas por outros sistemas. Tente novamente após ${formatDateTime(nextQueryAt)}.`,
             ultNSU: currentNSU,
             maxNSU,
             documentsCount: totalDocsReceived,
@@ -299,8 +320,18 @@ export class DistributionEngine {
       throw error;
     } finally {
       try {
-        this.recordHistory(companyId, docType, environment, startedAt, initialNSU, currentNSU,
-          totalDocsReceived, finalHistoryStatus, finalError);
+        recordQueryHistory(
+          this.db,
+          companyId,
+          docType,
+          environment,
+          startedAt,
+          initialNSU,
+          currentNSU,
+          totalDocsReceived,
+          finalHistoryStatus,
+          finalError
+        );
       } finally {
         this.activeQueries.delete(operationKey);
       }
@@ -313,109 +344,6 @@ export class DistributionEngine {
       throw new Error('Cancele a sincronização em andamento antes de resetar o NSU.');
     }
     this.distStateRepo.resetNSU(companyId, docType, environment);
-  }
-
-  private persistBatch(
-    companyId: number,
-    docType: DocumentType,
-    environment: SefazEnvironment,
-    company: NonNullable<ReturnType<CompanyRepository['findById']>>,
-    documents: ParsedFiscalDocumentInfo[],
-    lastNSU: string,
-    maxNSU: string,
-    configuredBasePath: string
-  ): void {
-    const pendingWrites: PendingFileWrite[] = [];
-    try {
-      this.db.transaction(() => {
-        for (const doc of documents) {
-          const pending = this.storageService.saveXmlTransactional(
-            company, docType, environment, doc.access_key, doc.rawXml,
-            doc.issue_date, doc.schema_type, configuredBasePath
-          );
-          pendingWrites.push(pending);
-          this.docRepo.upsert({
-            company_id: companyId,
-            document_type: doc.document_type,
-            environment,
-            origin: 'SEFAZ_DISTRIBUTION',
-            nsu: doc.nsu,
-            schema_type: doc.schema_type,
-            access_key: doc.access_key,
-            document_number: doc.document_number,
-            series: doc.series,
-            issue_date: doc.issue_date,
-            received_at: new Date().toISOString(),
-            issuer_cnpj: doc.issuer_cnpj,
-            issuer_name: doc.issuer_name,
-            recipient_cnpj: doc.recipient_cnpj,
-            recipient_name: doc.recipient_name,
-            total_value: doc.total_value,
-            xml_path: pending.filePath,
-            xml_status: 'XML_DISPONIVEL',
-            pdf_status: 'PDF_INDISPONIVEL',
-            situacao_fiscal: doc.situacao_fiscal,
-          });
-        }
-        this.distStateRepo.updateNSU(companyId, docType, lastNSU, maxNSU, 'IDLE', undefined,
-          environment, 138);
-      });
-      pendingWrites.forEach((write) => write.commit());
-    } catch (error) {
-      for (const write of pendingWrites.reverse()) {
-        try { write.rollback(); } catch { /* preserva o erro original */ }
-      }
-      throw error;
-    }
-  }
-
-  private recordHistory(
-    companyId: number,
-    docType: DocumentType,
-    environment: SefazEnvironment,
-    startedAt: string,
-    beforeNSU: string,
-    afterNSU: string,
-    count: number,
-    status: string,
-    error?: string
-  ): void {
-    this.db.execute(
-      `INSERT INTO query_history (
-        company_id, document_type, environment, started_at, finished_at,
-        last_nsu_before, last_nsu_after, documents_received, status, error_message
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [companyId, docType, environment, startedAt, new Date().toISOString(), beforeNSU,
-        afterNSU, count, status, error || null]
-    );
-  }
-
-  private throwIfAborted(signal: AbortSignal): void {
-    if (signal.aborted) throw new Error('Consulta cancelada pelo usuário.');
-  }
-
-  private delay(ms: number, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(new Error('Consulta cancelada pelo usuário.'));
-      };
-      const timer = setTimeout(() => {
-        signal.removeEventListener('abort', onAbort);
-        resolve();
-      }, ms);
-      signal.addEventListener('abort', onAbort, { once: true });
-    });
-  }
-
-  private formatDate(value: string): string {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('pt-BR');
-  }
-
-  private formatDateTime(value: string): string {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('pt-BR');
   }
 
   private cancelledResult(companyId: number, documentType: DocumentType): SefazQueryResult {
