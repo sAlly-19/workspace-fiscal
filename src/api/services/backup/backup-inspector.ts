@@ -1,5 +1,6 @@
 import { existsSync, statSync, readFileSync } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import { createClient } from '@libsql/client';
 import type { BackupInspectionResult, BackupManifest } from './backup.types';
@@ -101,6 +102,24 @@ export async function inspectBackup(filePath: string): Promise<BackupInspectionR
     }
     if (manifest.modules.includes('SETTINGS') && !zip.getEntry('data/settings.json')) {
       return { valid: false, error: 'Arquivo corrompido: dados de Configurações ausentes no pacote.' };
+    }
+
+    // Valida checksums SHA-256 de todas as entradas declaradas
+    if (manifest.checksums && typeof manifest.checksums === 'object') {
+      for (const [entryPath, expectedHash] of Object.entries(manifest.checksums)) {
+        const entry = zip.getEntry(entryPath);
+        if (!entry) {
+          return { valid: false, error: `Arquivo corrompido: entrada ${entryPath} ausente no pacote.` };
+        }
+        const data = entry.getData();
+        const actualHash = `sha256:${crypto.createHash('sha256').update(data).digest('hex')}`;
+        if (actualHash !== expectedHash) {
+          return {
+            valid: false,
+            error: `Falha de integridade: checksum SHA-256 divergente no arquivo ${entryPath}.`,
+          };
+        }
+      }
     }
 
     return {

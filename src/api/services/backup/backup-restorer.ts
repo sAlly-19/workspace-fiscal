@@ -97,6 +97,9 @@ export async function restoreBackup(
   }
 
   try {
+    // Força flush e truncamento do log WAL antes da restauração
+    await rawClient.execute('PRAGMA wal_checkpoint(TRUNCATE);').catch(() => {});
+
     // Inicia transação atômica no SQLite
     await rawClient.execute('BEGIN IMMEDIATE TRANSACTION;');
 
@@ -384,7 +387,15 @@ export async function restoreBackup(
       throw new Error(`Inconsistência de chave estrangeira após restauração: ${JSON.stringify(fkCheck.rows)}`);
     }
 
+    // 5. Verificação de integridade do arquivo de banco
+    const intCheck = await rawClient.execute('PRAGMA integrity_check;');
+    const checkRes = intCheck.rows?.[0]?.[0] ?? (intCheck.rows?.[0] as any)?.integrity_check;
+    if (checkRes !== 'ok') {
+      throw new Error(`Integridade do banco após restauração inválida: ${checkRes}`);
+    }
+
     await rawClient.execute('COMMIT;');
+    await rawClient.execute('PRAGMA wal_checkpoint(TRUNCATE);').catch(() => {});
     logger.info({ modules, safetyBackup: safety.filename }, 'restore_completed_successfully');
     activityLogService
       .record({

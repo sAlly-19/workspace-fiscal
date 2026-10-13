@@ -302,5 +302,33 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
     });
     expect(fs.existsSync(safetyRes2.path)).toBe(true);
   });
+
+  it('Cenário H (IMP-014): inspectBackup e restoreBackup rejeitam backup com SHA-256 adulterado', async () => {
+    // 1. Gera backup válido
+    const backupRes = await backupService.createBackup({
+      modules: ['SETTINGS'],
+      customDestination: testDir,
+      customFilename: 'backup_tamper_source.wfb',
+    });
+
+    // 2. Cria arquivo adulterado (modifica data/settings.json sem alterar checksums no manifesto)
+    const zip = new AdmZip(backupRes.path);
+    const tamperedPath = path.join(testDir, 'backup_tampered.wfb');
+    zip.updateFile('data/settings.json', Buffer.from(JSON.stringify({ applicationSettings: [{ key: 'hacked', value: 'yes' }] }), 'utf-8'));
+    zip.writeZip(tamperedPath);
+
+    // 3. inspectBackup deve acusar falha de integridade SHA-256
+    const inspection = await backupService.inspectBackup(tamperedPath);
+    expect(inspection.valid).toBe(false);
+    expect(inspection.error).toContain('checksum SHA-256 divergente');
+
+    // 4. restoreBackup deve recusar restaurar
+    await expect(
+      backupService.restoreBackup({
+        filePath: tamperedPath,
+        modulesToRestore: ['SETTINGS'],
+      })
+    ).rejects.toThrow(/checksum SHA-256 divergente/);
+  });
 });
 

@@ -201,14 +201,14 @@ Commit: `feat(backup): atomic WAL snapshot via VACUUM INTO and SHA-256 manifest 
 - Consumes: Manifestos com `checksums`, snapshots `VACUUM INTO`.
 - Produces: `inspectBackup` e `restoreBackup` validando integridade SHA-256, `PRAGMA integrity_check` e `PRAGMA wal_checkpoint(TRUNCATE)`.
 
-- [ ] **Step 1: Escrever teste para rejeição de backups corrompidos ou com hash divergente (RED)**
+- [x] **Step 1: Escrever teste para rejeição de backups corrompidos ou com hash divergente (RED)**
 Adicionar testes em `src/api/services/backup.service.test.ts` validando que se o arquivo `.wfb` tiver seu conteúdo adulterado (hash SHA-256 inválido) ou o arquivo SQLite estiver corrompido, `inspectBackup` e `restoreBackup` abortam com erro claro e não tocam nos dados ativos.
 
-- [ ] **Step 2: Executar teste para verificar falha (RED)**
+- [x] **Step 2: Executar teste para verificar falha (RED)**
 Run: `npm.cmd test -- src/api/services/backup.service.test.ts`
 Expected: FAIL (validação de checksum ainda não estava ativa).
 
-- [ ] **Step 3: Implementar validação de SHA-256 e `integrity_check` em `backup-inspector.ts` e `backup-restorer.ts`**
+- [x] **Step 3: Implementar validação de SHA-256 e `integrity_check` em `backup-inspector.ts` e `backup-restorer.ts`**
 1. Em `backup-inspector.ts`:
    - Validar `checksums` no manifesto de arquivos `.wfb`.
    - Executar `PRAGMA integrity_check` em SQLite legado.
@@ -217,11 +217,11 @@ Expected: FAIL (validação de checksum ainda não estava ativa).
    - Executar `PRAGMA wal_checkpoint(TRUNCATE);` antes e depois da restauração.
    - Executar `PRAGMA integrity_check;` no banco restaurado.
 
-- [ ] **Step 4: Executar teste para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar teste para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/api/services/backup.service.test.ts src/api/services/backup/backup-modules.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 5**
+- [x] **Step 5: Commit local da Task 5**
 Commit: `feat(backup): enforce SHA-256 verification and atomic wal checkpointing on restore`
 
 ---
