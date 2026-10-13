@@ -42,12 +42,16 @@ export const documentEvents = sqliteTable(
 
 export const companies = sqliteTable('companies', {
   id: text('id').primaryKey(), // UUID
+  numericId: integer('numeric_id'), // ID numérico sequencial para o Buscador
   name: text('name').notNull(), // Razão social
   tradeName: text('trade_name'), // Nome fantasia
   document: text('document'), // CNPJ/CPF - mantido para compatibilidade
   cnpj: text('cnpj'), // CNPJ normalizado (apenas dígitos)
-  state: text('state'), // UF
+  uf: text('uf').default('35'), // Sigla ou código UF (Buscador)
+  state: text('state'), // UF (Depreciação)
   city: text('city'),
+  folderPath: text('folder_path'), // Pasta associada no Buscador
+  isActive: integer('is_active', { mode: 'boolean' }).default(false), // Empresa ativa no Buscador
   // Regra de início da depreciação: MONTH_OF_ACQUISITION | NEXT_MONTH | PROPORTIONAL
   depreciationRule: text('depreciation_rule').default('PROPORTIONAL'),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`).notNull(),

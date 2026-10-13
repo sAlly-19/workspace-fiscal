@@ -18,13 +18,17 @@ type NfseEventRow = Omit<NfseEvent, 'document_id' | 'nsu' | 'event_identifier' |
 export class NfseEventRepository {
   constructor(private db: DatabaseManager) {}
 
+  private get docTable(): string {
+    return this.db.hasTable('buscador_documents') ? 'buscador_documents' : 'documents';
+  }
+
   public upsert(event: NewNfseEvent): NfseEvent {
     const accessKey = normalizeNfseAccessKey(event.access_key);
     const existing = this.findDuplicate(event.company_id, event.environment, event.event_identifier, event.content_hash);
     if (existing) return existing;
 
     const linkedDocument = event.document_id ?? this.db.queryOne<{ id: number }>(
-      `SELECT id FROM documents
+      `SELECT id FROM ${this.docTable}
        WHERE company_id = ? AND document_type = 'NFSE' AND environment = ? AND access_key = ?
        LIMIT 1;`,
       [event.company_id, event.environment, accessKey]

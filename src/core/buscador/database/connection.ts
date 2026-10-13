@@ -51,6 +51,13 @@ export class DatabaseManager {
     this.db.pragma('foreign_keys = ON');
   }
 
+  public hasTable(table: string): boolean {
+    return this.queryOne<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+      [table]
+    ) !== null;
+  }
+
   private hasColumn(table: string, column: string): boolean {
     return this.queryAll<{ name: string }>(`PRAGMA table_info(${table});`).some((row) => row.name === column);
   }
@@ -72,6 +79,38 @@ export class DatabaseManager {
       if (!this.hasColumn('companies', 'uf')) {
         this.execute("ALTER TABLE companies ADD COLUMN uf TEXT DEFAULT '35';");
       }
+      if (!this.hasColumn('companies', 'numeric_id')) {
+        this.execute('ALTER TABLE companies ADD COLUMN numeric_id INTEGER;');
+        try {
+          this.execute('UPDATE companies SET numeric_id = CAST(id AS INTEGER) WHERE numeric_id IS NULL AND typeof(id) = "integer";');
+          this.execute('UPDATE companies SET numeric_id = CAST(rowid AS INTEGER) WHERE numeric_id IS NULL;');
+        } catch {}
+        this.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_numeric_id ON companies(numeric_id);');
+      }
+      if (!this.hasColumn('companies', 'state')) {
+        this.execute('ALTER TABLE companies ADD COLUMN state TEXT;');
+      }
+      if (!this.hasColumn('companies', 'trade_name')) {
+        this.execute('ALTER TABLE companies ADD COLUMN trade_name TEXT;');
+      }
+      if (!this.hasColumn('companies', 'city')) {
+        this.execute('ALTER TABLE companies ADD COLUMN city TEXT;');
+      }
+      this.execute(`
+        CREATE TRIGGER IF NOT EXISTS trg_companies_numeric_id
+        AFTER INSERT ON companies
+        FOR EACH ROW
+        WHEN NEW.numeric_id IS NULL
+        BEGIN
+          UPDATE companies
+          SET numeric_id = CASE
+            WHEN typeof(NEW.id) = 'integer' THEN NEW.id
+            WHEN CAST(NEW.id AS INTEGER) > 0 AND CAST(NEW.id AS TEXT) = NEW.id THEN CAST(NEW.id AS INTEGER)
+            ELSE (SELECT COALESCE(MAX(numeric_id), 0) + 1 FROM companies)
+          END
+          WHERE rowid = NEW.rowid;
+        END;
+      `);
       if (!this.hasColumn('certificates', 'has_private_key')) {
         this.execute('ALTER TABLE certificates ADD COLUMN has_private_key INTEGER NOT NULL DEFAULT 1;');
       }

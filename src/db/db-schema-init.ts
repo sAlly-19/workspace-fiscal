@@ -27,9 +27,37 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
     const compCols = compInfo.rows.map((r: any) => r.name || r[1]);
     if (!compCols.includes('trade_name')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "trade_name" TEXT;');
     if (!compCols.includes('cnpj')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "cnpj" TEXT;');
+    if (!compCols.includes('numeric_id')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "numeric_id" INTEGER;');
+    if (!compCols.includes('uf')) await rawClient.execute(`ALTER TABLE "companies" ADD COLUMN "uf" TEXT DEFAULT '35';`);
     if (!compCols.includes('state')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "state" TEXT;');
     if (!compCols.includes('city')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "city" TEXT;');
+    if (!compCols.includes('folder_path')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "folder_path" TEXT;');
+    if (!compCols.includes('is_active')) await rawClient.execute('ALTER TABLE "companies" ADD COLUMN "is_active" INTEGER DEFAULT 0;');
     if (!compCols.includes('depreciation_rule')) await rawClient.execute(`ALTER TABLE "companies" ADD COLUMN "depreciation_rule" TEXT DEFAULT 'PROPORTIONAL';`);
+
+    // Backfill numeric_id for existing companies
+    const nullNumeric = await rawClient.execute('SELECT id FROM "companies" WHERE "numeric_id" IS NULL ORDER BY "created_at" ASC;');
+    for (let i = 0; i < nullNumeric.rows.length; i++) {
+      const rowId = (nullNumeric.rows[i] as any)?.id || (nullNumeric.rows[i] as any)?.[0];
+      await rawClient.execute({
+        sql: 'UPDATE "companies" SET "numeric_id" = (SELECT COALESCE(MAX("numeric_id"), 0) + 1 FROM "companies") WHERE "id" = ?;',
+        args: [rowId],
+      });
+    }
+
+    await rawClient.execute('CREATE UNIQUE INDEX IF NOT EXISTS "idx_companies_numeric_id" ON "companies"("numeric_id");');
+    await rawClient.execute('CREATE UNIQUE INDEX IF NOT EXISTS "idx_companies_cnpj" ON "companies"("cnpj") WHERE "cnpj" IS NOT NULL AND "cnpj" != \'\';');
+    await rawClient.execute(`
+      CREATE TRIGGER IF NOT EXISTS "trg_companies_numeric_id"
+      AFTER INSERT ON "companies"
+      FOR EACH ROW
+      WHEN NEW.numeric_id IS NULL
+      BEGIN
+        UPDATE "companies"
+        SET numeric_id = (SELECT COALESCE(MAX(numeric_id), 0) + 1 FROM "companies")
+        WHERE id = NEW.id;
+      END;
+    `);
   } catch (e) {
     logger.warn({ err: (e as Error).message }, 'database_companies_migration_note');
   }
@@ -294,5 +322,153 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_dep_asset_comp" ON "depreciation_entries"("asset_id", "competence");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_exports_company" ON "depreciation_exports"("company_id");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_exports_comp" ON "depreciation_exports"("competence");');
+
+  // --- Buscador SEFAZ & NFS-e Tables ---
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "certificates" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "company_id" INTEGER NOT NULL UNIQUE,
+      "subject" TEXT NOT NULL,
+      "issuer" TEXT NOT NULL,
+      "serial_number" TEXT,
+      "thumbprint" TEXT NOT NULL,
+      "valid_from" TEXT NOT NULL,
+      "valid_to" TEXT NOT NULL,
+      "provider" TEXT NOT NULL DEFAULT 'windows_store',
+      "has_private_key" INTEGER NOT NULL DEFAULT 1,
+      "extracted_cnpj" TEXT,
+      "extracted_cpf" TEXT,
+      "created_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "updated_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY ("company_id") REFERENCES "companies"("numeric_id") ON DELETE CASCADE
+    );
+  `);
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "distribution_state" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "company_id" INTEGER NOT NULL,
+      "document_type" TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+      "environment" TEXT NOT NULL DEFAULT 'homologation' CHECK(environment IN ('homologation', 'production')),
+      "last_nsu" TEXT NOT NULL DEFAULT '000000000000000',
+      "max_nsu" TEXT NOT NULL DEFAULT '000000000000000',
+      "last_query_at" TEXT,
+      "status" TEXT NOT NULL DEFAULT 'IDLE' CHECK(status IN ('IDLE', 'RUNNING', 'RATE_LIMITED', 'ERROR')),
+      "last_error" TEXT,
+      "last_cstat" INTEGER,
+      "next_query_at" TEXT,
+      "created_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "updated_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE("company_id", "document_type", "environment"),
+      FOREIGN KEY ("company_id") REFERENCES "companies"("numeric_id") ON DELETE CASCADE
+    );
+  `);
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "buscador_documents" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "company_id" INTEGER NOT NULL,
+      "document_type" TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+      "environment" TEXT NOT NULL DEFAULT 'homologation' CHECK(environment IN ('homologation', 'production')),
+      "origin" TEXT NOT NULL DEFAULT 'SEFAZ_DISTRIBUTION' CHECK(origin IN ('SEFAZ_DISTRIBUTION', 'NFSE_ADN_DISTRIBUTION', 'NFSE_SEFIN_DIRECT')),
+      "nsu" TEXT NOT NULL,
+      "schema_type" TEXT NOT NULL,
+      "access_key" TEXT NOT NULL,
+      "content_hash" TEXT,
+      "document_number" TEXT,
+      "series" TEXT,
+      "issue_date" TEXT,
+      "received_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "issuer_cnpj" TEXT,
+      "issuer_name" TEXT,
+      "recipient_cnpj" TEXT,
+      "recipient_name" TEXT,
+      "total_value" REAL DEFAULT 0,
+      "xml_path" TEXT,
+      "pdf_path" TEXT,
+      "xml_status" TEXT NOT NULL DEFAULT 'XML_DISPONIVEL' CHECK(xml_status IN ('XML_DISPONIVEL', 'XML_INDISPONIVEL')),
+      "pdf_status" TEXT NOT NULL DEFAULT 'PDF_INDISPONIVEL' CHECK(pdf_status IN ('PDF_DISPONIVEL', 'PDF_INDISPONIVEL')),
+      "situacao_fiscal" TEXT DEFAULT 'AUTORIZADA' CHECK(situacao_fiscal IN ('AUTORIZADA', 'CANCELADA', 'DENEGADA')),
+      "created_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "updated_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      UNIQUE("company_id", "document_type", "environment", "access_key"),
+      FOREIGN KEY ("company_id") REFERENCES "companies"("numeric_id") ON DELETE CASCADE
+    );
+  `);
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_bdocs_company" ON "buscador_documents"("company_id");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_bdocs_key" ON "buscador_documents"("access_key");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_bdocs_type" ON "buscador_documents"("document_type");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_bdocs_nsu" ON "buscador_documents"("nsu");');
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "nfse_events" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "company_id" INTEGER NOT NULL,
+      "document_id" INTEGER,
+      "environment" TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
+      "access_key" TEXT NOT NULL,
+      "nsu" TEXT,
+      "event_identifier" TEXT,
+      "event_type" TEXT NOT NULL,
+      "event_sequence" INTEGER,
+      "event_date" TEXT,
+      "schema_type" TEXT NOT NULL,
+      "xml_path" TEXT NOT NULL,
+      "content_hash" TEXT NOT NULL,
+      "created_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "updated_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY ("company_id") REFERENCES "companies"("numeric_id") ON DELETE CASCADE,
+      FOREIGN KEY ("document_id") REFERENCES "buscador_documents"("id") ON DELETE SET NULL
+    );
+  `);
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_nfse_events_doc" ON "nfse_events"("document_id");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_nfse_events_access" ON "nfse_events"("company_id", "environment", "access_key");');
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "query_history" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "company_id" INTEGER NOT NULL,
+      "document_type" TEXT NOT NULL,
+      "started_at" TEXT NOT NULL,
+      "finished_at" TEXT NOT NULL,
+      "last_nsu_before" TEXT NOT NULL,
+      "last_nsu_after" TEXT NOT NULL,
+      "documents_received" INTEGER NOT NULL DEFAULT 0,
+      "status" TEXT NOT NULL,
+      "error_message" TEXT,
+      "environment" TEXT NOT NULL DEFAULT 'homologation',
+      FOREIGN KEY ("company_id") REFERENCES "companies"("numeric_id") ON DELETE CASCADE
+    );
+  `);
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "download_history" (
+      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "document_id" INTEGER,
+      "download_type" TEXT NOT NULL CHECK(download_type IN ('XML', 'PDF', 'ZIP')),
+      "destination_path" TEXT NOT NULL,
+      "downloaded_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      "success" INTEGER NOT NULL DEFAULT 1,
+      "error_message" TEXT,
+      FOREIGN KEY ("document_id") REFERENCES "buscador_documents"("id") ON DELETE SET NULL
+    );
+  `);
+
+  await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "app_settings" (
+      "key" TEXT PRIMARY KEY NOT NULL,
+      "value" TEXT NOT NULL,
+      "updated_at" TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+
+  await rawClient.execute(`
+    INSERT OR IGNORE INTO "app_settings" ("key", "value") VALUES 
+    ('default_storage_path', ''),
+    ('sefaz_environment', 'homologation'),
+    ('nfse_environment', 'homologation'),
+    ('items_per_page', '50'),
+    ('log_level', 'info');
+  `);
 }
 

@@ -10,14 +10,19 @@ import { normalizeNfseNsu } from '../../nfse/domain/nsu';
 export class DocumentRepository {
   constructor(private db: DatabaseManager) {}
 
+  private get table(): string {
+    return this.db.hasTable('buscador_documents') ? 'buscador_documents' : 'documents';
+  }
+
   public upsert(doc: Omit<FiscalDocument, 'id' | 'created_at' | 'updated_at'>): FiscalDocument {
     const cleanKey = doc.document_type === 'NFSE'
       ? normalizeNfseAccessKey(doc.access_key)
       : sanitizeAccessKey(doc.access_key);
     const cleanNSU = doc.document_type === 'NFSE' ? normalizeNfseNsu(doc.nsu) : formatNSU(doc.nsu);
+    const t = this.table;
 
     this.db.execute(
-      `INSERT INTO documents (
+      `INSERT INTO ${t} (
         company_id, document_type, environment, origin, nsu, schema_type, access_key, content_hash,
         document_number, series, issue_date, received_at,
         issuer_cnpj, issuer_name, recipient_cnpj, recipient_name,
@@ -26,82 +31,82 @@ export class DocumentRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(company_id, document_type, environment, access_key) DO UPDATE SET
         nsu = CASE
-          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) > length(documents.nsu) THEN excluded.nsu
-          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) = length(documents.nsu) AND excluded.nsu > documents.nsu THEN excluded.nsu
-          WHEN excluded.document_type <> 'NFSE' AND excluded.nsu > documents.nsu THEN excluded.nsu
-          ELSE documents.nsu
+          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) > length(${t}.nsu) THEN excluded.nsu
+          WHEN excluded.document_type = 'NFSE' AND length(excluded.nsu) = length(${t}.nsu) AND excluded.nsu > ${t}.nsu THEN excluded.nsu
+          WHEN excluded.document_type <> 'NFSE' AND excluded.nsu > ${t}.nsu THEN excluded.nsu
+          ELSE ${t}.nsu
         END,
         origin = CASE
-          WHEN documents.origin = 'NFSE_ADN_DISTRIBUTION' OR excluded.origin = 'NFSE_ADN_DISTRIBUTION'
+          WHEN ${t}.origin = 'NFSE_ADN_DISTRIBUTION' OR excluded.origin = 'NFSE_ADN_DISTRIBUTION'
             THEN 'NFSE_ADN_DISTRIBUTION'
-          ELSE documents.origin
+          ELSE ${t}.origin
         END,
-        content_hash = COALESCE(excluded.content_hash, documents.content_hash),
+        content_hash = COALESCE(excluded.content_hash, ${t}.content_hash),
         schema_type = CASE
-          WHEN documents.schema_type LIKE 'procNFe%' OR documents.schema_type LIKE 'procCTe%' THEN documents.schema_type
+          WHEN ${t}.schema_type LIKE 'procNFe%' OR ${t}.schema_type LIKE 'procCTe%' THEN ${t}.schema_type
           WHEN excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%' THEN excluded.schema_type
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' THEN excluded.schema_type
-          ELSE COALESCE(documents.schema_type, excluded.schema_type)
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' THEN excluded.schema_type
+          ELSE COALESCE(${t}.schema_type, excluded.schema_type)
         END,
         document_number = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.document_number IS NOT NULL THEN excluded.document_number
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.document_number IS NOT NULL THEN excluded.document_number
-          ELSE COALESCE(NULLIF(documents.document_number, ''), NULLIF(excluded.document_number, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.document_number IS NOT NULL THEN excluded.document_number
+          ELSE COALESCE(NULLIF(${t}.document_number, ''), NULLIF(excluded.document_number, ''))
         END,
         series = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.series IS NOT NULL THEN excluded.series
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.series IS NOT NULL THEN excluded.series
-          ELSE COALESCE(NULLIF(documents.series, ''), NULLIF(excluded.series, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.series IS NOT NULL THEN excluded.series
+          ELSE COALESCE(NULLIF(${t}.series, ''), NULLIF(excluded.series, ''))
         END,
         issue_date = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issue_date IS NOT NULL THEN excluded.issue_date
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issue_date IS NOT NULL THEN excluded.issue_date
-          ELSE COALESCE(NULLIF(documents.issue_date, ''), NULLIF(excluded.issue_date, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issue_date IS NOT NULL THEN excluded.issue_date
+          ELSE COALESCE(NULLIF(${t}.issue_date, ''), NULLIF(excluded.issue_date, ''))
         END,
         issuer_cnpj = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_cnpj IS NOT NULL THEN excluded.issuer_cnpj
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_cnpj IS NOT NULL THEN excluded.issuer_cnpj
-          ELSE COALESCE(NULLIF(documents.issuer_cnpj, ''), NULLIF(excluded.issuer_cnpj, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_cnpj IS NOT NULL THEN excluded.issuer_cnpj
+          ELSE COALESCE(NULLIF(${t}.issuer_cnpj, ''), NULLIF(excluded.issuer_cnpj, ''))
         END,
         issuer_name = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_name IS NOT NULL THEN excluded.issuer_name
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_name IS NOT NULL THEN excluded.issuer_name
-          ELSE COALESCE(NULLIF(documents.issuer_name, ''), NULLIF(excluded.issuer_name, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.issuer_name IS NOT NULL THEN excluded.issuer_name
+          ELSE COALESCE(NULLIF(${t}.issuer_name, ''), NULLIF(excluded.issuer_name, ''))
         END,
         recipient_cnpj = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_cnpj IS NOT NULL THEN excluded.recipient_cnpj
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_cnpj IS NOT NULL THEN excluded.recipient_cnpj
-          ELSE COALESCE(NULLIF(documents.recipient_cnpj, ''), NULLIF(excluded.recipient_cnpj, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_cnpj IS NOT NULL THEN excluded.recipient_cnpj
+          ELSE COALESCE(NULLIF(${t}.recipient_cnpj, ''), NULLIF(excluded.recipient_cnpj, ''))
         END,
         recipient_name = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_name IS NOT NULL THEN excluded.recipient_name
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_name IS NOT NULL THEN excluded.recipient_name
-          ELSE COALESCE(NULLIF(documents.recipient_name, ''), NULLIF(excluded.recipient_name, ''))
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.recipient_name IS NOT NULL THEN excluded.recipient_name
+          ELSE COALESCE(NULLIF(${t}.recipient_name, ''), NULLIF(excluded.recipient_name, ''))
         END,
         total_value = CASE
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.total_value > 0 THEN excluded.total_value
           WHEN excluded.total_value > 0 THEN excluded.total_value
-          ELSE documents.total_value
+          ELSE ${t}.total_value
         END,
         xml_path = CASE
-          WHEN (documents.schema_type LIKE 'procNFe%' OR documents.schema_type LIKE 'procCTe%') AND documents.schema_type NOT LIKE '%Evento%' AND documents.xml_path IS NOT NULL THEN documents.xml_path
+          WHEN (${t}.schema_type LIKE 'procNFe%' OR ${t}.schema_type LIKE 'procCTe%') AND ${t}.schema_type NOT LIKE '%Evento%' AND ${t}.xml_path IS NOT NULL THEN ${t}.xml_path
           WHEN (excluded.schema_type LIKE 'procNFe%' OR excluded.schema_type LIKE 'procCTe%') AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.xml_path IS NOT NULL THEN excluded.xml_path
-          WHEN documents.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.xml_path IS NOT NULL THEN excluded.xml_path
-          ELSE COALESCE(documents.xml_path, excluded.xml_path)
+          WHEN ${t}.schema_type LIKE '%Evento%' AND excluded.schema_type NOT LIKE '%Evento%' AND excluded.xml_path IS NOT NULL THEN excluded.xml_path
+          ELSE COALESCE(${t}.xml_path, excluded.xml_path)
         END,
-        pdf_path = COALESCE(excluded.pdf_path, documents.pdf_path),
+        pdf_path = COALESCE(excluded.pdf_path, ${t}.pdf_path),
         xml_status = CASE
-          WHEN documents.xml_status = 'XML_DISPONIVEL' OR excluded.xml_status = 'XML_DISPONIVEL' THEN 'XML_DISPONIVEL'
+          WHEN ${t}.xml_status = 'XML_DISPONIVEL' OR excluded.xml_status = 'XML_DISPONIVEL' THEN 'XML_DISPONIVEL'
           ELSE 'XML_INDISPONIVEL'
         END,
         pdf_status = CASE
-          WHEN documents.pdf_path IS NOT NULL OR excluded.pdf_path IS NOT NULL THEN 'PDF_DISPONIVEL'
+          WHEN ${t}.pdf_path IS NOT NULL OR excluded.pdf_path IS NOT NULL THEN 'PDF_DISPONIVEL'
           ELSE 'PDF_INDISPONIVEL'
         END,
         situacao_fiscal = CASE
-          WHEN excluded.situacao_fiscal = 'CANCELADA' OR documents.situacao_fiscal = 'CANCELADA' THEN 'CANCELADA'
-          WHEN excluded.situacao_fiscal = 'DENEGADA' OR documents.situacao_fiscal = 'DENEGADA' THEN 'DENEGADA'
-          ELSE COALESCE(excluded.situacao_fiscal, documents.situacao_fiscal)
+          WHEN excluded.situacao_fiscal = 'CANCELADA' OR ${t}.situacao_fiscal = 'CANCELADA' THEN 'CANCELADA'
+          WHEN excluded.situacao_fiscal = 'DENEGADA' OR ${t}.situacao_fiscal = 'DENEGADA' THEN 'DENEGADA'
+          ELSE COALESCE(excluded.situacao_fiscal, ${t}.situacao_fiscal)
         END,
         updated_at = datetime('now', 'localtime');`,
       [
@@ -144,7 +149,7 @@ export class DocumentRepository {
 
   public findById(id: number, companyId: number): FiscalDocument | null {
     return this.db.queryOne<FiscalDocument>(
-      'SELECT * FROM documents WHERE id = ? AND company_id = ?;',
+      `SELECT * FROM ${this.table} WHERE id = ? AND company_id = ?;`,
       [id, companyId]
     );
   }
@@ -158,18 +163,18 @@ export class DocumentRepository {
     const cleanKey = sanitizeAccessKey(accessKey);
     if (companyId !== undefined && documentType && environment) {
       return this.db.queryOne<FiscalDocument>(
-        `SELECT * FROM documents
+        `SELECT * FROM ${this.table}
          WHERE company_id = ? AND document_type = ? AND environment = ? AND access_key = ?;`,
         [companyId, documentType, environment, cleanKey]
       );
     }
     return companyId === undefined
       ? this.db.queryOne<FiscalDocument>(
-          'SELECT * FROM documents WHERE access_key = ? ORDER BY id LIMIT 1;',
+          `SELECT * FROM ${this.table} WHERE access_key = ? ORDER BY id LIMIT 1;`,
           [cleanKey]
         )
       : this.db.queryOne<FiscalDocument>(
-          'SELECT * FROM documents WHERE company_id = ? AND access_key = ?;',
+          `SELECT * FROM ${this.table} WHERE company_id = ? AND access_key = ?;`,
           [companyId, cleanKey]
         );
   }
@@ -206,17 +211,25 @@ export class DocumentRepository {
       params.push(filters.end_date);
     }
 
+    if (filters.direction) {
+      if (filters.direction === 'INBOUND') {
+        conditions.push(`(d.recipient_cnpj = c.cnpj OR (d.recipient_cnpj IS NULL AND ${effectiveIssuerCnpj} <> c.cnpj))`);
+      } else if (filters.direction === 'OUTBOUND') {
+        conditions.push(`${effectiveIssuerCnpj} = c.cnpj`);
+      }
+    }
+
     if (filters.access_key) {
-      conditions.push('d.access_key LIKE ?');
-      params.push(`%${sanitizeAccessKey(filters.access_key)}%`);
+      conditions.push('d.access_key = ?');
+      params.push(sanitizeAccessKey(filters.access_key));
     }
 
     if (filters.document_number) {
-      conditions.push('d.document_number LIKE ?');
-      params.push(`%${filters.document_number.trim()}%`);
+      conditions.push('d.document_number = ?');
+      params.push(filters.document_number.trim());
     }
 
-    if (filters.issuer_cnpj_or_name) {
+    if (filters.issuer_cnpj_or_name?.trim()) {
       conditions.push(`(${effectiveIssuerCnpj} LIKE ? OR ${effectiveIssuerName} LIKE ?)`);
       const term = `%${filters.issuer_cnpj_or_name.trim()}%`;
       params.push(term, term);
@@ -258,7 +271,7 @@ export class DocumentRepository {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Contagem total
-    const fromClause = 'FROM documents d JOIN companies c ON c.id = d.company_id';
+    const fromClause = `FROM ${this.table} d JOIN companies c ON (c.numeric_id = d.company_id OR c.id = d.company_id OR c.id = CAST(d.company_id AS TEXT))`;
     const countSql = `SELECT COUNT(*) as total ${fromClause} ${whereClause};`;
     const countRow = this.db.queryOne<{ total: number }>(countSql, params);
     const total = countRow?.total || 0;
@@ -293,7 +306,7 @@ export class DocumentRepository {
 
   public updateStoragePaths(id: number, xmlPath?: string, pdfPath?: string): void {
     this.db.execute(
-      `UPDATE documents 
+      `UPDATE ${this.table} 
        SET xml_path = COALESCE(?, xml_path),
            pdf_path = COALESCE(?, pdf_path),
            xml_status = CASE WHEN ? IS NOT NULL THEN 'XML_DISPONIVEL' ELSE xml_status END,
@@ -306,7 +319,7 @@ export class DocumentRepository {
 
   public isKnownStoragePath(filePath: string, companyId: number): boolean {
     return Boolean(
-      this.db.queryOne('SELECT id FROM documents WHERE company_id = ? AND (xml_path = ? OR pdf_path = ?) LIMIT 1;', [
+      this.db.queryOne(`SELECT id FROM ${this.table} WHERE company_id = ? AND (xml_path = ? OR pdf_path = ?) LIMIT 1;`, [
         companyId,
         filePath,
         filePath,

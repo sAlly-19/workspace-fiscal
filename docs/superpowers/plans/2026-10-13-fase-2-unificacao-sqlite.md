@@ -83,7 +83,7 @@ Commit: `feat(db): replace sql.js with synchronous native libsql in DatabaseMana
   - Tabela `buscador_documents` para captura SEFAZ/NSU isolada de `documents`.
   - `CompaniesRepository.create` e `CompanyRepository.create` deduplicando e compartilhando empresas por CNPJ de 14 dígitos.
 
-- [ ] **Step 1: Escrever testes unitários de deduplicação e Dual-ID de empresas (RED)**
+- [x] **Step 1: Escrever testes unitários de deduplicação e Dual-ID de empresas (RED)**
 Criar `src/api/repositories/companies.repository.test.ts` testando:
 1. Criação de empresa na Depreciação com CNPJ formatado gera `numeric_id` e normaliza CNPJ para 14 dígitos.
 2. Inserção de empresa existente por CNPJ atualiza dados sem duplicar.
@@ -93,11 +93,11 @@ Criar `src/core/buscador/database/CompanyRepository.test.ts` testando:
 2. `findById(numericId)` recupera a empresa com `id: number`.
 3. Empresa criada na Depreciação é encontrada pelo Buscador via `findByCNPJ`.
 
-- [ ] **Step 2: Executar testes para verificar falha (RED)**
+- [x] **Step 2: Executar testes para verificar falha (RED)**
 Run: `npm.cmd test -- src/api/repositories/companies.repository.test.ts src/core/buscador/database/CompanyRepository.test.ts`
 Expected: FAIL (métodos e colunas ainda não integrados).
 
-- [ ] **Step 3: Atualizar DDL e Migrações em `src/db/db-schema-init.ts` e `src/core/buscador/database/schema.ts`**
+- [x] **Step 3: Atualizar DDL e Migrações em `src/db/db-schema-init.ts` e `src/core/buscador/database/schema.ts`**
 1. Em `src/db/db-schema-init.ts`:
    - Adicionar colunas em `companies`: `numeric_id`, `uf`, `folder_path`, `is_active`.
    - Adicionar trigger `trg_companies_numeric_id` para garantir geração sequencial de `numeric_id` quando nulo.
@@ -109,11 +109,11 @@ Expected: FAIL (métodos e colunas ainda não integrados).
    - `CompanyRepository.ts`: Mapear `numeric_id` para `id: number`.
    - `companies.repository.ts`: Garantir geração de `numeric_id`, deduplicação por CNPJ de 14 dígitos e retorno harmonizado.
 
-- [ ] **Step 4: Executar testes para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar testes para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/api/repositories/companies.repository.test.ts src/core/buscador/database/CompanyRepository.test.ts src/core/buscador/database/repositories/nfse-repositories.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 2**
+- [x] **Step 5: Commit local da Task 2**
 Commit: `feat(db): unify companies schema with dual-id, deduplication and buscador_documents segregation`
 
 ---
@@ -247,3 +247,4 @@ Expected: Builds concluídos com sucesso sem erros.
 
 - [ ] **Step 4: Commit local da Task 6**
 Commit: `chore: complete phase 2 sqlite unification verification and build validation`
+

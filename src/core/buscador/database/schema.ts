@@ -4,15 +4,33 @@ PRAGMA foreign_keys = ON;
 
 -- 1. Tabela de Empresas
 CREATE TABLE IF NOT EXISTS companies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+    numeric_id INTEGER UNIQUE,
     name TEXT NOT NULL,
+    trade_name TEXT,
     cnpj TEXT NOT NULL UNIQUE,
     uf TEXT DEFAULT '35',
+    state TEXT,
+    city TEXT,
     folder_path TEXT,
     is_active INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+CREATE TRIGGER IF NOT EXISTS trg_companies_numeric_id
+AFTER INSERT ON companies
+FOR EACH ROW
+WHEN NEW.numeric_id IS NULL
+BEGIN
+  UPDATE companies
+  SET numeric_id = CASE
+    WHEN typeof(NEW.id) = 'integer' THEN NEW.id
+    WHEN CAST(NEW.id AS INTEGER) > 0 AND CAST(NEW.id AS TEXT) = NEW.id THEN CAST(NEW.id AS INTEGER)
+    ELSE (SELECT COALESCE(MAX(numeric_id), 0) + 1 FROM companies)
+  END
+  WHERE rowid = NEW.rowid;
+END;
 
 -- 2. Tabela de Certificados Digitais Associados (Metadados públicos apenas)
 CREATE TABLE IF NOT EXISTS certificates (
@@ -30,7 +48,7 @@ CREATE TABLE IF NOT EXISTS certificates (
     extracted_cpf TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE
 );
 
 -- 3. Estado de Distribuição de NSU por Empresa e Tipo de Documento
@@ -49,7 +67,7 @@ CREATE TABLE IF NOT EXISTS distribution_state (
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     UNIQUE(company_id, document_type, environment),
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE
 );
 
 -- 4. Tabela de Documentos Fiscais Recebidos e Armazenados
@@ -79,7 +97,7 @@ CREATE TABLE IF NOT EXISTS documents (
     situacao_fiscal TEXT DEFAULT 'AUTORIZADA' CHECK(situacao_fiscal IN ('AUTORIZADA', 'CANCELADA', 'DENEGADA')),
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE
 );
 
 -- Os índices de documentos são criados após as migrations para permitir
@@ -102,7 +120,7 @@ CREATE TABLE IF NOT EXISTS nfse_events (
     content_hash TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE,
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL
 );
 
@@ -126,7 +144,7 @@ CREATE TABLE IF NOT EXISTS query_history (
     status TEXT NOT NULL,
     error_message TEXT,
     environment TEXT NOT NULL DEFAULT 'homologation',
-    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE
 );
 
 -- 6. Histórico de Downloads

@@ -18,8 +18,9 @@ export class ReconciliationService {
    * sem apagar os metadados do documento.
    */
   public reconcileCompanyStorage(companyId: number): ReconciliationReport {
+    const table = this.db.hasTable('buscador_documents') ? 'buscador_documents' : 'documents';
     const docs = this.db.queryAll<FiscalDocument>(
-      'SELECT id, document_type, xml_path, pdf_path, xml_status, pdf_status FROM documents WHERE company_id = ?;',
+      `SELECT id, document_type, xml_path, pdf_path, xml_status, pdf_status FROM ${table} WHERE company_id = ?;`,
       [companyId]
     );
 
@@ -66,7 +67,7 @@ export class ReconciliationService {
 
         if (shouldUpdate) {
           this.db.execute(
-            `UPDATE documents 
+            `UPDATE ${table} 
              SET xml_status = ?, pdf_status = ?, updated_at = datetime('now', 'localtime')
              WHERE id = ?;`,
             [newXmlStatus, newPdfStatus, doc.id]
