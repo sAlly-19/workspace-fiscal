@@ -1,7 +1,7 @@
-import initSqlJs, { Database as SqlJsDatabase, SqlJsStatic } from 'sql.js';
 import path from 'path';
 import fs from 'fs';
 import { INITIAL_SCHEMA_SQL } from './schema';
+import initSqlJs, { SqlJsStatic } from 'sql.js';
 
 let sqlModulePromise: Promise<SqlJsStatic> | null = null;
 let sqlModule: SqlJsStatic | null = null;
@@ -13,31 +13,42 @@ export async function getSqlModule(): Promise<SqlJsStatic> {
   return sqlModule;
 }
 
-export class DatabaseManager {
-  private db: SqlJsDatabase;
-  private readonly SQL: SqlJsStatic;
-  private readonly dbPath: string;
-  private inTransaction = false;
+function getDatabaseConstructor(): any {
+  try {
+    const mod = require('libsql');
+    return typeof mod === 'function' ? mod : mod.default || mod.Database;
+  } catch {
+    const mod = require('@libsql/client');
+    return mod.Database;
+  }
+}
 
-  private constructor(SQL: SqlJsStatic, dbPath: string = ':memory:') {
-    this.SQL = SQL;
+export class DatabaseManager {
+  private db: any;
+  private readonly dbPath: string;
+
+  private constructor(dbPath: string = ':memory:') {
     this.dbPath = dbPath;
-    if (dbPath !== ':memory:' && fs.existsSync(dbPath)) {
-      this.db = new SQL.Database(fs.readFileSync(dbPath));
-    } else {
-      if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-      this.db = new SQL.Database();
+    if (dbPath !== ':memory:') {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     }
+    const Database = getDatabaseConstructor();
+    this.db = new Database(dbPath);
     this.configurePragmas();
     this.initSchema();
   }
 
   public static async create(dbPath: string = ':memory:'): Promise<DatabaseManager> {
-    return new DatabaseManager(await getSqlModule(), dbPath);
+    return new DatabaseManager(dbPath);
   }
 
   private configurePragmas(): void {
-    this.db.exec('PRAGMA foreign_keys = ON;');
+    if (this.dbPath !== ':memory:') {
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('synchronous = NORMAL');
+      this.db.pragma('busy_timeout = 5000');
+    }
+    this.db.pragma('foreign_keys = ON');
   }
 
   private hasColumn(table: string, column: string): boolean {
@@ -45,30 +56,30 @@ export class DatabaseManager {
   }
 
   private initSchema(): void {
-    this.db.run(INITIAL_SCHEMA_SQL);
+    this.db.exec(INITIAL_SCHEMA_SQL);
     this.runMigrations();
-    this.db.run(`UPDATE documents
-      SET document_number = CAST(CAST(substr(access_key, 26, 9) AS INTEGER) AS TEXT),
-          series = CAST(CAST(substr(access_key, 23, 3) AS INTEGER) AS TEXT)
-      WHERE (document_number IS NULL OR document_number = '') AND LENGTH(access_key) = 44;`);
-    this.persist();
+    try {
+      this.execute(`UPDATE documents
+        SET document_number = CAST(CAST(substr(access_key, 26, 9) AS INTEGER) AS TEXT),
+            series = CAST(CAST(substr(access_key, 23, 3) AS INTEGER) AS TEXT)
+        WHERE (document_number IS NULL OR document_number = '') AND LENGTH(access_key) = 44;`);
+    } catch {}
   }
 
   private runMigrations(): void {
-    this.db.exec('PRAGMA foreign_keys = OFF;');
-    this.db.exec('BEGIN TRANSACTION;');
+    this.db.pragma('foreign_keys = OFF');
     try {
       if (!this.hasColumn('companies', 'uf')) {
-        this.db.run("ALTER TABLE companies ADD COLUMN uf TEXT DEFAULT '35';");
+        this.execute("ALTER TABLE companies ADD COLUMN uf TEXT DEFAULT '35';");
       }
       if (!this.hasColumn('certificates', 'has_private_key')) {
-        this.db.run('ALTER TABLE certificates ADD COLUMN has_private_key INTEGER NOT NULL DEFAULT 1;');
+        this.execute('ALTER TABLE certificates ADD COLUMN has_private_key INTEGER NOT NULL DEFAULT 1;');
       }
       if (!this.hasColumn('certificates', 'extracted_cnpj')) {
-        this.db.run('ALTER TABLE certificates ADD COLUMN extracted_cnpj TEXT;');
+        this.execute('ALTER TABLE certificates ADD COLUMN extracted_cnpj TEXT;');
       }
       if (!this.hasColumn('certificates', 'extracted_cpf')) {
-        this.db.run('ALTER TABLE certificates ADD COLUMN extracted_cpf TEXT;');
+        this.execute('ALTER TABLE certificates ADD COLUMN extracted_cpf TEXT;');
       }
       if (!this.hasColumn('distribution_state', 'environment')) this.migrateDistributionState();
 
@@ -78,7 +89,7 @@ export class DatabaseManager {
       if (/access_key\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(documentSql)) this.migrateDocuments();
 
       if (!this.hasColumn('query_history', 'environment')) {
-        this.db.run("ALTER TABLE query_history ADD COLUMN environment TEXT NOT NULL DEFAULT 'homologation';");
+        this.execute("ALTER TABLE query_history ADD COLUMN environment TEXT NOT NULL DEFAULT 'homologation';");
       }
       const distributionSql = this.queryOne<{ sql: string }>(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'distribution_state';"
@@ -91,12 +102,10 @@ export class DatabaseManager {
       if (needsDocumentsV3) this.migrateDocumentsV3();
 
       this.createNfseEventsTable();
-      this.db.run("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('nfse_environment', 'homologation');");
+      this.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('nfse_environment', 'homologation');");
       this.createDocumentIndexes();
-      this.db.run('PRAGMA user_version = 3;');
-      this.db.exec('COMMIT;');
+      this.db.pragma('user_version = 3');
     } catch (error) {
-      this.db.exec('ROLLBACK;');
       throw new Error(`Falha ao migrar o banco de dados: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       this.configurePragmas();
@@ -104,7 +113,7 @@ export class DatabaseManager {
   }
 
   private migrateDistributionState(): void {
-    this.db.run(`CREATE TABLE distribution_state_v2 (
+    this.db.exec(`CREATE TABLE distribution_state_v2 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')),
       environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
@@ -116,17 +125,17 @@ export class DatabaseManager {
       UNIQUE(company_id, document_type, environment),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );`);
-    this.db.run(`INSERT INTO distribution_state_v2 (
+    this.db.exec(`INSERT INTO distribution_state_v2 (
       id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at, status, last_error, created_at, updated_at
     ) SELECT id, company_id, document_type,
       COALESCE((SELECT value FROM app_settings WHERE key = 'sefaz_environment'), 'homologation'),
       last_nsu, max_nsu, last_query_at, status, last_error, created_at, updated_at FROM distribution_state;`);
-    this.db.run('DROP TABLE distribution_state;');
-    this.db.run('ALTER TABLE distribution_state_v2 RENAME TO distribution_state;');
+    this.db.exec('DROP TABLE distribution_state;');
+    this.db.exec('ALTER TABLE distribution_state_v2 RENAME TO distribution_state;');
   }
 
   private migrateDocuments(): void {
-    this.db.run(`CREATE TABLE documents_v2 (
+    this.db.exec(`CREATE TABLE documents_v2 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')), nsu TEXT NOT NULL,
       schema_type TEXT NOT NULL, access_key TEXT NOT NULL, document_number TEXT, series TEXT, issue_date TEXT,
@@ -139,13 +148,13 @@ export class DatabaseManager {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       UNIQUE(company_id, access_key), FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );`);
-    this.db.run('INSERT INTO documents_v2 SELECT * FROM documents;');
-    this.db.run('DROP TABLE documents;');
-    this.db.run('ALTER TABLE documents_v2 RENAME TO documents;');
+    this.db.exec('INSERT INTO documents_v2 SELECT * FROM documents;');
+    this.db.exec('DROP TABLE documents;');
+    this.db.exec('ALTER TABLE documents_v2 RENAME TO documents;');
   }
 
   private migrateDistributionStateV3(): void {
-    this.db.run(`CREATE TABLE distribution_state_v3 (
+    this.db.exec(`CREATE TABLE distribution_state_v3 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
       environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
@@ -157,13 +166,13 @@ export class DatabaseManager {
       UNIQUE(company_id, document_type, environment),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );`);
-    this.db.run(`INSERT INTO distribution_state_v3 (
+    this.db.exec(`INSERT INTO distribution_state_v3 (
       id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at,
       status, last_error, last_cstat, next_query_at, created_at, updated_at
     ) SELECT id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at,
       status, last_error, last_cstat, next_query_at, created_at, updated_at FROM distribution_state;`);
-    this.db.run('DROP TABLE distribution_state;');
-    this.db.run('ALTER TABLE distribution_state_v3 RENAME TO distribution_state;');
+    this.db.exec('DROP TABLE distribution_state;');
+    this.db.exec('ALTER TABLE distribution_state_v3 RENAME TO distribution_state;');
   }
 
   private migrateDocumentsV3(): void {
@@ -171,7 +180,7 @@ export class DatabaseManager {
       "SELECT value FROM app_settings WHERE key = 'sefaz_environment';"
     )?.value === 'production' ? 'production' : 'homologation';
 
-    this.db.run(`CREATE TABLE documents_v3 (
+    this.db.exec(`CREATE TABLE documents_v3 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
       environment TEXT NOT NULL CHECK(environment IN ('homologation', 'production')),
@@ -188,7 +197,7 @@ export class DatabaseManager {
       UNIQUE(company_id, document_type, environment, access_key),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
     );`);
-    this.db.run(`INSERT INTO documents_v3 (
+    this.execute(`INSERT INTO documents_v3 (
       id, company_id, document_type, environment, origin, nsu, schema_type, access_key, content_hash,
       document_number, series, issue_date, received_at, issuer_cnpj, issuer_name,
       recipient_cnpj, recipient_name, total_value, xml_path, pdf_path, xml_status, pdf_status,
@@ -197,12 +206,12 @@ export class DatabaseManager {
       document_number, series, issue_date, received_at, issuer_cnpj, issuer_name,
       recipient_cnpj, recipient_name, total_value, xml_path, pdf_path, xml_status, pdf_status,
       situacao_fiscal, created_at, updated_at FROM documents;`, [legacyEnvironment]);
-    this.db.run('DROP TABLE documents;');
-    this.db.run('ALTER TABLE documents_v3 RENAME TO documents;');
+    this.db.exec('DROP TABLE documents;');
+    this.db.exec('ALTER TABLE documents_v3 RENAME TO documents;');
   }
 
   private createNfseEventsTable(): void {
-    this.db.run(`CREATE TABLE IF NOT EXISTS nfse_events (
+    this.db.exec(`CREATE TABLE IF NOT EXISTS nfse_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       company_id INTEGER NOT NULL,
       document_id INTEGER,
@@ -221,11 +230,11 @@ export class DatabaseManager {
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
       FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL
     );`);
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_nfse_events_document ON nfse_events(document_id);');
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_nfse_events_key ON nfse_events(company_id, environment, access_key);');
-    this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_hash
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_nfse_events_document ON nfse_events(document_id);');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_nfse_events_key ON nfse_events(company_id, environment, access_key);');
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_hash
       ON nfse_events(company_id, environment, content_hash);`);
-    this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_identifier
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_nfse_events_identifier
       ON nfse_events(company_id, environment, event_identifier) WHERE event_identifier IS NOT NULL;`);
   }
 
@@ -242,106 +251,48 @@ export class DatabaseManager {
       'CREATE INDEX IF NOT EXISTS idx_docs_recipient_cnpj ON documents(recipient_cnpj);',
       'CREATE INDEX IF NOT EXISTS idx_docs_document_type ON documents(document_type);',
     ];
-    for (const statement of statements) this.db.run(statement);
-  }
-
-  private persist(): void {
-    if (this.dbPath === ':memory:' || this.inTransaction) return;
-    const data = this.db.export();
-    this.configurePragmas();
-    const tempPath = `${this.dbPath}.${process.pid}.${Date.now()}.tmp`;
-    const fd = fs.openSync(tempPath, 'wx');
-    try {
-      fs.writeFileSync(fd, Buffer.from(data));
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    try {
-      fs.renameSync(tempPath, this.dbPath);
-    } catch (error) {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-      throw error;
-    }
+    for (const statement of statements) this.db.exec(statement);
   }
 
   public queryAll<T = unknown>(sql: string, params: unknown[] = []): T[] {
     const stmt = this.db.prepare(sql);
-    try {
-      if (params.length > 0) stmt.bind(params as any[]);
-      const results: T[] = [];
-      while (stmt.step()) results.push(stmt.getAsObject() as T);
-      return results;
-    } finally {
-      stmt.free();
+    const rows = stmt.all(...params) as any[];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i] && typeof rows[i] === 'object' && '_metadata' in rows[i]) {
+        delete rows[i]._metadata;
+      }
     }
+    return rows as T[];
   }
 
   public queryOne<T = unknown>(sql: string, params: unknown[] = []): T | null {
     const stmt = this.db.prepare(sql);
-    try {
-      if (params.length > 0) stmt.bind(params as any[]);
-      return stmt.step() ? stmt.getAsObject() as T : null;
-    } finally {
-      stmt.free();
+    const result = stmt.get(...params) as any;
+    if (!result) return null;
+    if (typeof result === 'object' && '_metadata' in result) {
+      delete result._metadata;
     }
+    return result as T;
   }
 
   public execute(sql: string, params: unknown[] = []): { changes: number; lastInsertRowid: number } {
-    const snapshot = this.createPersistenceSnapshot();
-    try {
-      this.db.run(sql, params as any[]);
-      const result = this.db.exec('SELECT changes() as changes, last_insert_rowid() as id;');
-      const changes = Number(result[0]?.values[0]?.[0] || 0);
-      const lastInsertRowid = Number(result[0]?.values[0]?.[1] || 0);
-      this.persist();
-      return { changes, lastInsertRowid };
-    } catch (error) {
-      if (snapshot) this.restoreSnapshot(snapshot);
-      throw error;
-    }
+    const stmt = this.db.prepare(sql);
+    const result = stmt.run(...params);
+    return {
+      changes: result.changes,
+      lastInsertRowid: Number(result.lastInsertRowid),
+    };
   }
 
   public transaction<T>(callback: () => T): T {
-    if (this.inTransaction) return callback();
-    const snapshot = this.createPersistenceSnapshot();
-    this.inTransaction = true;
-    this.db.exec('BEGIN TRANSACTION;');
-    let committed = false;
-    try {
-      const result = callback();
-      this.db.exec('COMMIT;');
-      committed = true;
-      this.inTransaction = false;
-      this.persist();
-      return result;
-    } catch (error) {
-      if (!committed) {
-        try { this.db.exec('ROLLBACK;'); } finally { this.inTransaction = false; }
-      } else {
-        this.inTransaction = false;
-        if (snapshot) this.restoreSnapshot(snapshot);
-      }
-      throw error;
-    }
-  }
-
-  private createPersistenceSnapshot(): Uint8Array | null {
-    if (this.dbPath === ':memory:' || this.inTransaction) return null;
-    const snapshot = this.db.export();
-    this.configurePragmas();
-    return snapshot;
-  }
-
-  private restoreSnapshot(snapshot: Uint8Array): void {
-    this.db.close();
-    this.db = new this.SQL.Database(snapshot);
-    this.configurePragmas();
+    const tx = this.db.transaction(() => callback());
+    return tx();
   }
 
   public close(): void {
-    this.persist();
-    this.db.close();
+    try {
+      this.db.close();
+    } catch {}
   }
 }
 
