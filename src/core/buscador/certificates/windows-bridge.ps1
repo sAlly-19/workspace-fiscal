@@ -22,12 +22,29 @@ param(
     [string]$HeadersFile,
 
     [Parameter(Mandatory=$false)]
-    [int]$TimeoutSec = 30
+    [int]$TimeoutSec = 30,
+
+    [Parameter(Mandatory=$false)]
+    [switch]$InputFromStdin
 )
 
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 [System.Net.ServicePointManager]::Expect100Continue = $false
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$stdinPayload = $null
+if ($InputFromStdin) {
+    [Console]::InputEncoding = [System.Text.Encoding]::UTF8
+    $rawStdin = [Console]::In.ReadToEnd()
+    if ($rawStdin -and $rawStdin.Trim() -ne "") {
+        try {
+            $stdinPayload = $rawStdin | ConvertFrom-Json
+        } catch {
+            Write-Error "Falha ao desserializar JSON de entrada via stdin: $($_.Exception.Message)"
+            exit 8
+        }
+    }
+}
 
 if ($Action -eq "list") {
     $certs = @(Get-ChildItem -Path "Cert:\CurrentUser\My" -ErrorAction SilentlyContinue)
@@ -73,7 +90,8 @@ if ($Action -eq "list") {
 }
 
 if ($Action -eq "request") {
-    if (-not $Thumbprint -or -not $Url -or -not $EnvelopeFile) {
+    $hasEnvelope = ($InputFromStdin -and $stdinPayload -and $stdinPayload.envelope) -or ($EnvelopeFile -and (Test-Path $EnvelopeFile))
+    if (-not $Thumbprint -or -not $Url -or -not $hasEnvelope) {
         Write-Error "Parâmetros obrigatórios ausentes para ação 'request'."
         exit 1
     }
@@ -99,12 +117,16 @@ if ($Action -eq "request") {
         exit 2
     }
 
-    if (-not (Test-Path $EnvelopeFile)) {
+    $envelopeContent = ""
+    if ($InputFromStdin -and $stdinPayload -and $stdinPayload.envelope) {
+        $envelopeContent = $stdinPayload.envelope
+    } elseif ($EnvelopeFile -and (Test-Path $EnvelopeFile)) {
+        $envelopeContent = [System.IO.File]::ReadAllText($EnvelopeFile, [System.Text.Encoding]::UTF8)
+    } else {
         Write-Error "Arquivo de envelope SOAP '$EnvelopeFile' não encontrado."
         exit 3
     }
 
-    $envelopeContent = [System.IO.File]::ReadAllText($EnvelopeFile, [System.Text.Encoding]::UTF8)
     $envelopeBytes = [System.Text.Encoding]::UTF8.GetBytes($envelopeContent)
 
     $request = [System.Net.HttpWebRequest]::Create($Url)
@@ -178,7 +200,8 @@ if ($Action -eq "request") {
 }
 
 if ($Action -eq "http") {
-    if (-not $Thumbprint -or -not $Url -or -not $HeadersFile) {
+    $hasHeaders = $InputFromStdin -or ($HeadersFile -and (Test-Path $HeadersFile))
+    if (-not $Thumbprint -or -not $Url -or -not $hasHeaders) {
         Write-Error "Parâmetros obrigatórios ausentes para ação 'http'."
         exit 1
     }
@@ -218,10 +241,6 @@ if ($Action -eq "http") {
         Write-Error "Certificado selecionado sem chave privada válida ou expirado."
         exit 2
     }
-    if (-not (Test-Path $HeadersFile)) {
-        Write-Error "Arquivo temporário de headers não encontrado."
-        exit 3
-    }
 
     $request = [System.Net.HttpWebRequest]::Create($uri)
     $request.Method = "GET"
@@ -231,9 +250,17 @@ if ($Action -eq "http") {
     [void]$request.ClientCertificates.Add($cert)
     $request.KeepAlive = $false
 
-    $headersJson = [System.IO.File]::ReadAllText($HeadersFile, [System.Text.Encoding]::UTF8)
-    if ($headersJson) {
-        $headers = $headersJson | ConvertFrom-Json
+    $headers = $null
+    if ($InputFromStdin -and $stdinPayload -and $stdinPayload.headers) {
+        $headers = $stdinPayload.headers
+    } elseif ($HeadersFile -and (Test-Path $HeadersFile)) {
+        $headersJson = [System.IO.File]::ReadAllText($HeadersFile, [System.Text.Encoding]::UTF8)
+        if ($headersJson) {
+            $headers = $headersJson | ConvertFrom-Json
+        }
+    }
+
+    if ($headers) {
         foreach ($property in $headers.PSObject.Properties) {
             $headerName = [string]$property.Name
             $headerValue = [string]$property.Value
