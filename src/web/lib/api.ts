@@ -13,6 +13,7 @@ declare global {
   interface Window {
     api: {
       getApiBaseUrl: () => Promise<string>;
+      getApiToken?: () => Promise<string>;
       getAppVersion: () => Promise<string>;
       getAppPaths: () => Promise<{
         userData: string;
@@ -71,6 +72,22 @@ declare global {
 
 export const apiBaseUrl: string = '';
 let _cachedApiBaseUrl: string | null = null;
+let _cachedApiToken: string | null = null;
+
+export async function getApiToken(): Promise<string | null> {
+  if (_cachedApiToken) return _cachedApiToken;
+  if (typeof window !== 'undefined' && window.api?.getApiToken) {
+    try {
+      _cachedApiToken = await window.api.getApiToken();
+      if (_cachedApiToken) return _cachedApiToken;
+    } catch {}
+  }
+  return null;
+}
+
+export function clearApiTokenCache(): void {
+  _cachedApiToken = null;
+}
 
 export async function getApiBaseUrl(): Promise<string> {
   if (_cachedApiBaseUrl) return _cachedApiBaseUrl;
@@ -108,9 +125,21 @@ export function apiUrlSync(path: string): string {
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = await getApiBaseUrl();
+  const token = await getApiToken();
   const url = base + (path.startsWith('/') ? path : '/' + path);
+
+  const headers = new Headers(init?.headers || {});
+  if (token && !headers.has('X-Workspace-Token')) {
+    headers.set('X-Workspace-Token', token);
+  }
+
+  const mergedInit: RequestInit = {
+    ...init,
+    headers,
+  };
+
   try {
-    return await fetch(url, init);
+    return await fetch(url, mergedInit);
   } catch (err) {
     // Só aciona o overlay se a API realmente estiver fora do ar
     try {

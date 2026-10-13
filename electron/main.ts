@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { promises as fs } from 'fs';
 
 import { initDatabase } from '../src/db';
 import { createApp } from '../src/api/app';
+import { setApiToken } from '../src/api/middleware/localAuth';
 import { backupService } from '../src/api/services/backup.service';
 import { updateService } from '../src/api/services/update.service';
 import { appUpdater } from './updater';
@@ -23,6 +25,7 @@ if (!isDev && process.env.NODE_ENV !== 'production') {
 let apiServer: { port: number; close: () => void } | null = null;
 let mainWindow: BrowserWindow | null = null;
 let fiscalServices: ApplicationContext | null = null;
+let localApiToken: string = '';
 
 function resolveIconPath(): string | undefined {
   const candidates = [
@@ -41,6 +44,9 @@ function resolveIconPath(): string | undefined {
 
 async function startApiServer(): Promise<number> {
   await initDatabase();
+
+  localApiToken = crypto.randomBytes(32).toString('hex');
+  setApiToken(localApiToken);
 
   const expressApp = createApp();
   const PORT = 0;
@@ -72,6 +78,7 @@ async function startApiServer(): Promise<number> {
 
 function registerIpcHandlers(apiBaseUrl: string) {
   ipcMain.handle('api:baseUrl', () => apiBaseUrl);
+  ipcMain.handle('auth:get-api-token', () => localApiToken);
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:checkForUpdates', async () => updateService.checkLatestRelease());
   ipcMain.handle('app:getPaths', () => ({

@@ -175,13 +175,13 @@ export class WindowsStoreCertificateProvider implements ICertificateProvider {
       let stdout = '';
       let stderr = '';
 
-      proc.stdout.setEncoding('utf-8');
-      proc.stdout.on('data', chunk => {
+      proc.stdout?.setEncoding('utf-8');
+      proc.stdout?.on('data', chunk => {
         stdout += chunk;
       });
 
-      proc.stderr.setEncoding('utf-8');
-      proc.stderr.on('data', chunk => {
+      proc.stderr?.setEncoding('utf-8');
+      proc.stderr?.on('data', chunk => {
         stderr += chunk;
       });
 

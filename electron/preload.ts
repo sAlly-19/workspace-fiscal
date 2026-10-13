@@ -36,6 +36,7 @@ export interface WindowStatePayload {
 
 const api = {
   getApiBaseUrl: (): Promise<string> => ipcRenderer.invoke('api:baseUrl'),
+  getApiToken: (): Promise<string> => ipcRenderer.invoke('auth:get-api-token'),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   getAppPaths: () => ipcRenderer.invoke('app:getPaths'),
   openXmlDialog: (options?: { multiSelections?: boolean }): Promise<OpenXmlResult> =>
