@@ -182,4 +182,50 @@ describe('useSefazSync hook', () => {
     expect(loadCompanyContext).toHaveBeenCalledWith(mockCompany);
     expect(result.current.pendingNsuReset).toBeNull();
   });
+
+  it('aborts synchronization if certificate health check fails', async () => {
+    (globalThis as any).window.fiscalApi.certificates = {
+      checkHealth: vi.fn().mockResolvedValue({
+        status: 'NOT_FOUND_IN_STORE',
+        message: 'Certificado não localizado no repositório do Windows.',
+      }),
+    };
+
+    const { result } = renderHook(() =>
+      useSefazSync({
+        activeCompany: mockCompany,
+        companyCert: mockCert,
+        loadCompanyContext,
+        onOpenCertModal,
+      })
+    );
+
+    await result.current.handleConsultSefaz('NFE');
+
+    expect(result.current.isSefazModalOpen).toBe(false);
+    expect((window as any).fiscalApi.sefaz.consultDocuments).not.toHaveBeenCalled();
+  });
+
+  it('aborts synchronization if SEFAZ cooldown is still active', async () => {
+    const futureCooldown = new Date(Date.now() + 600000).toISOString();
+
+    const { result } = renderHook(() =>
+      useSefazSync({
+        activeCompany: mockCompany,
+        companyCert: mockCert,
+        nsuStatus: {
+          nfeLastNSU: '100',
+          cteLastNSU: '50',
+          nfeNextQueryAt: futureCooldown,
+        },
+        loadCompanyContext,
+        onOpenCertModal,
+      })
+    );
+
+    await result.current.handleConsultSefaz('NFE');
+
+    expect(result.current.isSefazModalOpen).toBe(false);
+    expect((window as any).fiscalApi.sefaz.consultDocuments).not.toHaveBeenCalled();
+  });
 });

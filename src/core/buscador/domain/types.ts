@@ -63,6 +63,16 @@ export interface CertificateInfo {
   extracted_cpf?: string;
 }
 
+export type CertificateHealthStatus = 'READY' | 'NOT_FOUND_IN_STORE' | 'EXPIRED' | 'NO_PRIVATE_KEY' | 'NO_CERT';
+
+export interface CertificateHealthResult {
+  status: CertificateHealthStatus;
+  message: string;
+  subject?: string;
+  thumbprint?: string;
+  validTo?: string;
+}
+
 export interface DistributionState {
   id: number;
   company_id: number;

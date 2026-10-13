@@ -1,19 +1,23 @@
 import React from 'react';
 import { KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { CertificateInfo, Company } from '@/core/buscador/domain/types';
+import { CertificateInfo, CertificateHealthResult, Company } from '@/core/buscador/domain/types';
 
 export interface CertificateCardProps {
   activeCompany: Company | null;
   companyCert: CertificateInfo | null;
+  certHealth?: CertificateHealthResult | null;
   onOpenCertModal: () => void;
 }
 
 export const CertificateCard: React.FC<CertificateCardProps> = ({
   activeCompany,
   companyCert,
+  certHealth,
   onOpenCertModal,
 }) => {
   const isValid = companyCert && !companyCert.is_expired;
+  const isLiveReady = certHealth?.status === 'READY';
+  const isNotFoundInStore = certHealth?.status === 'NOT_FOUND_IN_STORE';
 
   return (
     <div className="m-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] p-3 text-xs shadow-xs">
@@ -28,15 +32,29 @@ export const CertificateCard: React.FC<CertificateCardProps> = ({
         <div className="space-y-1">
           <p
             className={`flex items-center gap-1 font-semibold ${
-              isValid ? 'text-[var(--success)]' : 'text-[var(--danger)]'
+              isNotFoundInStore
+                ? 'text-amber-500'
+                : isLiveReady || (isValid && !certHealth)
+                ? 'text-[var(--success)]'
+                : 'text-[var(--danger)]'
             }`}
           >
-            {isValid ? (
+            {isNotFoundInStore ? (
+              <ShieldAlert className="h-4 w-4 text-amber-500" />
+            ) : isLiveReady || (isValid && !certHealth) ? (
               <ShieldCheck className="h-4 w-4" />
             ) : (
               <ShieldAlert className="h-4 w-4" />
             )}
-            <span>{isValid ? 'Válido' : 'Expirado'}</span>
+            <span>
+              {isNotFoundInStore
+                ? 'Não Detectado no Windows'
+                : isLiveReady
+                ? 'Conectado e Válido'
+                : isValid
+                ? 'Válido'
+                : 'Expirado'}
+            </span>
           </p>
           <p
             className="truncate font-mono text-[11px] text-[var(--text-secondary)]"
@@ -47,6 +65,11 @@ export const CertificateCard: React.FC<CertificateCardProps> = ({
           <p className="text-[11px] text-[var(--text-muted)]">
             Validade: {new Date(companyCert.valid_to).toLocaleDateString('pt-BR')}
           </p>
+          {isNotFoundInStore && (
+            <p className="rounded bg-amber-500/10 border border-amber-500/20 p-1 text-[10px] text-amber-500 leading-tight">
+              Conecte o Token / Smartcard na máquina para sincronizar.
+            </p>
+          )}
         </div>
       ) : (
         <p className="text-[var(--warning)]">Nenhum certificado associado.</p>

@@ -28,6 +28,8 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = (props) => {
         isSynchronizing={props.isSynchronizing}
         synchronizingType={props.synchronizingType}
         hasActiveCompany={props.hasActiveCompany}
+        certHealth={props.certHealth}
+        onCooldownEnd={props.onCooldownEnd}
       />
       <DocumentTable
         documents={props.documents}

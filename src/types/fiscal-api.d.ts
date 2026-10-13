@@ -3,6 +3,7 @@ import type {
   CreateCompanyDTO,
   UpdateCompanyDTO,
   CertificateInfo,
+  CertificateHealthResult,
   FiscalDocument,
   DocumentDownloadRequest,
   DocumentReference,
@@ -31,6 +32,7 @@ export interface FiscalDesktopAPI {
     listAvailable: () => Promise<CertificateInfo[]>;
     getForCompany: (companyId: number) => Promise<CertificateInfo | null>;
     associateToCompany: (companyId: number, thumbprint: string) => Promise<boolean>;
+    checkHealth: (companyId: number) => Promise<CertificateHealthResult>;
   };
   documents: {
     search: (filters: DocumentSearchFilters) => Promise<PaginatedResult<FiscalDocument>>;
@@ -42,7 +44,16 @@ export interface FiscalDesktopAPI {
   };
   sefaz: {
     consultDocuments: (companyId: number, docType?: 'NFE' | 'CTE') => Promise<CombinedSefazQueryResult>;
-    getStatus: (companyId: number) => Promise<{ nfeLastNSU: string; cteLastNSU: string; isRunning: boolean }>;
+    getStatus: (companyId: number) => Promise<{
+      nfeLastNSU: string;
+      cteLastNSU: string;
+      isRunning: boolean;
+      environment?: string;
+      nfeStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+      nfeNextQueryAt?: string | null;
+      cteStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+      cteNextQueryAt?: string | null;
+    }>;
     cancelQuery: (companyId: number, docType?: 'NFE' | 'CTE') => Promise<boolean>;
     resetNSU: (companyId: number, docType: 'NFE' | 'CTE') => Promise<boolean>;
     onProgress: (callback: (data: { companyId: number; documentType: 'NFE' | 'CTE'; message: string; currentNSU?: string; count?: number }) => void) => () => void;

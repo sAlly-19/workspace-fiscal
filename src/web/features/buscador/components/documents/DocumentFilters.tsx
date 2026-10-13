@@ -1,8 +1,19 @@
 import React from 'react';
-import { RefreshCw, RotateCcw, Search } from 'lucide-react';
+import { Clock, RefreshCw, RotateCcw, Search } from 'lucide-react';
+import type { CertificateHealthResult } from '@/core/buscador/domain/types';
+import { useCooldownTimer } from '../../hooks/useCooldownTimer';
 
 export interface DocumentFiltersProps {
-  nsuStatus: { nfeLastNSU: string; cteLastNSU: string };
+  nsuStatus: {
+    nfeLastNSU: string;
+    cteLastNSU: string;
+    nfeStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    nfeNextQueryAt?: string | null;
+    cteStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    cteNextQueryAt?: string | null;
+  };
+  certHealth?: CertificateHealthResult | null;
+  onCooldownEnd?: () => void;
   selectedDocTypes: { nfe: boolean; cte: boolean };
   onToggleDocType: (type: 'nfe' | 'cte', checked: boolean) => void;
   startDate: string;
@@ -23,6 +34,8 @@ export interface DocumentFiltersProps {
 
 export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   nsuStatus,
+  certHealth,
+  onCooldownEnd,
   selectedDocTypes,
   onToggleDocType,
   startDate,
@@ -39,7 +52,12 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   isSynchronizing,
   synchronizingType,
   hasActiveCompany,
-}) => (
+}) => {
+  const nfeCooldown = useCooldownTimer(nsuStatus?.nfeNextQueryAt, onCooldownEnd);
+  const cteCooldown = useCooldownTimer(nsuStatus?.cteNextQueryAt, onCooldownEnd);
+  const isCertBlocked = Boolean(certHealth && certHealth.status !== 'READY');
+
+  return (
   <section
     data-testid="document-filters"
     className="shrink-0 space-y-2.5 border-b border-[var(--border-subtle)] bg-[var(--surface-panel)] p-3.5 text-xs select-none"
@@ -113,11 +131,31 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
     </div>
 
     <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-2 text-[11px] text-[var(--text-muted)]">
-      <span className="mr-auto">
-        NSU NF-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.nfeLastNSU}</b>
-        <span className="mx-2 text-[var(--border-strong)]">·</span>
-        CT-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.cteLastNSU}</b>
-      </span>
+      <div className="flex flex-wrap items-center gap-2 mr-auto">
+        <span>
+          NSU NF-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.nfeLastNSU}</b>
+          <span className="mx-2 text-[var(--border-strong)]">·</span>
+          CT-e: <b className="font-mono font-bold text-[var(--text-primary)]">{nsuStatus.cteLastNSU}</b>
+        </span>
+        {nfeCooldown.isCoolingDown && (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[10px] font-semibold text-amber-500"
+            title={`SEFAZ em espera por consumo indevido. Liberado em ${nfeCooldown.formattedTime}.`}
+          >
+            <Clock className="h-3 w-3" />
+            <span>Espera NF-e: {nfeCooldown.formattedTime}</span>
+          </span>
+        )}
+        {cteCooldown.isCoolingDown && (
+          <span
+            className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[10px] font-semibold text-amber-500"
+            title={`SEFAZ em espera por consumo indevido. Liberado em ${cteCooldown.formattedTime}.`}
+          >
+            <Clock className="h-3 w-3" />
+            <span>Espera CT-e: {cteCooldown.formattedTime}</span>
+          </span>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 ml-auto">
         {/* Bloco NF-e */}
@@ -136,17 +174,31 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
             <button
               type="button"
               onClick={() => (onSynchronizeNfe ? onSynchronizeNfe() : onSynchronize?.('NFE'))}
-              disabled={isSynchronizing || !hasActiveCompany}
-              title="Sincronizar apenas NF-e com a SEFAZ"
+              disabled={isSynchronizing || !hasActiveCompany || isCertBlocked || nfeCooldown.isCoolingDown}
+              title={
+                !hasActiveCompany
+                  ? 'Selecione uma empresa'
+                  : isCertBlocked
+                  ? (certHealth?.message || 'Certificado digital não está pronto')
+                  : nfeCooldown.isCoolingDown
+                  ? `Limite de requisições da SEFAZ ativo. Aguarde ${nfeCooldown.formattedTime} para consultar NF-e.`
+                  : 'Sincronizar apenas NF-e com a SEFAZ'
+              }
               aria-label="Sincronizar apenas NF-e com a SEFAZ"
-              className="flex items-center gap-1 rounded bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-blue-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+              className={`flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs transition cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                nfeCooldown.isCoolingDown ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500'
+              }`}
             >
-              <RefreshCw
-                className={`h-3 w-3 ${
-                  isSynchronizing && (!synchronizingType || synchronizingType === 'NFE') ? 'animate-spin' : ''
-                }`}
-              />
-              <span>Sincronizar NF-e</span>
+              {nfeCooldown.isCoolingDown ? (
+                <Clock className="h-3 w-3" />
+              ) : (
+                <RefreshCw
+                  className={`h-3 w-3 ${
+                    isSynchronizing && (!synchronizingType || synchronizingType === 'NFE') ? 'animate-spin' : ''
+                  }`}
+                />
+              )}
+              <span>{nfeCooldown.isCoolingDown ? `NF-e (${nfeCooldown.formattedTime})` : 'Sincronizar NF-e'}</span>
             </button>
           )}
         </div>
@@ -167,22 +219,37 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
             <button
               type="button"
               onClick={() => (onSynchronizeCte ? onSynchronizeCte() : onSynchronize?.('CTE'))}
-              disabled={isSynchronizing || !hasActiveCompany}
-              title="Sincronizar apenas CT-e com a SEFAZ"
+              disabled={isSynchronizing || !hasActiveCompany || isCertBlocked || cteCooldown.isCoolingDown}
+              title={
+                !hasActiveCompany
+                  ? 'Selecione uma empresa'
+                  : isCertBlocked
+                  ? (certHealth?.message || 'Certificado digital não está pronto')
+                  : cteCooldown.isCoolingDown
+                  ? `Limite de requisições da SEFAZ ativo. Aguarde ${cteCooldown.formattedTime} para consultar CT-e.`
+                  : 'Sincronizar apenas CT-e com a SEFAZ'
+              }
               aria-label="Sincronizar apenas CT-e com a SEFAZ"
-              className="flex items-center gap-1 rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 transition cursor-pointer"
+              className={`flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs transition cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                cteCooldown.isCoolingDown ? 'bg-amber-600 hover:bg-amber-500' : 'bg-indigo-600 hover:bg-indigo-500'
+              }`}
             >
-              <RefreshCw
-                className={`h-3 w-3 ${
-                  isSynchronizing && (!synchronizingType || synchronizingType === 'CTE') ? 'animate-spin' : ''
-                }`}
-              />
-              <span>Sincronizar CT-e</span>
+              {cteCooldown.isCoolingDown ? (
+                <Clock className="h-3 w-3" />
+              ) : (
+                <RefreshCw
+                  className={`h-3 w-3 ${
+                    isSynchronizing && (!synchronizingType || synchronizingType === 'CTE') ? 'animate-spin' : ''
+                  }`}
+                />
+              )}
+              <span>{cteCooldown.isCoolingDown ? `CT-e (${cteCooldown.formattedTime})` : 'Sincronizar CT-e'}</span>
             </button>
           )}
         </div>
       </div>
     </div>
   </section>
-);
+  );
+};
 

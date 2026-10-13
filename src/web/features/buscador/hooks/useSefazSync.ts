@@ -1,12 +1,22 @@
 import { useState } from 'react';
-import type { Company, CertificateInfo } from '@/core/buscador/domain/types';
+import type { Company, CertificateInfo, CertificateHealthResult } from '@/core/buscador/domain/types';
 import { presentAfterRefresh } from '@/core/buscador/domain/sync-result';
 import { FeedbackInput, useUiStore } from '../stores/ui.store';
 import { feedbackFromError, feedbackFromSyncResult } from '../features/feedback/feedback-adapters';
+import { calculateRemainingSeconds, formatRemainingTime } from '../utils/cooldown';
 
 export interface UseSefazSyncOptions {
   activeCompany: Company | null;
   companyCert: CertificateInfo | null;
+  certHealth?: CertificateHealthResult | null;
+  nsuStatus?: {
+    nfeLastNSU: string;
+    cteLastNSU: string;
+    nfeStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    nfeNextQueryAt?: string | null;
+    cteStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    cteNextQueryAt?: string | null;
+  };
   loadCompanyContext: (company: Company) => Promise<void>;
   onOpenCertModal: () => void;
 }
@@ -14,6 +24,8 @@ export interface UseSefazSyncOptions {
 export function useSefazSync({
   activeCompany,
   companyCert,
+  certHealth,
+  nsuStatus,
   loadCompanyContext,
   onOpenCertModal,
 }: UseSefazSyncOptions) {
@@ -45,6 +57,51 @@ export function useSefazSync({
         kind: 'error',
         title: 'Certificado digital expirado',
         message: 'O certificado associado a esta empresa está expirado. Selecione um certificado válido.',
+      });
+      return;
+    }
+
+    if (window.fiscalApi?.certificates?.checkHealth) {
+      try {
+        const liveHealth = await window.fiscalApi.certificates.checkHealth(activeCompany.id);
+        if (liveHealth && liveHealth.status !== 'READY') {
+          pushFeedback({
+            kind: 'warning',
+            title: 'Certificado indisponível',
+            message: liveHealth.message,
+          });
+          return;
+        }
+      } catch (err: any) {
+        console.warn('Falha no health-check do certificado:', err);
+      }
+    }
+
+    const nowMs = Date.now();
+    if (
+      (!targetType || targetType === 'NFE') &&
+      nsuStatus?.nfeNextQueryAt &&
+      Date.parse(nsuStatus.nfeNextQueryAt) > nowMs
+    ) {
+      const remaining = calculateRemainingSeconds(nsuStatus.nfeNextQueryAt, nowMs);
+      pushFeedback({
+        kind: 'warning',
+        title: 'Consulta NF-e em espera (SEFAZ)',
+        message: `Limite de requisições da SEFAZ ativo (Consumo Indevido). Aguarde ${formatRemainingTime(remaining)} antes de tentar novamente.`,
+      });
+      return;
+    }
+
+    if (
+      targetType === 'CTE' &&
+      nsuStatus?.cteNextQueryAt &&
+      Date.parse(nsuStatus.cteNextQueryAt) > nowMs
+    ) {
+      const remaining = calculateRemainingSeconds(nsuStatus.cteNextQueryAt, nowMs);
+      pushFeedback({
+        kind: 'warning',
+        title: 'Consulta CT-e em espera (SEFAZ)',
+        message: `Limite de requisições da SEFAZ ativo. Aguarde ${formatRemainingTime(remaining)} antes de tentar novamente.`,
       });
       return;
     }

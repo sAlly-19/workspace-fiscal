@@ -73,6 +73,10 @@ export function registerSefazHandlers(services: ApplicationContext, getMainWindo
       cteLastNSU: cte.last_nsu,
       isRunning: nfe.status === 'RUNNING' || cte.status === 'RUNNING',
       environment,
+      nfeStatus: nfe.status,
+      nfeNextQueryAt: nfe.next_query_at || null,
+      cteStatus: cte.status,
+      cteNextQueryAt: cte.next_query_at || null,
     };
   });
 

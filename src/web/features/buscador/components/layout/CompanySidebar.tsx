@@ -1,5 +1,4 @@
-import React from 'react';
-import { Company, CertificateInfo } from '@/core/buscador/domain/types';
+import { Company, CertificateInfo, CertificateHealthResult } from '@/core/buscador/domain/types';
 import { CompanyList } from '../Sidebar/CompanyList';
 import { CertificateCard } from '../Sidebar/CertificateCard';
 
@@ -7,6 +6,7 @@ export interface CompanySidebarProps {
   companies: Company[];
   activeCompany: Company | null;
   companyCert: CertificateInfo | null;
+  certHealth?: CertificateHealthResult | null;
   onSelectCompany: (id: number) => void;
   onNewCompany: () => void;
   onEditCompany?: (company: Company) => void;
@@ -23,6 +23,7 @@ export const CompanySidebar: React.FC<CompanySidebarProps> = ({
   companies,
   activeCompany,
   companyCert,
+  certHealth,
   onSelectCompany,
   onNewCompany,
   onEditCompany,
@@ -55,6 +56,7 @@ export const CompanySidebar: React.FC<CompanySidebarProps> = ({
       <CertificateCard
         activeCompany={activeCompany}
         companyCert={companyCert}
+        certHealth={certHealth}
         onOpenCertModal={onOpenCertModal}
       />
     </aside>

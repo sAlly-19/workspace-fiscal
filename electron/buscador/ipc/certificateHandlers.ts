@@ -32,4 +32,56 @@ export function registerCertificateHandlers(services: ApplicationContext, getMai
 
     return true;
   });
+
+  registerSecureHandler('certificates:checkHealth', getMainWindow, async (_event, id) => {
+    const companyId = requirePositiveInteger(id, 'ID da empresa');
+    const company = services.companyService.getById(companyId);
+    if (!company) throw new Error('Empresa não encontrada.');
+
+    const certRecord = services.certRepo.getByCompanyId(companyId);
+    if (!certRecord) {
+      return {
+        status: 'NO_CERT',
+        message: 'Nenhum certificado vinculado a esta empresa.',
+      };
+    }
+
+    const liveCert = await services.certProvider.getCertificate(certRecord.thumbprint);
+    if (!liveCert) {
+      return {
+        status: 'NOT_FOUND_IN_STORE',
+        message: 'Certificado não localizado no repositório do Windows. Verifique se o Token/Smartcard está conectado.',
+        subject: certRecord.subject,
+        thumbprint: certRecord.thumbprint,
+      };
+    }
+
+    if (liveCert.is_expired || new Date(liveCert.valid_to).getTime() <= Date.now()) {
+      return {
+        status: 'EXPIRED',
+        message: `Certificado expirou em ${new Date(liveCert.valid_to).toLocaleDateString('pt-BR')}.`,
+        subject: liveCert.subject,
+        thumbprint: liveCert.thumbprint,
+        validTo: liveCert.valid_to,
+      };
+    }
+
+    if (!liveCert.has_private_key) {
+      return {
+        status: 'NO_PRIVATE_KEY',
+        message: 'O certificado não possui chave privada acessível.',
+        subject: liveCert.subject,
+        thumbprint: liveCert.thumbprint,
+        validTo: liveCert.valid_to,
+      };
+    }
+
+    return {
+      status: 'READY',
+      message: 'Certificado ativo e válido no Windows.',
+      subject: liveCert.subject,
+      thumbprint: liveCert.thumbprint,
+      validTo: liveCert.valid_to,
+    };
+  });
 }

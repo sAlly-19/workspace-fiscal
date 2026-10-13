@@ -3,6 +3,7 @@ import {
   Company, 
   FiscalDocument, 
   CertificateInfo, 
+  CertificateHealthResult,
   AppSettings, 
   DocumentType,
   DownloadBatchResult
@@ -45,8 +46,18 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeCompany, setActiveCompany] = useState<Company | null>(null);
   const [companyCert, setCompanyCert] = useState<CertificateInfo | null>(null);
+  const [certHealth, setCertHealth] = useState<CertificateHealthResult | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [nsuStatus, setNsuStatus] = useState<{ nfeLastNSU: string; cteLastNSU: string }>({
+  const [nsuStatus, setNsuStatus] = useState<{
+    nfeLastNSU: string;
+    cteLastNSU: string;
+    isRunning?: boolean;
+    environment?: string;
+    nfeStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    nfeNextQueryAt?: string | null;
+    cteStatus?: 'IDLE' | 'RUNNING' | 'RATE_LIMITED' | 'ERROR';
+    cteNextQueryAt?: string | null;
+  }>({
     nfeLastNSU: '000000000000000',
     cteLastNSU: '000000000000000',
   });
@@ -116,13 +127,15 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const loadCompanyContext = async (company: Company, settingsOverride?: AppSettings) => {
     const requestId = ++companyContextRequest.current;
     try {
-      const [cert, status] = await Promise.all([
+      const [cert, status, health] = await Promise.all([
         window.fiscalApi?.certificates.getForCompany(company.id) || null,
         window.fiscalApi?.sefaz.getStatus(company.id) || { nfeLastNSU: '000000000000000', cteLastNSU: '000000000000000' },
+        window.fiscalApi?.certificates?.checkHealth ? window.fiscalApi.certificates.checkHealth(company.id) : null,
       ]);
       if (requestId !== companyContextRequest.current) return;
       setCompanyCert(cert);
       setNsuStatus(status);
+      setCertHealth(health);
       await searchLocalDocuments(company.id, 1, undefined, settingsOverride?.items_per_page);
     } catch (err: any) {
       console.error(err);
@@ -225,6 +238,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   } = useSefazSync({
     activeCompany,
     companyCert,
+    certHealth,
+    nsuStatus,
     loadCompanyContext: (comp) => loadCompanyContext(comp),
     onOpenCertModal: () => setIsCertModalOpen(true),
   });
@@ -338,6 +353,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       header={(
         <AppHeader
           activeCompany={activeCompany}
+          certHealth={certHealth}
           environment={workspaceMode === 'NFSE' ? (settings?.nfse_environment || 'homologation') : (settings?.sefaz_environment || 'homologation')}
           workspaceMode={workspaceMode}
           onWorkspaceModeChange={handleWorkspaceModeChange}
@@ -361,6 +377,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           companies={companies}
           activeCompany={activeCompany}
           companyCert={companyCert}
+          certHealth={certHealth}
           activeFilter={activeFilter}
           onSelectCompany={handleSelectCompany}
           onNewCompany={() => {
@@ -429,6 +446,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       ) : (
         <DocumentWorkspace
           nsuStatus={nsuStatus}
+          certHealth={certHealth}
+          onCooldownEnd={() => { if (activeCompany) loadCompanyContext(activeCompany); }}
           selectedDocTypes={selectedDocTypes}
           onToggleDocType={(type, checked) => setSelectedDocTypes(prev => ({ ...prev, [type]: checked }))}
           startDate={startDate}

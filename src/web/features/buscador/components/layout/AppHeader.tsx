@@ -1,12 +1,13 @@
 import React from 'react';
 import { ArrowLeft, Building2, Moon, RefreshCw, Settings, Sun } from 'lucide-react';
-import type { Company, SefazEnvironment } from '@/core/buscador/domain/types';
+import type { CertificateHealthResult, Company, SefazEnvironment } from '@/core/buscador/domain/types';
 import type { NfseEnvironment } from '@/core/buscador/nfse/domain/types';
 import { NfseWorkspaceSelector } from '../NfseWorkspaceSelector';
 import type { BuscadorWorkspaceMode } from '../../features/workspace/workspace-controller';
 
 interface AppHeaderProps {
   activeCompany: Pick<Company, 'name'> | null;
+  certHealth?: CertificateHealthResult | null;
   environment: SefazEnvironment | NfseEnvironment;
   workspaceMode?: BuscadorWorkspaceMode;
   onWorkspaceModeChange?: (mode: BuscadorWorkspaceMode) => void;
@@ -21,6 +22,7 @@ interface AppHeaderProps {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   activeCompany,
+  certHealth,
   environment,
   workspaceMode = 'SEFAZ',
   onWorkspaceModeChange,
@@ -66,7 +68,44 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     )}
 
     <div className="min-w-0 flex-1 border-l border-[var(--border-subtle)] pl-4">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Empresa ativa</div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Empresa ativa</span>
+        {activeCompany && certHealth && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-normal ${
+              certHealth.status === 'READY'
+                ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-500'
+                : certHealth.status === 'NOT_FOUND_IN_STORE'
+                ? 'border-amber-500/40 bg-amber-500/15 text-amber-500'
+                : certHealth.status === 'EXPIRED'
+                ? 'border-rose-500/40 bg-rose-500/15 text-rose-500'
+                : 'border-slate-500/30 bg-slate-500/10 text-[var(--text-muted)]'
+            }`}
+            title={certHealth.message}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                certHealth.status === 'READY'
+                  ? 'bg-emerald-500 animate-pulse'
+                  : certHealth.status === 'NOT_FOUND_IN_STORE'
+                  ? 'bg-amber-500'
+                  : certHealth.status === 'EXPIRED'
+                  ? 'bg-rose-500'
+                  : 'bg-slate-400'
+              }`}
+            />
+            <span>
+              {certHealth.status === 'READY'
+                ? 'Certificado Conectado'
+                : certHealth.status === 'NOT_FOUND_IN_STORE'
+                ? 'Certificado Não Detectado'
+                : certHealth.status === 'EXPIRED'
+                ? 'Certificado Expirado'
+                : 'Sem Certificado'}
+            </span>
+          </span>
+        )}
+      </div>
       <div className="truncate text-sm font-medium text-[var(--text-primary)]" title={activeCompany?.name || undefined}>
         {activeCompany?.name || 'Nenhuma empresa ativa'}
       </div>

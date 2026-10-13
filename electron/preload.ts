@@ -104,6 +104,7 @@ const fiscalApi = {
     getForCompany: (companyId: number) => ipcRenderer.invoke('certificates:getForCompany', companyId),
     associateToCompany: (companyId: number, thumbprint: string) =>
       ipcRenderer.invoke('certificates:associateToCompany', companyId, thumbprint),
+    checkHealth: (companyId: number) => ipcRenderer.invoke('certificates:checkHealth', companyId),
   },
   documents: {
     search: (filters: any) => ipcRenderer.invoke('documents:search', filters),
