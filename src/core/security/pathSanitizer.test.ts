@@ -55,3 +55,4 @@ describe('pathSanitizer', () => {
     expect(() => assertInsideDirectory(base, path.resolve('/etc/passwd'))).toThrow(PathTraversalError);
   });
 });
+

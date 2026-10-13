@@ -60,3 +60,4 @@ export function localAuthMiddleware(req: Request, res: Response, next: NextFunct
 
   next();
 }
+

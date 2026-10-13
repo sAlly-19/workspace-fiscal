@@ -58,3 +58,4 @@ export function assertInsideDirectory(baseDir: string, targetPath: string): stri
   }
   return path.resolve(targetPath);
 }
+
