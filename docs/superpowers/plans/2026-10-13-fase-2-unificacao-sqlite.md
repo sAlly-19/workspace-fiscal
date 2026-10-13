@@ -233,18 +233,18 @@ Commit: `feat(backup): enforce SHA-256 verification and atomic wal checkpointing
 - Verify: `npm run lint`
 - Verify: `npm run build`
 
-- [ ] **Step 1: Executar suíte completa de testes**
+- [x] **Step 1: Executar suíte completa de testes**
 Run: `npm.cmd test`
 Expected: Todas as suítes passam sem erros (100% PASS).
 
-- [ ] **Step 2: Executar checagem de tipos e lint**
+- [x] **Step 2: Executar checagem de tipos e lint**
 Run: `npm.cmd run lint`
 Expected: 0 erros de TypeScript nos projetos web e electron.
 
-- [ ] **Step 3: Executar build web e build electron**
+- [x] **Step 3: Executar build web e build electron**
 Run: `npm.cmd run build`
 Expected: Builds concluídos com sucesso sem erros.
 
-- [ ] **Step 4: Commit local da Task 6**
+- [x] **Step 4: Commit local da Task 6**
 Commit: `chore: complete phase 2 sqlite unification verification and build validation`
 

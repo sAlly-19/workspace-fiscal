@@ -123,6 +123,7 @@ export interface FiscalDocument {
 export interface DocumentSearchFilters {
   company_id: number;
   document_types?: DocumentType[];
+  direction?: DocumentDirection;
   environment?: SefazEnvironment | NfseEnvironment;
   start_date?: string;
   end_date?: string;

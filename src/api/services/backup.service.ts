@@ -122,8 +122,8 @@ export class BackupService {
     return res;
   }
 
-  async createSafetyBackup(): Promise<{ filename: string; path: string; sizeBytes: number }> {
-    return createSafetyBackup(this.settings);
+  async createSafetyBackup(customSettings?: BackupSettings): Promise<{ filename: string; path: string; sizeBytes: number }> {
+    return createSafetyBackup(customSettings || this.settings);
   }
 
   async inspectBackup(filePath: string): Promise<BackupInspectionResult> {
