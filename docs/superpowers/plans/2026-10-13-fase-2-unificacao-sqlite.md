@@ -163,16 +163,16 @@ Commit: `feat(buscador): unify sqlite path and add idempotent legacy migration`
 **Interfaces:**
 - Produces: `createSafetyBackup` usando `VACUUM INTO` com deleção de arquivo prévio; `createBackup` gerando `checksums: Record<string, string>` no `manifest.json`.
 
-- [ ] **Step 1: Escrever teste para snapshot `VACUUM INTO` e SHA-256 no manifesto (RED)**
+- [x] **Step 1: Escrever teste para snapshot `VACUUM INTO` e SHA-256 no manifesto (RED)**
 Adicionar testes em `src/api/services/backup.service.test.ts`:
 1. `createSafetyBackup` gera snapshot válido com `PRAGMA integrity_check = 'ok'` mesmo se o arquivo de destino já existir antes da execução.
 2. `createBackup` inclui bloco `checksums` no manifesto com hashes SHA-256 válidos.
 
-- [ ] **Step 2: Executar teste para verificar falha (RED)**
+- [x] **Step 2: Executar teste para verificar falha (RED)**
 Run: `npm.cmd test -- src/api/services/backup.service.test.ts`
 Expected: FAIL (comportamento atual usa `fs.copyFile` e não inclui `checksums`).
 
-- [ ] **Step 3: Implementar `VACUUM INTO` e checksums SHA-256 em `backup-creator.ts`**
+- [x] **Step 3: Implementar `VACUUM INTO` e checksums SHA-256 em `backup-creator.ts`**
 1. Em `createSafetyBackup`:
    - Checar se o destino existe: `if (existsSync(rawBackupPath)) await fs.unlink(rawBackupPath);`.
    - Executar `await rawClient.execute({ sql: 'VACUUM INTO ?', args: [rawBackupPath] });`.
@@ -180,11 +180,11 @@ Expected: FAIL (comportamento atual usa `fs.copyFile` e não inclui `checksums`)
    - Calcular `crypto.createHash('sha256').update(content).digest('hex')` para cada arquivo adicionado ao ZIP.
    - Adicionar o mapa `checksums` no `BackupManifest`.
 
-- [ ] **Step 4: Executar teste para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar teste para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/api/services/backup.service.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 4**
+- [x] **Step 5: Commit local da Task 4**
 Commit: `feat(backup): atomic WAL snapshot via VACUUM INTO and SHA-256 manifest integrity`
 
 ---

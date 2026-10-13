@@ -1,5 +1,6 @@
 import { promises as fs, existsSync, statSync } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import { DB_PATH, rawClient, db } from '../../../db';
 import { storageService } from '../storage.service';
@@ -49,6 +50,13 @@ export async function createBackup(
 
   const zip = new AdmZip();
   const manifestStats: BackupManifest['stats'] = {};
+  const checksums: Record<string, string> = {};
+
+  const addFileWithChecksum = (entryPath: string, buffer: Buffer) => {
+    zip.addFile(entryPath, buffer);
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    checksums[entryPath] = `sha256:${hash}`;
+  };
 
   // 2. Extrai dados do módulo DEPRECIATION
   if (modules.includes('DEPRECIATION')) {
@@ -74,7 +82,7 @@ export async function createBackup(
       depreciationExports: depExportsList,
     };
 
-    zip.addFile('data/depreciation.json', Buffer.from(JSON.stringify(depreciationPayload, null, 2), 'utf-8'));
+    addFileWithChecksum('data/depreciation.json', Buffer.from(JSON.stringify(depreciationPayload, null, 2), 'utf-8'));
   }
 
   // 3. Extrai dados do módulo NF_VIEW (e compacta os arquivos XML físicos)
@@ -107,7 +115,7 @@ export async function createBackup(
         xmlFileName = baseName;
         try {
           const xmlContent = await storageService.readXml(doc.rawXmlPath);
-          zip.addFile(`storage/documents/${baseName}`, Buffer.from(xmlContent, 'utf-8'));
+          addFileWithChecksum(`storage/documents/${baseName}`, Buffer.from(xmlContent, 'utf-8'));
           xmlFileCount++;
         } catch (e) {
           logger.warn({ docId: doc.id, rawXmlPath: doc.rawXmlPath }, 'backup_xml_read_failed');
@@ -127,7 +135,7 @@ export async function createBackup(
         xmlFileName = baseName;
         try {
           const xmlContent = await storageService.readXml(ev.rawXmlPath);
-          zip.addFile(`storage/documents/${baseName}`, Buffer.from(xmlContent, 'utf-8'));
+          addFileWithChecksum(`storage/documents/${baseName}`, Buffer.from(xmlContent, 'utf-8'));
           xmlFileCount++;
         } catch (e) {
           logger.warn({ eventId: ev.id, rawXmlPath: ev.rawXmlPath }, 'backup_event_xml_read_failed');
@@ -151,7 +159,7 @@ export async function createBackup(
       documentEvents: eventPayloads,
     };
 
-    zip.addFile('data/nf_view.json', Buffer.from(JSON.stringify(nfViewPayload, null, 2), 'utf-8'));
+    addFileWithChecksum('data/nf_view.json', Buffer.from(JSON.stringify(nfViewPayload, null, 2), 'utf-8'));
   }
 
   // 4. Extrai configurações gerais
@@ -163,16 +171,17 @@ export async function createBackup(
       applicationSettings: settingsList,
     };
 
-    zip.addFile('data/settings.json', Buffer.from(JSON.stringify(settingsPayload, null, 2), 'utf-8'));
+    addFileWithChecksum('data/settings.json', Buffer.from(JSON.stringify(settingsPayload, null, 2), 'utf-8'));
   }
 
   // 5. Gera Manifesto
   const manifest: BackupManifest = {
     format: 'workspace-fiscal-backup',
-    formatVersion: '1.0',
+    formatVersion: '2.0',
     appVersion: '3.0.0',
     createdAt: new Date().toISOString(),
     modules,
+    checksums,
     stats: manifestStats,
   };
 
@@ -237,11 +246,17 @@ export async function createSafetyBackup(
   const destination = settings.destination || getDefaultDestination();
   await fs.mkdir(destination, { recursive: true });
 
-  // Salva cópia bruta do sqlite para emergência absoluta
+  // Salva snapshot atômico do sqlite via VACUUM INTO para emergência absoluta
   const rawBackupPath = `${DB_PATH}.safety.${stamp}.bak`;
   try {
-    if (existsSync(DB_PATH)) {
-      await fs.copyFile(DB_PATH, rawBackupPath);
+    if (existsSync(DB_PATH) && rawClient) {
+      if (existsSync(rawBackupPath)) {
+        await fs.unlink(rawBackupPath);
+      }
+      await rawClient.execute({
+        sql: 'VACUUM INTO ?;',
+        args: [rawBackupPath],
+      });
     }
   } catch (e) {
     logger.warn({ err: (e as Error).message }, 'backup_raw_sqlite_safety_failed');

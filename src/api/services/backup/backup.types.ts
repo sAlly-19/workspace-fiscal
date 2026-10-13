@@ -11,10 +11,11 @@ export interface BackupSettings {
 
 export interface BackupManifest {
   format: 'workspace-fiscal-backup';
-  formatVersion: '1.0';
+  formatVersion: '1.0' | '2.0';
   appVersion: string;
   createdAt: string;
   modules: BackupModule[];
+  checksums?: Record<string, string>;
   stats: {
     companies?: number;
     categories?: number;

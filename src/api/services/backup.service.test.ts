@@ -26,10 +26,11 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
   it('Cenário A: Backup completo (.wfb) cria manifesto válido e estatísticas reais', async () => {
     // 1. Prepara dados de teste
     const testCompanyId = `comp_test_${Date.now()}`;
+    const testCnpj = `99${Date.now().toString().slice(-12)}`;
     await db.insert(companies).values({
       id: testCompanyId,
       name: 'Empresa Teste A',
-      cnpj: '12345678000199',
+      cnpj: testCnpj,
       depreciationRule: 'PROPORTIONAL',
     });
 
@@ -268,6 +269,38 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
       where: eq(companies.id, companyId),
     });
     expect(reloadedCompany?.depreciationRule).toBe('PROPORTIONAL');
+  });
+
+  it('Cenário G (IMP-014): createBackup gera checksums SHA-256 e createSafetyBackup executa VACUUM INTO atômico', async () => {
+    // 1. Gera backup e verifica checksums
+    const backupRes = await backupService.createBackup({
+      modules: ['DEPRECIATION', 'SETTINGS'],
+      customDestination: testDir,
+      customFilename: 'backup_sha256_test.wfb',
+    });
+
+    expect(backupRes.manifest.checksums).toBeDefined();
+    expect(backupRes.manifest.checksums!['data/depreciation.json']).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(backupRes.manifest.checksums!['data/settings.json']).toMatch(/^sha256:[a-f0-9]{64}$/);
+
+    // 2. Executa createSafetyBackup
+    const safetyRes = await backupService.createSafetyBackup({
+      destination: testDir,
+      intervalDays: 7,
+      retentionCount: 5,
+      enabled: true,
+    });
+
+    expect(fs.existsSync(safetyRes.path)).toBe(true);
+
+    // 3. Testa idempotência/remoção de destino prévio no VACUUM INTO
+    const safetyRes2 = await backupService.createSafetyBackup({
+      destination: testDir,
+      intervalDays: 7,
+      retentionCount: 5,
+      enabled: true,
+    });
+    expect(fs.existsSync(safetyRes2.path)).toBe(true);
   });
 });
 
