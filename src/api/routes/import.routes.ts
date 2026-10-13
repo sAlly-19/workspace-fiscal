@@ -23,7 +23,7 @@ const upload = multer({
   },
 });
 
-router.post('/', upload.array('files'), async (req, res) => {
+router.post(['/', '/upload'], upload.array('files'), async (req, res) => {
   try {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
