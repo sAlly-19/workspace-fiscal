@@ -16,9 +16,9 @@ import {
   Archive,
 } from 'lucide-react';
 
-export type AppVersion = '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
+export type AppVersion = '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
-export const CURRENT_APP_VERSION = '3.5.0';
+export const CURRENT_APP_VERSION = '3.5.1';
 
 export interface VersionBulletPoint {
   boldPrefix?: string;
@@ -47,10 +47,78 @@ export interface VersionSectionData {
 
 export const WHATS_NEW_VERSIONS: VersionSectionData[] = [
   {
-    id: '3.5.0',
-    label: 'v3.5.0 (Atual)',
+    id: '3.5.1',
+    label: 'v3.5.1 (Atual)',
     isCurrent: true,
     subtitleText: 'Lançamento mais recente',
+    cards: [
+      {
+        id: '3.5.1-sync-split-cooldown',
+        icon: RefreshCw,
+        iconClasses: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        hoverBorderClasses: 'hover:border-purple-300 dark:hover:border-purple-500/30',
+        title: 'Sincronização Dividida NF-e/CT-e & Cooldown em Tempo Real',
+        badgeText: 'Buscador & SEFAZ',
+        badgeClasses: 'text-purple-600 dark:text-purple-400',
+        description: 'Controle granular para consultas SEFAZ com proteção ativa contra consumo indevido:',
+        bullets: [
+          {
+            boldPrefix: 'Sincronização Independente: ',
+            text: 'Botões separados para sincronizar NF-e e CT-e individualmente, sem concorrência ou bloqueios cruzados entre modelos.',
+          },
+          {
+            boldPrefix: 'Cronômetro de Cooldown ao Vivo: ',
+            text: 'Contagem regressiva no próprio botão (mm:ss) ao atingir rate-limit da SEFAZ (cStat 656), liberando a consulta no tempo exato.',
+          },
+        ],
+      },
+      {
+        id: '3.5.1-certificado-preflight',
+        icon: ShieldCheck,
+        iconClasses: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        hoverBorderClasses: 'hover:border-emerald-300 dark:hover:border-emerald-500/30',
+        title: 'Validação de Certificado em Tempo Real & Pre-flight Check',
+        badgeText: 'Segurança & Certificados',
+        badgeClasses: 'text-emerald-600 dark:text-emerald-400',
+        description: 'Prevenção de consultas indevidas e diagnóstico transparente de conectividade:',
+        bullets: [
+          {
+            boldPrefix: 'Pre-flight Check Automático: ',
+            text: 'Testa se o certificado está instalado no repositório do Windows e dentro do prazo de validade antes da requisição SEFAZ.',
+          },
+          {
+            boldPrefix: 'Badges de Status em Tempo Real: ',
+            text: 'Indicadores visuais instantâneos no cabeçalho e na barra lateral (🟢 Conectado / 🟡 Não detectado / 🔴 Expirado).',
+          },
+        ],
+      },
+      {
+        id: '3.5.1-activity-logs-resilience',
+        icon: Search,
+        iconClasses: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        hoverBorderClasses: 'hover:border-blue-300 dark:hover:border-blue-500/30',
+        title: 'Logs de Atividades do Sistema & Resiliência de Arquivos',
+        badgeText: 'Auditoria & Estabilidade',
+        badgeClasses: 'text-blue-600 dark:text-blue-400',
+        description: 'Rastreabilidade completa de operações e proteção avançada contra falhas locais:',
+        bullets: [
+          {
+            boldPrefix: 'Central de Logs de Atividades: ',
+            text: 'Nova aba nas Configurações com filtros por módulo (Buscador, Backup, Workspace) e severidade, com painel de detalhes.',
+          },
+          {
+            boldPrefix: 'Gravação Blindada no Windows: ',
+            text: 'Retentativas com backoff contra travas temporárias do antivírus (EPERM) e suporte nativo a upload via arrastar e soltar (drag & drop).',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3.5.0',
+    label: 'v3.5.0',
+    isCurrent: false,
+    subtitleText: 'Versão anterior',
     cards: [
       {
         id: '3.5.0-filtro-nfe-gestao',

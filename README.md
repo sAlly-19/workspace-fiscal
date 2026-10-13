@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **3.5.0**
+Versão: **3.5.1**
 
 ---
 
@@ -413,7 +413,24 @@ npm run lint
 
 O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
 
-### Versão 3.5.0 (Atual)
+### Versão 3.5.1 (Atual)
+- **Buscador NF — Sincronização Dividida NF-e e CT-e:**
+  - Botões dedicados e independentes para "Sincronizar NF-e" e "Sincronizar CT-e" com controle de concorrência individual e histórico desacoplado.
+- **Validação Prévia de Saúde do Certificado Digital (Pre-flight Check):**
+  - Verificação em tempo real da presença e validade do certificado no repositório do Windows antes do envio de consultas para a SEFAZ, prevenindo erros indevidos de comunicação e consumo acidental de cotas.
+  - Badges visuais imediatos no cabeçalho e na barra lateral (🟢 Conectado / 🟡 Não detectado / 🔴 Expirado).
+- **Cronômetro de Cooldown SEFAZ em Tempo Real:**
+  - Contagem regressiva ao vivo nos botões de sincronização (`⏳ NF-e (mm:ss)` / `⏳ CT-e (mm:ss)`) em situações de rate-limit (*cStat 656*), com bloqueio automático até o encerramento do prazo regulamentar.
+- **Central de Auditoria — Logs de Atividades do Sistema:**
+  - Nova aba "Logs de Atividades" nas Configurações com histórico completo de eventos de sincronização SEFAZ, operações de backup, restaurações e erros operacionais.
+  - Filtros rápidos por módulo (Buscador, Backup, Workspace, Geral) e nível de severidade (INFO, WARN, ERROR), painel lateral detalhado e botão para cópia imediata do log.
+- **Resiliência de Arquivos & Importação Estável:**
+  - Gravação atômica blindada contra travas transitórias do Windows (antivírus e indexador) com 7 retentativas em backoff exponencial e fallback automático de cópia (`safeReplaceFileSync`).
+  - Suporte completo à rota `POST /api/import/upload` para importação de arquivos fiscais via arrastar e soltar (drag-and-drop) na tela principal do NF View.
+- **Componentização e Refatoração Modular:**
+  - Decomposição modular de mais de 20 grandes arquivos em submódulos desacoplados, com preservação de 100% dos comportamentos e cobertura de testes unitários.
+
+### Versão 3.5.0
 - **Buscador NF — Filtros Rápidos no Card e Gestão de Empresas:**
   - Grade de filtros rápidos no card da empresa ativa com botões para NF-e, CT-e, NFS-e e Todos com destaque de seleção ativa e alternância imediata de workspace.
   - Ações diretas para edição e exclusão segura de empresas na barra lateral e modal de edição, com confirmação e remoção atômica.

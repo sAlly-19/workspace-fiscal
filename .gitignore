@@ -89,6 +89,8 @@ Desktop.ini
 scratch/
 temp/
 tmp/
+*.tmp
+*.restore
 
 # Testing
 .vitest/

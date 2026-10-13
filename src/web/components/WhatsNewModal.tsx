@@ -20,7 +20,7 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
   const isLight = currentTheme === 'light';
 
   const [internalOpen, setInternalOpen] = useState(false);
-  const [activeVersion, setActiveVersion] = useState<AppVersion>('3.5.0');
+  const [activeVersion, setActiveVersion] = useState<AppVersion>(CURRENT_APP_VERSION);
 
   useEffect(() => {
     if (open !== undefined) {
@@ -154,14 +154,14 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                   }`}
                 >
                   <span>{v.label}</span>
-                  {v.isCurrent && activeVersion === '3.5.0' && (
+                  {v.isCurrent && activeVersion === CURRENT_APP_VERSION && (
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   )}
                 </button>
               ))}
             </div>
             <span className={`text-[11px] shrink-0 hidden sm:inline ${isLight ? 'text-slate-500' : 'text-zinc-500'}`}>
-              {activeVersion === '3.5.0'
+              {activeVersion === CURRENT_APP_VERSION
                 ? 'Lançamento mais recente'
                 : activeVersion === '2.5.0'
                   ? 'Lançamento do Hub Fiscal'
