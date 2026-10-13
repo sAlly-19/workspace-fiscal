@@ -16,6 +16,7 @@ import assetImportRoutes from './routes/asset-import.routes';
 import updatesRoutes from './routes/updates.routes';
 import { mutationRateLimiter, readRateLimiter, requestLogger } from './middleware/rateLimit';
 import { errorHandler } from './middleware/errorHandler';
+import { localAuthMiddleware } from './middleware/localAuth';
 import { logger } from './utils/logger';
 
 /**
@@ -42,7 +43,7 @@ export function createApp(): express.Express {
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Workspace-Token');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(204);
     }
@@ -56,7 +57,8 @@ export function createApp(): express.Express {
     res.json({ status: 'ok', service: 'nf-view-api' });
   });
 
-  // Rotas da API
+  // Autenticação local e controle de tráfego
+  app.use('/api', localAuthMiddleware);
   app.use('/api', readRateLimiter);
   app.use('/api/import', importRoutes);
   app.use('/api/workspace', workspaceRoutes);
