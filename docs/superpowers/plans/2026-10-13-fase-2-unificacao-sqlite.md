@@ -130,25 +130,25 @@ Commit: `feat(db): unify companies schema with dual-id, deduplication and buscad
 - Consumes: `resolveDbPath()` de `src/db/db-paths.ts`.
 - Produces: `migrateLegacyBuscadorDatabase(legacyPath, targetPath): Promise<boolean>` que executa migração segura e renomeia o arquivo legado para `.bak`.
 
-- [ ] **Step 1: Escrever teste para a migração de banco legado do Buscador (RED)**
+- [x] **Step 1: Escrever teste para a migração de banco legado do Buscador (RED)**
 Criar `src/db/legacy-buscador-migration.test.ts` gerando um banco legado simulado `fiscal_storage.db` com empresas, certificados, NSUs e documentos, e afirmando que após a migração:
 1. Os dados foram incorporados em `workspace-fiscal.sqlite`.
 2. O arquivo legado foi renomeado para `fiscal_storage.db.migrated.<ts>.bak`.
 3. Execuções subsequentes são no-ops idempotentes.
 
-- [ ] **Step 2: Executar teste para verificar falha (RED)**
+- [x] **Step 2: Executar teste para verificar falha (RED)**
 Run: `npm.cmd test -- src/db/legacy-buscador-migration.test.ts`
 Expected: FAIL (módulo ainda não existe).
 
-- [ ] **Step 3: Implementar `legacy-buscador-migration.ts` e integrar em `electron/buscador/services.ts`**
+- [x] **Step 3: Implementar `legacy-buscador-migration.ts` e integrar em `electron/buscador/services.ts`**
 1. Implementar a rotina em `src/db/legacy-buscador-migration.ts` lendo tabelas legadas com `PRAGMA integrity_check` e inserindo em `companies` (com deduplicação por CNPJ), `certificates`, `distribution_state`, `buscador_documents`, `nfse_events` e `app_settings`.
 2. Em `electron/buscador/services.ts`, chamar `migrateLegacyBuscadorDatabase` e passar `resolveDbPath()` para `getDatabase()`.
 
-- [ ] **Step 4: Executar teste para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar teste para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/db/legacy-buscador-migration.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 3**
+- [x] **Step 5: Commit local da Task 3**
 Commit: `feat(buscador): unify sqlite path and add idempotent legacy migration`
 
 ---

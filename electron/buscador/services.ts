@@ -1,5 +1,7 @@
 import path from 'path';
 import fs from 'fs';
+import { resolveDbPath } from '../../src/db/db-paths';
+import { migrateLegacyBuscadorDatabase } from '../../src/db/legacy-buscador-migration';
 import { getDatabase } from '../../src/core/buscador/database/connection';
 import { CompanyRepository } from '../../src/core/buscador/database/repositories/CompanyRepository';
 import { CertificateRepository } from '../../src/core/buscador/database/repositories/CertificateRepository';
@@ -50,11 +52,18 @@ export interface ApplicationContext {
 }
 
 export async function initializeServices(userDataPath: string): Promise<ApplicationContext> {
-  const dbPath = path.join(userDataPath, 'fiscal_storage.db');
+  const legacyDbPath = path.join(userDataPath, 'fiscal_storage.db');
+  const dbPath = resolveDbPath();
   const storageDir = path.join(userDataPath, 'documents');
 
   if (!fs.existsSync(userDataPath)) {
     fs.mkdirSync(userDataPath, { recursive: true });
+  }
+
+  try {
+    await migrateLegacyBuscadorDatabase(legacyDbPath, dbPath);
+  } catch (migErr) {
+    console.error('Falha na migração do banco legado do Buscador:', migErr);
   }
 
   const db = await getDatabase(dbPath);
