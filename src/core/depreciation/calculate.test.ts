@@ -57,6 +57,27 @@ describe('proportionalFirstMonthCents', () => {
     // 1000 * 16 / 31 = 516.12 -> round 516
     expect(value).toBe(516);
   });
+
+  it('deve calcular proporcional do primeiro mes sem desvio por divisao flutuante dupla', () => {
+    // Aquisição dia 15 num mês de 31 dias: dim=31, daysRemaining=17
+    // acquisitionCents = 100000 (R$ 1.000,00), annualRate = 20%
+    // Formula exata: round(100000 * 20 * 17 / (1200 * 31)) = round(34000000 / 37200) = 914 centavos (R$ 9,14)
+    const date = new Date(2026, 0, 15); // Jan 15, 2026
+    const prop = proportionalFirstMonthCents(100000, 20, date);
+    expect(prop).toBe(914);
+  });
+
+  it('deve garantir convergencia exata de schedule proporcional com anos bissextos e taxas impares', () => {
+    const schedule = generateSchedule({
+      acquisitionValue: 100000,
+      annualRate: 15,
+      acquisitionDate: new Date(2024, 1, 15), // Fev 15, 2024 (ano bissexto dim=29, rem=15)
+      depreciationRule: 'PROPORTIONAL',
+    });
+    const totalDepreciated = schedule.reduce((sum, item) => sum + item.depreciationValue, 0);
+    expect(totalDepreciated).toBe(100000);
+    expect(schedule[schedule.length - 1].currentValue).toBe(0);
+  });
 });
 
 describe('generateSchedule', () => {

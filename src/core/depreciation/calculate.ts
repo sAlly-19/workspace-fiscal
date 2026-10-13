@@ -73,12 +73,8 @@ export function proportionalFirstMonthCents(
   const day = acquisitionDate.getDate();
   const dim = daysInMonth(year, month);
   const daysRemaining = dim - day + 1; // inclusive
-  // Proporcional sobre mensal cheio
-  // = round( acquisition * annual * daysRemaining / (100*12*dim) )
-  const fullMonthly = (acquisitionCents * annualRate) / 1200;
-  const proportional = (fullMonthly * daysRemaining) / dim;
-  return Math.round(proportional);
-  // Alternativa direta sem double rounding: Math.round(acquisitionCents * annualRate * daysRemaining / (100*12*dim))
+  // Operação inteira antes da divisão para evitar float drift
+  return Math.round((acquisitionCents * annualRate * daysRemaining) / (1200 * dim));
 }
 
 /**
