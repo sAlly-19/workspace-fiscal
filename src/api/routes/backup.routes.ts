@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { backupService, BackupModule } from '../services/backup.service';
+import { sanitizeFileName } from '../../core/security/pathSanitizer';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/create', async (req, res) => {
     const result = await backupService.createBackup({
       modules: Array.isArray(modules) && modules.length > 0 ? modules : ['NF_VIEW', 'DEPRECIATION', 'SETTINGS'],
       customDestination: destination,
-      customFilename: filename,
+      customFilename: filename ? sanitizeFileName(filename) : undefined,
     });
     res.json(result);
   } catch (e) {

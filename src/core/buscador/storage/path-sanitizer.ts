@@ -1,22 +1,19 @@
 import path from 'path';
 import type { DocumentType, SefazEnvironment } from '../domain/types';
+import {
+  sanitizeFileName as baseSanitizeFileName,
+  isPathSafe as baseIsPathSafe,
+  assertInsideDirectory,
+  PathTraversalError,
+} from '../../security/pathSanitizer';
+
+export { assertInsideDirectory, PathTraversalError };
 
 /**
- * Sanitiza um nome de arquivo ou pasta removendo caracteres ilegais para o sistema de arquivos do Windows
- * Caracteres proibidos no Windows: < > : " / \ | ? * e caracteres de controle (ASCII 0-31)
+ * Sanitiza um nome de arquivo ou pasta utilizando o módulo central pathSanitizer
  */
 export function sanitizeFilename(filename: string): string {
-  if (!filename) return '';
-
-  // Remove qualquer prefixo de directory traversal (ex: ../ ou ..\)
-  let clean = filename.replace(/^(\.\.[\/\\])+/, '');
-
-  return clean
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_') // Substitui caracteres proibidos e separadores por underscore
-    .replace(/\.{2,}/g, '.')                // Previne múltiplos pontos consecutivos
-    .replace(/^\.+|\.+$/g, '')              // Remove pontos no início e no fim
-    .trim()
-    .substring(0, 255);                     // Limite máximo de comprimento de nome de arquivo
+  return baseSanitizeFileName(filename);
 }
 
 /**
@@ -24,13 +21,7 @@ export function sanitizeFilename(filename: string): string {
  * prevenindo qualquer ataque de Path Traversal (Directory Traversal)
  */
 export function isSafeSubpath(baseDir: string, targetPath: string): boolean {
-  if (!baseDir || !targetPath) return false;
-
-  const resolvedBase = path.resolve(baseDir);
-  const resolvedTarget = path.resolve(targetPath);
-
-  // Deve iniciar exatamente com o diretório base mais o separador de diretório
-  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep);
+  return baseIsPathSafe(baseDir, targetPath);
 }
 
 /**

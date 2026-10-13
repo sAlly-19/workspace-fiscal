@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { importService } from '../services/import.service';
+import { sanitizeFileName } from '../../core/security/pathSanitizer';
 
 const router = Router();
 // Limite de 100MB para pacotes ZIP e 10MB para XMLs individuais
@@ -45,7 +46,7 @@ router.post(['/', '/upload'], upload.array('files'), async (req, res) => {
               const buffer = entry.getData();
               unpackedFiles.push({
                 fieldname: 'files',
-                originalname: path.basename(entry.entryName),
+                originalname: sanitizeFileName(path.basename(entry.entryName)),
                 encoding: '7bit',
                 mimetype: 'text/xml',
                 size: buffer.length,
@@ -168,7 +169,7 @@ router.post('/paths', async (req, res) => {
             const buffer = entry.getData();
             inMemoryFiles.push({
               fieldname: 'files',
-              originalname: path.basename(entry.entryName),
+              originalname: sanitizeFileName(path.basename(entry.entryName)),
               encoding: '7bit',
               mimetype: 'text/xml',
               size: buffer.length,
@@ -186,17 +187,20 @@ router.post('/paths', async (req, res) => {
     };
 
     for (const p of filePaths) {
-      if (typeof p !== 'string') continue;
+      if (typeof p !== 'string' || !p.trim()) continue;
+      const normalized = path.normalize(p.trim());
+      // Rejeita sequências relativas de directory traversal
+      if (normalized.includes('..') && !path.isAbsolute(normalized)) continue;
       try {
-        if (!fs.existsSync(p)) continue;
-        const stat = fs.statSync(p);
+        if (!fs.existsSync(normalized)) continue;
+        const stat = fs.statSync(normalized);
         if (stat.isDirectory()) {
-          walkDir(p);
+          walkDir(normalized);
         } else if (stat.isFile()) {
-          if (p.toLowerCase().endsWith('.xml')) {
-            targetXmlPaths.push(p);
-          } else if (p.toLowerCase().endsWith('.zip')) {
-            tryExtractZip(p);
+          if (normalized.toLowerCase().endsWith('.xml')) {
+            targetXmlPaths.push(normalized);
+          } else if (normalized.toLowerCase().endsWith('.zip')) {
+            tryExtractZip(normalized);
           }
         }
       } catch {}
