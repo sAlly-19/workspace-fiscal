@@ -259,6 +259,44 @@ const SAMPLE_NFSE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </Nfse>
 </CompNfse>`;
 
+const SAMPLE_PROCEVENTO_CTE_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<procEventoCTe versao="3.00" xmlns="http://www.portalfiscal.inf.br/cte">
+  <eventoCTe versao="3.00">
+    <infEvento Id="ID1101103526011111111100011157001000000456100000045601">
+      <cOrgao>35</cOrgao>
+      <tpAmb>1</tpAmb>
+      <CNPJ>11111111000111</CNPJ>
+      <chCTe>35260111111111000111570010000004561000000456</chCTe>
+      <dhEvento>2026-02-01T14:30:00-03:00</dhEvento>
+      <tpEvento>110110</tpEvento>
+      <nSeqEvento>1</nSeqEvento>
+      <detEvento versaoEvento="3.00">
+        <descEvento>Carta de Correcao</descEvento>
+        <xCorrecao>Alteracao de informacao</xCorrecao>
+      </detEvento>
+    </infEvento>
+  </eventoCTe>
+</procEventoCTe>`;
+
+const SAMPLE_PROCEVENTO_NFE_WITH_CTEXTO_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<procEventoNFe versao="1.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <evento versao="1.00">
+    <infEvento Id="ID1101103524011234567800019955001000000123100000013101">
+      <cOrgao>35</cOrgao>
+      <tpAmb>1</tpAmb>
+      <CNPJ>12345678000199</CNPJ>
+      <chNFe>35240112345678000199550010000001231000000131</chNFe>
+      <dhEvento>2026-01-20T11:00:00-03:00</dhEvento>
+      <tpEvento>110110</tpEvento>
+      <nSeqEvento>1</nSeqEvento>
+      <detEvento versao="1.00">
+        <descEvento>Carta de Correcao</descEvento>
+        <cTexto>Correcao de dados adicionais da nota fiscal</cTexto>
+      </detEvento>
+    </infEvento>
+  </evento>
+</procEventoNFe>`;
+
 describe('Fiscal Detectors and Parsers', () => {
   it('detects NFe correctly', () => {
     const type = detectFiscalDocument(SAMPLE_NFE_XML);
@@ -357,6 +395,25 @@ describe('Fiscal Detectors and Parsers', () => {
     const doc = parseFiscalDocument(SAMPLE_NFE_XML, 'NFE', 'path.xml');
     expect(doc.type).toBe('NFE');
     expect(doc.number).toBe('123');
+  });
+
+  it('detects and parses procEventoCTe correctly as CTE', () => {
+    const type = detectFiscalDocument(SAMPLE_PROCEVENTO_CTE_XML);
+    expect(type).toBe('CTE');
+    const doc = parseFiscalDocument(SAMPLE_PROCEVENTO_CTE_XML, type, 'cte-event.xml');
+    expect(doc.type).toBe('CTE');
+    expect(doc.accessKey).toBe('35260111111111000111570010000004561000000456');
+    expect(doc.number).toBe('456');
+  });
+
+  it('detects and parses procEventoNFe with cTexto tag as NFE without being misclassified as CTE', () => {
+    const type = detectFiscalDocument(SAMPLE_PROCEVENTO_NFE_WITH_CTEXTO_XML);
+    expect(type).toBe('NFE');
+    const doc = parseFiscalDocument(SAMPLE_PROCEVENTO_NFE_WITH_CTEXTO_XML, type, 'nfe-event.xml');
+    expect(doc.type).toBe('NFE');
+    expect(doc.accessKey).toBe('35240112345678000199550010000001231000000131');
+    expect(doc.number).toBe('123');
+    expect(doc.items[0].description).toBe('Correcao de dados adicionais da nota fiscal');
   });
 });
 

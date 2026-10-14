@@ -9,13 +9,16 @@ export class NFeParser extends FiscalParser {
     const jsonObj = this.parseXml(xmlContent);
     
     // Check if it is a procEventoNFe or evento (e.g. Carta de Correção or Cancelamento)
-    const evento = jsonObj.procEventoNFe?.evento || jsonObj.evento;
+    const evento = jsonObj.procEventoNFe?.evento
+      || jsonObj.procEventoNFe?.eventoNFe
+      || jsonObj.eventoNFe
+      || jsonObj.evento;
     if (evento && (evento.infEvento || evento['@_versao'])) {
       const infEvento = evento.infEvento || evento;
-      const chNFe = infEvento.chNFe ? String(infEvento.chNFe) : '';
+      const chNFe = infEvento.chNFe || infEvento.chDFe ? String(infEvento.chNFe || infEvento.chDFe) : '';
       const tpEvento = String(infEvento.tpEvento || '');
       const descEvento = infEvento.detEvento?.descEvento || (tpEvento === '110110' ? 'Carta de Correção Eletrônica' : 'Evento NF-e');
-      const xCorrecao = infEvento.detEvento?.xCorrecao || infEvento.detEvento?.xJust || descEvento;
+      const xCorrecao = infEvento.detEvento?.xCorrecao || infEvento.detEvento?.cTexto || infEvento.detEvento?.xJust || descEvento;
       
       const numFromKey = chNFe.length >= 34 ? chNFe.substring(25, 34).replace(/^0+/, '') : undefined;
       const serieFromKey = chNFe.length >= 25 ? chNFe.substring(22, 25).replace(/^0+/, '') : undefined;

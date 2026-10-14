@@ -59,13 +59,17 @@ export class CTeParser extends FiscalParser {
     }
 
     // Suporte a evento ou resumo de evento de CT-e
-    const eventoCTe = jsonObj.procEventoCTe?.eventoCTe || jsonObj.eventoCTe || jsonObj.resEventoCTe;
+    const eventoCTe = jsonObj.procEventoCTe?.eventoCTe
+      || jsonObj.procEventoCTe?.evento
+      || jsonObj.eventoCTe
+      || jsonObj.resEventoCTe;
     if (eventoCTe) {
       const infEvento = eventoCTe.infEvento || eventoCTe;
-      const chCTe = infEvento.chCTe ? String(infEvento.chCTe) : '';
+      const chCTe = infEvento.chCTe || infEvento.chDFe ? String(infEvento.chCTe || infEvento.chDFe) : '';
       const numFromKey = chCTe.length >= 34 ? chCTe.substring(25, 34).replace(/^0+/, '') : undefined;
       const serieFromKey = chCTe.length >= 25 ? chCTe.substring(22, 25).replace(/^0+/, '') : undefined;
       const descEvento = infEvento.detEvento?.descEvento || infEvento.descEvento || 'Evento CT-e';
+      const xCorrecao = infEvento.detEvento?.xCorrecao || infEvento.detEvento?.xJust || infEvento.detEvento?.cTexto || descEvento;
 
       return {
         id: crypto.randomUUID(),
@@ -80,7 +84,7 @@ export class CTeParser extends FiscalParser {
           document: infEvento.CNPJ || infEvento.CPF || 'NÃO INFORMADO',
         },
         items: [{
-          description: typeof descEvento === 'string' ? descEvento : 'Evento CT-e',
+          description: typeof xCorrecao === 'string' ? xCorrecao : 'Evento CT-e',
           quantity: 1,
           unitPrice: 0,
           totalPrice: 0,

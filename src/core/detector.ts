@@ -21,26 +21,50 @@ export function detectFiscalDocument(xmlContent: string): DocumentType {
     return 'NFSE';
   }
 
-  // CT-e detection (incluindo resCTe)
+  // Explicit CT-e events (prioritized before generic <evento>)
   if (
-    contentLower.includes('<cteproc') || 
-    contentLower.includes('<cte') ||
-    contentLower.includes('<infcte') ||
-    contentLower.includes('<rescte')
+    contentLower.includes('<proceventocte') ||
+    contentLower.includes('<eventocte') ||
+    contentLower.includes('<reseventocte') ||
+    contentLower.includes('<chcte>')
   ) {
     return 'CTE';
   }
 
-  // NF-e / NFC-e / Inutilização / Eventos (incluindo resNFe e resEvento)
+  // Explicit NF-e events
+  if (
+    contentLower.includes('<proceventonfe') ||
+    contentLower.includes('<eventonfe') ||
+    contentLower.includes('<reseventonfe') ||
+    contentLower.includes('<chnfe>')
+  ) {
+    if (contentLower.includes('<mod>65</mod>') || contentLower.includes('<mod>65 </mod>')) {
+      return 'NFCE';
+    }
+    return 'NFE';
+  }
+
+  // CT-e documents (delimited to avoid matching <cTexto> or other tags)
+  if (
+    contentLower.includes('<cteproc') || 
+    contentLower.includes('<infcte') ||
+    contentLower.includes('<rescte') ||
+    /<cte[\s>]/i.test(xmlContent)
+  ) {
+    return 'CTE';
+  }
+
+  // NF-e / NFC-e / Inutilização / Generic Events
   if (
     contentLower.includes('<proceventonfe') || 
     contentLower.includes('<evento') || 
     contentLower.includes('<resevento') ||
     contentLower.includes('<nfeproc') || 
-    contentLower.includes('<nfe') ||
+    contentLower.includes('<infnfe') ||
     contentLower.includes('<resnfe') ||
     contentLower.includes('<retinutnfe') ||
-    contentLower.includes('<inutnfe')
+    contentLower.includes('<inutnfe') ||
+    /<nfe[\s>]/i.test(xmlContent)
   ) {
     if (contentLower.includes('<mod>65</mod>') || contentLower.includes('<mod>65 </mod>')) {
       return 'NFCE';
