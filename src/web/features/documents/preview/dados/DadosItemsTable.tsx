@@ -109,7 +109,7 @@ function DadosItemsTableContent({
             Exibindo {INITIAL_ITEMS_LIMIT} de {items.length} itens
           </span>
           <button
-            onClick={() => setIsExpanded(true)}
+            onClick={() => setUserExpanded(true)}
             className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer"
           >
             Mostrar todos os {items.length} itens
