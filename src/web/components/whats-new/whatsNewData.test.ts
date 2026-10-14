@@ -2,27 +2,27 @@ import { describe, it, expect } from 'vitest';
 import { CURRENT_APP_VERSION, WHATS_NEW_VERSIONS, type AppVersion } from './whatsNewData';
 
 describe('whatsNewData integrity tests', () => {
-  it('should define CURRENT_APP_VERSION as 3.5.1', () => {
-    expect(CURRENT_APP_VERSION).toBe('3.5.1');
+  it('should define CURRENT_APP_VERSION as 3.5.2', () => {
+    expect(CURRENT_APP_VERSION).toBe('3.5.2');
   });
 
-  it('should include all 7 supported application versions in descending order', () => {
-    const expectedVersions: AppVersion[] = ['3.5.1', '3.5.0', '3.0.0', '2.5.3', '2.5.2', '2.5.1', '2.5.0'];
+  it('should include all 8 supported application versions in descending order', () => {
+    const expectedVersions: AppVersion[] = ['3.5.2', '3.5.1', '3.5.0', '3.0.0', '2.5.3', '2.5.2', '2.5.1', '2.5.0'];
     const actualVersions = WHATS_NEW_VERSIONS.map((v) => v.id);
     expect(actualVersions).toEqual(expectedVersions);
   });
 
-  it('should mark version 3.5.1 as current with proper label and subtitle', () => {
+  it('should mark version 3.5.2 as current with proper label and subtitle', () => {
+    const v352 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.2');
+    expect(v352).toBeDefined();
+    expect(v352?.isCurrent).toBe(true);
+    expect(v352?.label).toBe('v3.5.2 (Atual)');
+    expect(v352?.subtitleText).toBe('Lançamento mais recente');
+
     const v351 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.1');
     expect(v351).toBeDefined();
-    expect(v351?.isCurrent).toBe(true);
-    expect(v351?.label).toBe('v3.5.1 (Atual)');
-    expect(v351?.subtitleText).toBe('Lançamento mais recente');
-
-    const v350 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.0');
-    expect(v350).toBeDefined();
-    expect(v350?.isCurrent).toBe(false);
-    expect(v350?.label).toBe('v3.5.0');
+    expect(v351?.isCurrent).toBe(false);
+    expect(v351?.label).toBe('v3.5.1');
   });
 
   it('should ensure each version contains exactly 3 detailed cards with required visual classes', () => {

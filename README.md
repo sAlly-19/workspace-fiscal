@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **3.5.1**
+Versão: **3.5.2**
 
 ---
 
@@ -413,7 +413,25 @@ npm run lint
 
 O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
 
-### Versão 3.5.1 (Atual)
+### Versão 3.5.2 (Atual)
+- **Conformidade Tributária 2026 (IBS, CBS e Imposto Seletivo):**
+  - Extração híbrida para layout plano e agrupadores oficiais da NT 2024.002 / NT 2025.002 (`gIBSCBS`, `gIBS`, `gCBS`, `IBSCBSTot`) nos parsers NF-e, CT-e e NFS-e.
+  - Exibição analítica condicional no DANFE e na aba "Dados da Nota", preservando 100% da visualização legada para notas anteriores a 2026.
+- **CNPJ Alfanumérico da RFB & Chaves de Acesso Estritas:**
+  - Implementação da validação oficial Módulo 11 para CNPJs com letras (IN RFB 2.229/2024) com paridade matemática.
+  - Validação posicional estrita em chaves de 44 caracteres, restringindo caracteres alfanuméricos exclusivamente às posições da raiz e filial do CNPJ.
+- **Autenticidade SEFAZ & Assinatura Digital XMLDSig:**
+  - Detecção automática de integridade criptográfica XMLDSig e mapeamento visual de protocolos SEFAZ (`cStat 100/150` para Autorizada, `101/151/110/301/302/303` para Cancelada/Denegada e badges para ausência de protocolo).
+- **Banco SQLite Unificado em Modo WAL & Supervisor de Servidor Local:**
+  - Consolidação física de todos os dados do sistema em banco SQLite único com `PRAGMA journal_mode = WAL`, `busy_timeout = 5000` e integridade referencial.
+  - Sistema de backup `.wfb` com snapshot atômico via `VACUUM INTO` e integridade criptográfica SHA-256.
+  - Supervisor de servidor local Express com auto-recuperação transparente em backoff exponencial contra quedas.
+- **Otimização de Performance 60 FPS & Observabilidade Segura (LGPD):**
+  - Renderização progressiva (chunking) e memoização estrita via `React.memo` para navegação fluida em pastas com 1.000+ documentos e notas fiscais com centenas de itens.
+  - Anonimização LGPD recursiva em logs contra vazamento de senhas, chaves privadas e tokens.
+  - Pipeline de CI/CD automatizado via GitHub Actions cobrindo lint, testes e builds.
+
+### Versão 3.5.1
 - **Buscador NF — Sincronização Dividida NF-e e CT-e:**
   - Botões dedicados e independentes para "Sincronizar NF-e" e "Sincronizar CT-e" com controle de concorrência individual e histórico desacoplado.
 - **Validação Prévia de Saúde do Certificado Digital (Pre-flight Check):**

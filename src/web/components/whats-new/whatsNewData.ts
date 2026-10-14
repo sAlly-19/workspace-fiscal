@@ -16,9 +16,9 @@ import {
   Archive,
 } from 'lucide-react';
 
-export type AppVersion = '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
+export type AppVersion = '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
-export const CURRENT_APP_VERSION = '3.5.1';
+export const CURRENT_APP_VERSION = '3.5.2';
 
 export interface VersionBulletPoint {
   boldPrefix?: string;
@@ -47,10 +47,90 @@ export interface VersionSectionData {
 
 export const WHATS_NEW_VERSIONS: VersionSectionData[] = [
   {
-    id: '3.5.1',
-    label: 'v3.5.1 (Atual)',
+    id: '3.5.2',
+    label: 'v3.5.2 (Atual)',
     isCurrent: true,
     subtitleText: 'Lançamento mais recente',
+    cards: [
+      {
+        id: '3.5.2-reforma-tributaria-cnpj',
+        icon: ShieldCheck,
+        iconClasses: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        hoverBorderClasses: 'hover:border-purple-300 dark:hover:border-purple-500/30',
+        title: 'Reforma Tributária 2026 (IBS, CBS e IS) & CNPJ Alfanumérico',
+        badgeText: 'Conformidade Fiscal',
+        badgeClasses: 'text-purple-600 dark:text-purple-400',
+        description: 'Adequação completa às diretrizes da Emenda Constitucional 132/2023 e IN RFB 2.229/2024:',
+        bullets: [
+          {
+            boldPrefix: 'Tributos RTC 2026: ',
+            text: 'Extração híbrida de IBS, CBS e Imposto Seletivo (tags planas e nós oficiais gIBSCBS/IBSCBSTot), com quadro analítico retrocompatível no DANFE.',
+          },
+          {
+            boldPrefix: 'CNPJ Alfanumérico da RFB: ',
+            text: 'Validação rigorosa Módulo 11 com letras e validação posicional estrita em chaves de acesso de 44 caracteres.',
+          },
+          {
+            boldPrefix: 'Autenticidade SEFAZ: ',
+            text: 'Detecção de assinatura digital XMLDSig e mapeamento visual de status com protocolos oficiais de autorização.',
+          },
+        ],
+      },
+      {
+        id: '3.5.2-sqlite-wal-supervisor',
+        icon: RefreshCw,
+        iconClasses: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        hoverBorderClasses: 'hover:border-emerald-300 dark:hover:border-emerald-500/30',
+        title: 'SQLite Unificado em Modo WAL & Supervisor de Servidor',
+        badgeText: 'Infraestrutura & Dados',
+        badgeClasses: 'text-emerald-600 dark:text-emerald-400',
+        description: 'Consolidação de banco de dados e estabilidade máxima na camada de transporte:',
+        bullets: [
+          {
+            boldPrefix: 'Base Única de Dados: ',
+            text: 'Unificação dos dados de NF View, Depreciação e Buscador NF em banco SQLite único com PRAGMA journal_mode = WAL e busy_timeout de 5000ms.',
+          },
+          {
+            boldPrefix: 'Backup Estruturado com SHA-256: ',
+            text: 'Geração de pacotes .wfb com snapshot atômico via VACUUM INTO e checksum de integridade criptográfica.',
+          },
+          {
+            boldPrefix: 'Supervisor de Servidor Local: ',
+            text: 'Monitoramento contínuo do processo Express com auto-recuperação transparente em backoff exponencial contra quedas.',
+          },
+        ],
+      },
+      {
+        id: '3.5.2-performance-lgpd-cicd',
+        icon: Search,
+        iconClasses: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        hoverBorderClasses: 'hover:border-blue-300 dark:hover:border-blue-500/30',
+        title: 'Renderização 60 FPS, Segurança LGPD & CI/CD Automatizado',
+        badgeText: 'Performance & Governança',
+        badgeClasses: 'text-blue-600 dark:text-blue-400',
+        description: 'Eficiência de processamento para grandes lotes e conformidade em segurança da informação:',
+        bullets: [
+          {
+            boldPrefix: 'Renderização Progressiva e Memoização: ',
+            text: 'Navegação fluida em 60 FPS para pastas com 1.000+ documentos e notas fiscais com centenas de itens sem travamentos.',
+          },
+          {
+            boldPrefix: 'Anonimização de Logs (LGPD): ',
+            text: 'Redator recursivo de dados sensíveis ocultando senhas, chaves privadas PEM e tokens de autorização em relatórios.',
+          },
+          {
+            boldPrefix: 'Pipeline Automatizado de CI/CD: ',
+            text: 'Integração contínua no GitHub Actions com checagem de tipos, suíte completa de 85+ testes e build de produção.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3.5.1',
+    label: 'v3.5.1',
+    isCurrent: false,
+    subtitleText: 'Versão anterior',
     cards: [
       {
         id: '3.5.1-sync-split-cooldown',
