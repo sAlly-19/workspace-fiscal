@@ -117,9 +117,16 @@ export function DepreciationApp({ onBackToHome }: { onBackToHome?: () => void })
     [companies, selectedCompanyId]
   );
 
-  // Initial loads
+  // Initial loads & cross-module companies sync (IMP-012)
   useEffect(() => {
     fetchCompanies();
+    const handleCompaniesUpdated = () => {
+      fetchCompanies();
+    };
+    window.addEventListener('wsf:companies-updated', handleCompaniesUpdated);
+    return () => {
+      window.removeEventListener('wsf:companies-updated', handleCompaniesUpdated);
+    };
   }, [fetchCompanies]);
   useEffect(() => {
     if (selectedCompanyId) {

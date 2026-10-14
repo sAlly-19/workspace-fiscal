@@ -98,9 +98,16 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const nfseSyncTriggerRef = useRef<(() => Promise<void>) | null>(null);
   const [isNfseSyncing, setIsNfseSyncing] = useState(false);
 
-  // Carregamento inicial
+  // Carregamento inicial e sincronização reativa de empresas (IMP-012)
   useEffect(() => {
     loadInitialData();
+    const handleCompaniesUpdated = () => {
+      loadInitialData();
+    };
+    window.addEventListener('wsf:companies-updated', handleCompaniesUpdated);
+    return () => {
+      window.removeEventListener('wsf:companies-updated', handleCompaniesUpdated);
+    };
   }, []);
 
   const loadInitialData = async () => {
@@ -249,6 +256,13 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     setIsDeletingCompany(true);
     try {
       await window.fiscalApi.companies.delete(companyToDelete.id);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('wsf:companies-updated', {
+            detail: { action: 'delete', companyId: companyToDelete.id },
+          })
+        );
+      }
       pushFeedback({
         kind: 'success',
         title: 'Empresa removida',
@@ -501,6 +515,13 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
               await window.fiscalApi.companies.update({ id: editingCompany.id, ...data });
             } else {
               await window.fiscalApi.companies.create(data);
+            }
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('wsf:companies-updated', {
+                  detail: { action: editingCompany ? 'update' : 'create' },
+                })
+              );
             }
             loadInitialData();
           }}
