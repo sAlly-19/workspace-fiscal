@@ -1,6 +1,7 @@
 import { FiscalParser } from './base.parser';
 import { FiscalDocument, DocumentType, Party, FiscalItem, FiscalTotals, Address, FiscalBilling, FiscalTransport } from '../fiscal.types';
 import crypto from 'crypto';
+import { parseFiscalNumber } from './utils/xml-number.utils';
 
 export class NFeParser extends FiscalParser {
   parse(xmlContent: string, rawXmlPath: string, batchId?: string): FiscalDocument {
@@ -69,6 +70,79 @@ export class NFeParser extends FiscalParser {
         },
         items: [{
           description: `${motivo} - Protocolo: ${inut.nProt || 'S/N'}`,
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+        }],
+        totals: {
+          products: 0,
+          total: 0,
+        },
+        rawXmlPath,
+        batchId,
+        createdAt: new Date(),
+      };
+    }
+
+    // Check if it is a resNFe (SEFAZ summary)
+    const resNFe = jsonObj.resNFe;
+    if (resNFe) {
+      const chNFe = resNFe.chNFe ? String(resNFe.chNFe) : '';
+      const numFromKey = chNFe.length >= 34 ? chNFe.substring(25, 34).replace(/^0+/, '') : undefined;
+      const serieFromKey = chNFe.length >= 25 ? chNFe.substring(22, 25).replace(/^0+/, '') : undefined;
+      const totalVal = parseFiscalNumber(resNFe.vNF);
+
+      return {
+        id: crypto.randomUUID(),
+        type: 'NFE',
+        accessKey: chNFe || undefined,
+        number: numFromKey,
+        series: serieFromKey,
+        issueDate: resNFe.dhEmi ? new Date(resNFe.dhEmi) : new Date(),
+        status: 'VALID',
+        issuer: {
+          name: resNFe.xNome ? String(resNFe.xNome) : 'NÃO INFORMADO',
+          document: resNFe.CNPJ || resNFe.CPF || 'NÃO INFORMADO',
+          ie: resNFe.IE ? String(resNFe.IE) : undefined,
+        },
+        items: [{
+          description: 'Resumo de NF-e (Aguardando manifesto ou download integral)',
+          quantity: 1,
+          unitPrice: totalVal,
+          totalPrice: totalVal,
+        }],
+        totals: {
+          products: totalVal,
+          total: totalVal,
+        },
+        rawXmlPath,
+        batchId,
+        createdAt: new Date(),
+      };
+    }
+
+    // Check if it is a resEvento (SEFAZ summary event)
+    const resEvento = jsonObj.resEvento;
+    if (resEvento) {
+      const chNFe = resEvento.chNFe ? String(resEvento.chNFe) : '';
+      const numFromKey = chNFe.length >= 34 ? chNFe.substring(25, 34).replace(/^0+/, '') : undefined;
+      const serieFromKey = chNFe.length >= 25 ? chNFe.substring(22, 25).replace(/^0+/, '') : undefined;
+      const descEvento = resEvento.descEvento || resEvento.xEvento || (String(resEvento.tpEvento) === '110111' ? 'Cancelamento de NF-e' : 'Evento de Resumo NF-e');
+
+      return {
+        id: crypto.randomUUID(),
+        type: 'NFE',
+        accessKey: chNFe || undefined,
+        number: numFromKey,
+        series: serieFromKey,
+        issueDate: resEvento.dhEvento ? new Date(resEvento.dhEvento) : new Date(),
+        status: 'VALID',
+        issuer: {
+          name: typeof descEvento === 'string' ? descEvento : 'Evento de Resumo NF-e',
+          document: resEvento.CNPJ || resEvento.CPF || 'NÃO INFORMADO',
+        },
+        items: [{
+          description: typeof descEvento === 'string' ? descEvento : 'Evento de Resumo NF-e',
           quantity: 1,
           unitPrice: 0,
           totalPrice: 0,

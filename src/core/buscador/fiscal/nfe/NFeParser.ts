@@ -3,6 +3,7 @@ import { decompressDocZip } from '../utils/compression';
 import { SefazRawResponse, DocZipItem, ParsedFiscalDocumentInfo } from '../types';
 import { formatNSU } from '../../domain/nsu';
 import { sanitizeAccessKey, parseAccessKey } from '../../domain/access-key';
+import { parseFiscalNumber } from '../../../parsers/utils/xml-number.utils';
 
 export class NFeParser {
   private parser: XMLParser;
@@ -149,9 +150,9 @@ export class NFeParser {
         issue_date: String(ide.dhEmi || ide.dEmi || ''),
         issuer_cnpj: String(emit.CNPJ || emit.CPF || ''),
         issuer_name: String(emit.xNome || ''),
-        recipient_cnpj: String(dest.CNPJ || dest.CPF || ''),
-        recipient_name: String(dest.xNome || ''),
-        total_value: Number(total.vNF || 0),
+        recipient_cnpj: dest.CNPJ || dest.CPF ? String(dest.CNPJ || dest.CPF) : '',
+        recipient_name: dest.xNome ? String(dest.xNome) : '',
+        total_value: parseFiscalNumber(total.vNF),
         xml_status: 'XML_DISPONIVEL',
         pdf_status: 'PDF_INDISPONIVEL',
         situacao_fiscal: situacao,
@@ -187,7 +188,7 @@ export class NFeParser {
         issuer_name: String(res.xNome || ''),
         recipient_cnpj: undefined,
         recipient_name: undefined,
-        total_value: Number(res.vNF || 0),
+        total_value: parseFiscalNumber(res.vNF),
         xml_status: 'XML_DISPONIVEL',
         pdf_status: 'PDF_INDISPONIVEL', // Resumo NÃO tem dados suficientes para DANFE
         situacao_fiscal: situacao,

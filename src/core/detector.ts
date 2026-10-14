@@ -21,21 +21,24 @@ export function detectFiscalDocument(xmlContent: string): DocumentType {
     return 'NFSE';
   }
 
-  // CT-e detection
+  // CT-e detection (incluindo resCTe)
   if (
     contentLower.includes('<cteproc') || 
     contentLower.includes('<cte') ||
-    contentLower.includes('<infcte')
+    contentLower.includes('<infcte') ||
+    contentLower.includes('<rescte')
   ) {
     return 'CTE';
   }
 
-  // NF-e / NFC-e / Inutilização / Eventos
+  // NF-e / NFC-e / Inutilização / Eventos (incluindo resNFe e resEvento)
   if (
     contentLower.includes('<proceventonfe') || 
     contentLower.includes('<evento') || 
+    contentLower.includes('<resevento') ||
     contentLower.includes('<nfeproc') || 
     contentLower.includes('<nfe') ||
+    contentLower.includes('<resnfe') ||
     contentLower.includes('<retinutnfe') ||
     contentLower.includes('<inutnfe')
   ) {

@@ -3,6 +3,7 @@ import { decompressDocZip } from '../utils/compression';
 import { SefazRawResponse, DocZipItem, ParsedFiscalDocumentInfo } from '../types';
 import { formatNSU } from '../../domain/nsu';
 import { sanitizeAccessKey, parseAccessKey } from '../../domain/access-key';
+import { parseFiscalNumber } from '../../../parsers/utils/xml-number.utils';
 
 export class CTeParser {
   private parser: XMLParser;
@@ -141,9 +142,9 @@ export class CTeParser {
         issue_date: String(ide.dhEmi || ''),
         issuer_cnpj: String(emit.CNPJ || emit.CPF || ''),
         issuer_name: String(emit.xNome || ''),
-        recipient_cnpj: String(dest.CNPJ || dest.CPF || ''),
-        recipient_name: String(dest.xNome || ''),
-        total_value: Number(vPrest.vTPrest || vPrest.vRec || 0),
+        recipient_cnpj: dest.CNPJ || dest.CPF ? String(dest.CNPJ || dest.CPF) : '',
+        recipient_name: dest.xNome ? String(dest.xNome) : '',
+        total_value: parseFiscalNumber(vPrest.vTPrest || vPrest.vRec || 0),
         xml_status: 'XML_DISPONIVEL',
         pdf_status: 'PDF_INDISPONIVEL',
         situacao_fiscal: fiscalStatus,
@@ -174,7 +175,7 @@ export class CTeParser {
         issuer_name: String(res.xNome || ''),
         recipient_cnpj: undefined,
         recipient_name: undefined,
-        total_value: Number(res.vNF || res.vTPrest || 0),
+        total_value: parseFiscalNumber(res.vNF || res.vTPrest || 0),
         xml_status: 'XML_DISPONIVEL',
         pdf_status: 'PDF_INDISPONIVEL',
         situacao_fiscal: Number(res.cSitCTe) === 2 ? 'CANCELADA' : 'AUTORIZADA',

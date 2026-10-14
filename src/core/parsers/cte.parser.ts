@@ -1,6 +1,7 @@
 import { FiscalParser } from './base.parser';
 import { FiscalDocument, FiscalCteRoute } from '../fiscal.types';
 import crypto from 'crypto';
+import { parseFiscalNumber } from './utils/xml-number.utils';
 import {
   parseCteNumber,
   parseParty,
@@ -20,6 +21,80 @@ export class CTeParser extends FiscalParser {
   parse(xmlContent: string, rawXmlPath: string, batchId?: string): FiscalDocument {
     const jsonObj = this.parseXml(xmlContent);
     
+    // Suporte a resumo de CT-e (resCTe)
+    const resCTe = jsonObj.resCTe;
+    if (resCTe) {
+      const chCTe = resCTe.chCTe ? String(resCTe.chCTe) : '';
+      const numFromKey = chCTe.length >= 34 ? chCTe.substring(25, 34).replace(/^0+/, '') : undefined;
+      const serieFromKey = chCTe.length >= 25 ? chCTe.substring(22, 25).replace(/^0+/, '') : undefined;
+      const totalVal = parseFiscalNumber(resCTe.vTPrest || resCTe.vNF || resCTe.vRec || 0);
+
+      return {
+        id: crypto.randomUUID(),
+        type: 'CTE',
+        accessKey: chCTe || undefined,
+        number: numFromKey,
+        series: serieFromKey,
+        issueDate: resCTe.dhEmi ? new Date(resCTe.dhEmi) : new Date(),
+        status: 'VALID',
+        issuer: {
+          name: resCTe.xNome ? String(resCTe.xNome) : 'NÃO INFORMADO',
+          document: resCTe.CNPJ || resCTe.CPF || 'NÃO INFORMADO',
+          ie: resCTe.IE ? String(resCTe.IE) : undefined,
+        },
+        items: [{
+          description: 'Resumo de CT-e (Aguardando download completo)',
+          quantity: 1,
+          unitPrice: totalVal,
+          totalPrice: totalVal,
+        }],
+        totals: {
+          products: totalVal,
+          total: totalVal,
+        },
+        rawXmlPath,
+        batchId,
+        createdAt: new Date(),
+      };
+    }
+
+    // Suporte a evento ou resumo de evento de CT-e
+    const eventoCTe = jsonObj.procEventoCTe?.eventoCTe || jsonObj.eventoCTe || jsonObj.resEventoCTe;
+    if (eventoCTe) {
+      const infEvento = eventoCTe.infEvento || eventoCTe;
+      const chCTe = infEvento.chCTe ? String(infEvento.chCTe) : '';
+      const numFromKey = chCTe.length >= 34 ? chCTe.substring(25, 34).replace(/^0+/, '') : undefined;
+      const serieFromKey = chCTe.length >= 25 ? chCTe.substring(22, 25).replace(/^0+/, '') : undefined;
+      const descEvento = infEvento.detEvento?.descEvento || infEvento.descEvento || 'Evento CT-e';
+
+      return {
+        id: crypto.randomUUID(),
+        type: 'CTE',
+        accessKey: chCTe || undefined,
+        number: numFromKey,
+        series: serieFromKey,
+        issueDate: infEvento.dhEvento ? new Date(infEvento.dhEvento) : new Date(),
+        status: 'VALID',
+        issuer: {
+          name: typeof descEvento === 'string' ? descEvento : 'Evento CT-e',
+          document: infEvento.CNPJ || infEvento.CPF || 'NÃO INFORMADO',
+        },
+        items: [{
+          description: typeof descEvento === 'string' ? descEvento : 'Evento CT-e',
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+        }],
+        totals: {
+          products: 0,
+          total: 0,
+        },
+        rawXmlPath,
+        batchId,
+        createdAt: new Date(),
+      };
+    }
+
     const cte = jsonObj.cteProc?.CTe || jsonObj.CTe;
     
     if (!cte || !cte.infCte) {
