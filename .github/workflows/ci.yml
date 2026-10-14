@@ -1,0 +1,41 @@
+name: CI / Testes & Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Lint, Testes e Compilação
+    runs-on: ubuntu-latest
+
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências determinísticas
+        run: npm ci
+
+      - name: Validação de Tipagem TypeScript (Lint)
+        run: npm run lint
+
+      - name: Execução da Suíte de Testes Automatizados (Vitest)
+        run: npm test
+
+      - name: Compilação de Produção (Web & Electron)
+        run: npm run build
