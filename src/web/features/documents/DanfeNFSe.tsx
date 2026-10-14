@@ -1,83 +1,64 @@
-import { formatDate, formatTime, formatMoney, formatCnpjCpf, formatCep, formatPhone } from '../../../core/danfe/helpers';
+import { buildNfseViewModel } from '../../../core/danfe/view-models';
 
 interface DanfeNFSeProps {
   doc: any;
 }
 
 export function DanfeNFSe({ doc }: DanfeNFSeProps) {
-  // Emitente / Prestador
-  const issuerName = doc.issuer?.name || doc.issuerName || 'PRESTADOR DE SERVIÇOS';
-  const issuerDoc = formatCnpjCpf(doc.issuer?.document || doc.issuerDocument);
-  const issuerIM = doc.issuer?.im || doc.issuerIM || '-';
-  const issuerIE = doc.issuer?.ie || doc.issuerIE || '-';
-  const issuerStreet = doc.issuer?.address?.street 
-    ? `${doc.issuer.address.street}${doc.issuer.address.number ? ', ' + doc.issuer.address.number : ''}${doc.issuer.address.complement ? ' - ' + doc.issuer.address.complement : ''}`
-    : (doc.issuerAddress || '-');
-  const issuerBairro = doc.issuer?.address?.neighborhood || '-';
-  const issuerCep = formatCep(doc.issuer?.address?.zipCode);
-  const issuerCity = doc.issuer?.address?.city || doc.issuerCity || '-';
-  const issuerState = doc.issuer?.address?.state || doc.issuerState || '-';
-  const issuerPhone = formatPhone(doc.issuer?.phone);
-  const issuerEmail = doc.issuer?.email || '-';
+  const vm = buildNfseViewModel(doc);
 
-  // Tomador
-  const recipientName = doc.recipient?.name || doc.recipientName || 'TOMADOR DO SERVIÇO';
-  const recipientDoc = formatCnpjCpf(doc.recipient?.document || doc.recipientDocument);
-  const recipientIM = doc.recipient?.im || doc.recipientIM || '-';
-  const recipientIE = doc.recipient?.ie || doc.recipientIE || '-';
-  const recipientStreet = doc.recipient?.address?.street 
-    ? `${doc.recipient.address.street}${doc.recipient.address.number ? ', ' + doc.recipient.address.number : ''}${doc.recipient.address.complement ? ' - ' + doc.recipient.address.complement : ''}`
-    : (doc.recipientAddress || '-');
-  const recipientBairro = doc.recipient?.address?.neighborhood || '-';
-  const recipientCep = formatCep(doc.recipient?.address?.zipCode);
-  const recipientCity = doc.recipient?.address?.city || doc.recipientCity || '-';
-  const recipientState = doc.recipient?.address?.state || doc.recipientState || '-';
-  const recipientPhone = formatPhone(doc.recipient?.phone);
-  const recipientEmail = doc.recipient?.email || doc.recipientEmail || '-';
+  const {
+    issuerName,
+    issuerDoc,
+    issuerIM,
+    issuerIE,
+    issuerStreet,
+    issuerBairro,
+    issuerCep,
+    issuerCity,
+    issuerState,
+    issuerPhone,
+    issuerEmail,
+    recipientName,
+    recipientDoc,
+    recipientIM,
+    recipientIE,
+    recipientStreet,
+    recipientBairro,
+    recipientCep,
+    recipientCity,
+    recipientState,
+    recipientPhone,
+    recipientEmail,
+    serviceCode,
+    cnaeCode,
+    serviceCity,
+    serviceDescription,
+    number,
+    rpsNumber,
+    rpsSeries,
+    verificationCode,
+    issueDateStr,
+    issueTimeStr,
+    valorServicos,
+    deducoes,
+    descIncond,
+    descCond,
+    issValor,
+    issBase,
+    issAliquot,
+    issRetidoValor,
+    isIssRetido,
+    pisValor: pis,
+    cofinsValor: cofins,
+    inssValor: inss,
+    irValor: ir,
+    csllValor: csll,
+    outrasRetencoes: outrasRet,
+    totalRetencoes: totalRetencoesGeral,
+    valorLiquido,
+  } = vm;
 
-  // Informações de Serviço
-  const serviceCode = doc.serviceCode || doc.items?.[0]?.code || '-';
-  const cnaeCode = doc.cnaeCode || '-';
-  const cityServiceCode = doc.cityServiceCode || '-';
-  const serviceCity = doc.serviceCity || issuerCity;
-  const serviceDescription = doc.serviceDescription || doc.items?.[0]?.description || '-';
-
-  // Identificação e Autenticidade
-  const number = doc.number || '000.000';
-  const series = doc.series || '1';
-  const rpsNumber = doc.rpsNumber || '-';
-  const rpsSeries = doc.rpsSeries || '-';
-  const verificationCode = doc.verificationCode || doc.accessKey || '-';
-  const issueDateStr = doc.issueDate ? formatDate(doc.issueDate) : '-';
-  const issueTimeStr = doc.issueDate ? formatTime(doc.issueDate) : '-';
-
-  // Valores reais (SEM inventar impostos não presentes no XML)
-  const taxesObj = doc.totals?.taxes || {};
-  const valorServicos = doc.totals?.products ?? doc.totalAmount ?? 0;
-  const deducoes = doc.totals?.deductions ?? taxesObj.deductions ?? 0;
-  const descIncond = doc.totals?.unconditionalDiscount ?? doc.totals?.discount ?? 0;
-  const descCond = doc.totals?.conditionalDiscount ?? 0;
-
-  const issValor = taxesObj.iss ?? (doc.taxes?.find((t: any) => t.taxType === 'ISS')?.amount ?? 0);
-  const issBase = taxesObj.issBase ?? doc.totals?.icmsBase ?? (valServBase(valorServicos, deducoes, descIncond));
-  const issAliquot = taxesObj.issAliquot !== undefined && taxesObj.issAliquot !== null ? Number(taxesObj.issAliquot) : (doc.issAliquot ? Number(doc.issAliquot) : null);
-  
-  const issRetidoValor = typeof taxesObj.issRetained === 'number' ? taxesObj.issRetained : (taxesObj.issRetained ? issValor : 0);
-  const isIssRetido = issRetidoValor > 0 || taxesObj.issRetained === true || doc.issRetained === true;
-
-  // Impostos Federais Retidos
-  const pis = taxesObj.pis ?? (doc.taxes?.find((t: any) => t.taxType === 'PIS')?.amount ?? 0);
-  const cofins = taxesObj.cofins ?? (doc.taxes?.find((t: any) => t.taxType === 'COFINS')?.amount ?? 0);
-  const inss = taxesObj.inss ?? (doc.taxes?.find((t: any) => t.taxType === 'INSS')?.amount ?? 0);
-  const ir = taxesObj.ir ?? (doc.taxes?.find((t: any) => t.taxType === 'IR' || t.taxType === 'IRRF')?.amount ?? 0);
-  const csll = taxesObj.csll ?? (doc.taxes?.find((t: any) => t.taxType === 'CSLL')?.amount ?? 0);
-  const outrasRet = taxesObj.outrasRetencoes ?? 0;
-
-  const totalRetencoesFederais = pis + cofins + inss + ir + csll + outrasRet;
-  const totalRetencoesGeral = totalRetencoesFederais + (isIssRetido ? (issRetidoValor || issValor) : 0);
-  const valorLiquido = doc.totals?.total ?? (doc.totalAmount || (valorServicos - descIncond - totalRetencoesGeral));
-
-  // Regimes
   const optanteSimples = doc.optanteSimplesNacional;
   const regimeEspecial = doc.regimeEspecialTributacao;
   const exigibilidade = doc.exigibilidadeISS;

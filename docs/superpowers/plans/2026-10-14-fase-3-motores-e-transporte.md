@@ -126,24 +126,24 @@ Commit: `refactor(danfe): centralize formatters and escapeHtml in core layer`
 - Produces: `buildNfseViewModel(doc: any): NfseViewModel`, `buildCteViewModel(doc: any): CteViewModel`, `buildNfeViewModel(doc: any): NfeViewModel`.
 - Hardens: Renderizadores HTML sanitizam todas as variáveis interpoladas com `escapeHtml`.
 
-- [ ] **Step 1: Escrever testes para View-Models e injeção XSS em lote (RED)**
+- [x] **Step 1: Escrever testes para View-Models e injeção XSS em lote (RED)**
 Criar `src/core/danfe/danfe-xss.test.ts` injetando strings maliciosas com `<script>alert(1)</script>`, `"><img src=x onerror=alert(1)>`, etc. em nomes de emitente, tomador, itens, observações fiscais e endereços em NF-e, CT-e, NFS-e e NFC-e.
 
-- [ ] **Step 2: Executar testes para verificar falha (RED)**
+- [x] **Step 2: Executar testes para verificar falha (RED)**
 Run: `npm.cmd test -- src/core/danfe/danfe-xss.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar View-Models e aplicar escapeHtml em 100% das interpolações HTML**
+- [x] **Step 3: Implementar View-Models e aplicar escapeHtml em 100% das interpolações HTML**
 1. Implementar adaptadores em `src/core/danfe/view-models/`.
 2. Conectar `DanfeNFSe.tsx` e `danfe-nfse.renderer.ts` ao `buildNfseViewModel`.
 3. Conectar `DanfeDACTE.tsx` e `danfe-cte.renderer.ts` ao `buildCteViewModel`.
 4. Blindar todas as tags e atributos de `danfe-nfe.renderer.ts`, `danfe-cte.renderer.ts`, `danfe-nfse.renderer.ts` e `danfe-nfce.renderer.ts` com `escapeHtml`.
 
-- [ ] **Step 4: Executar testes para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar testes para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/core/danfe/danfe-xss.test.ts src/core/danfe/danfe-html.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 3**
+- [x] **Step 5: Commit local da Task 3**
 Commit: `feat(danfe): introduce shared view models and harden batch renderers against XSS`
 
 ---

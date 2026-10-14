@@ -68,7 +68,7 @@ describe('SEFAZ Summary Documents Support (resNFe, resEvento, resCTe)', () => {
       expect(doc.series).toBe('1');
       expect(doc.issuer?.document).toBe('12345678000199');
       expect(doc.issuer?.name).toBe('FORNECEDOR RESUMO SEFAZ LTDA');
-      expect(doc.totals.total).toBe(1500.5);
+      expect(doc.totals?.total).toBe(1500.5);
       expect(doc.items.length).toBeGreaterThan(0);
       expect(doc.items[0].description).toContain('Resumo');
       expect(doc.rawXmlPath).toBe('sample-resnfe.xml');
@@ -95,9 +95,10 @@ describe('SEFAZ Summary Documents Support (resNFe, resEvento, resCTe)', () => {
       expect(doc.accessKey).toBe('35260198765432000188570010000054321000000012');
       expect(doc.issuer?.document).toBe('98765432000188');
       expect(doc.issuer?.name).toBe('TRANSPORTADORA RESUMO LTDA');
-      expect(doc.totals.total).toBe(850.75);
+      expect(doc.totals?.total).toBe(850.75);
       expect(doc.items.length).toBeGreaterThan(0);
       expect(doc.items[0].description).toContain('Resumo de CT-e');
     });
   });
 });
+
