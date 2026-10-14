@@ -17,6 +17,15 @@ export interface DanfeTaxTotalsProps {
   totalTrib: number;
   cofins: number;
   valorTotalNota: number;
+  valorIbs?: number;
+  baseIbs?: number;
+  aliqIbs?: number;
+  valorCbs?: number;
+  baseCbs?: number;
+  aliqCbs?: number;
+  valorIs?: number;
+  baseIs?: number;
+  aliqIs?: number;
 }
 
 export function DanfeTaxTotals({
@@ -38,7 +47,17 @@ export function DanfeTaxTotals({
   totalTrib,
   cofins,
   valorTotalNota,
+  valorIbs,
+  baseIbs,
+  aliqIbs,
+  valorCbs,
+  baseCbs,
+  aliqCbs,
+  valorIs,
+  baseIs,
+  aliqIs,
 }: DanfeTaxTotalsProps) {
+  const hasRtc = (valorIbs !== undefined && valorIbs > 0) || (valorCbs !== undefined && valorCbs > 0) || (valorIs !== undefined && valorIs > 0);
   return (
     <>
       <div className="text-[8px] font-black uppercase text-black mb-0.5">CÁLCULO DO IMPOSTO</div>
@@ -120,6 +139,57 @@ export function DanfeTaxTotals({
           </div>
         </div>
       </div>
+      {hasRtc && (
+        <>
+          <div className="text-[8px] font-black uppercase text-black mb-0.5 mt-1">REFORMA TRIBUTÁRIA (RTC 2026)</div>
+          <div className="border border-black mb-1.5 text-[8px]">
+            <div className="flex">
+              {valorIbs !== undefined && valorIbs > 0 && (
+                <>
+                  {baseIbs !== undefined && (
+                    <div className="w-[18%] p-0.5 border-r border-black">
+                      <div className="text-[6.5px] text-gray-600 font-bold uppercase">BASE CÁLC. IBS</div>
+                      <div className="font-bold text-right">{baseIbs.toFixed(2)}</div>
+                    </div>
+                  )}
+                  <div className="w-[15%] p-0.5 border-r border-black">
+                    <div className="text-[6.5px] text-gray-600 font-bold uppercase">VALOR DO IBS</div>
+                    <div className="font-bold text-right">{valorIbs.toFixed(2)}</div>
+                  </div>
+                </>
+              )}
+              {valorCbs !== undefined && valorCbs > 0 && (
+                <>
+                  {baseCbs !== undefined && (
+                    <div className="w-[18%] p-0.5 border-r border-black">
+                      <div className="text-[6.5px] text-gray-600 font-bold uppercase">BASE CÁLC. CBS</div>
+                      <div className="font-bold text-right">{baseCbs.toFixed(2)}</div>
+                    </div>
+                  )}
+                  <div className="w-[15%] p-0.5 border-r border-black">
+                    <div className="text-[6.5px] text-gray-600 font-bold uppercase">VALOR DA CBS</div>
+                    <div className="font-bold text-right">{valorCbs.toFixed(2)}</div>
+                  </div>
+                </>
+              )}
+              {valorIs !== undefined && valorIs > 0 && (
+                <>
+                  {baseIs !== undefined && (
+                    <div className="w-[18%] p-0.5 border-r border-black">
+                      <div className="text-[6.5px] text-gray-600 font-bold uppercase">BASE CÁLC. IS</div>
+                      <div className="font-bold text-right">{baseIs.toFixed(2)}</div>
+                    </div>
+                  )}
+                  <div className="w-[16%] p-0.5">
+                    <div className="text-[6.5px] text-gray-600 font-bold uppercase">IMPOSTO SELETIVO</div>
+                    <div className="font-bold text-right">{valorIs.toFixed(2)}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

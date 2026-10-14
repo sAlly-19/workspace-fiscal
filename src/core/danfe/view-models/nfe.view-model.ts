@@ -60,6 +60,13 @@ export interface NfeViewModel {
   totalTrib: number;
   valorTotalNota: number;
 
+  valorIbs?: number;
+  baseIbs?: number;
+  valorCbs?: number;
+  baseCbs?: number;
+  valorIs?: number;
+  baseIs?: number;
+
   transpMod: string;
 }
 
@@ -121,6 +128,13 @@ export function buildNfeViewModel(doc: any): NfeViewModel {
   const cofins = doc.totals?.taxes?.cofins ?? (doc.taxes?.find((t: any) => t.taxType === 'COFINS')?.amount || 0);
   const valorTotalNota = doc.totalAmount || doc.totals?.total || 0;
 
+  const valorIbs = doc.totals?.taxes?.ibs ?? (doc.taxes?.find((t: any) => t.taxType === 'IBS')?.amount || 0);
+  const baseIbs = doc.totals?.taxes?.ibsBase;
+  const valorCbs = doc.totals?.taxes?.cbs ?? (doc.taxes?.find((t: any) => t.taxType === 'CBS')?.amount || 0);
+  const baseCbs = doc.totals?.taxes?.cbsBase;
+  const valorIs = doc.totals?.taxes?.is ?? (doc.taxes?.find((t: any) => t.taxType === 'IS')?.amount || 0);
+  const baseIs = doc.totals?.taxes?.isBase;
+
   const transport = doc.transport || {};
   const transpMod = formatModFrete(transport.modFrete);
 
@@ -176,6 +190,13 @@ export function buildNfeViewModel(doc: any): NfeViewModel {
     icmsUfDest,
     totalTrib,
     valorTotalNota,
+
+    valorIbs,
+    baseIbs,
+    valorCbs,
+    baseCbs,
+    valorIs,
+    baseIs,
 
     transpMod,
   };

@@ -305,6 +305,29 @@ export function renderDanfeNFeHtml(doc: any, pageIndex: number, totalPages: numb
           </div>
         </div>
 
+        ${(() => {
+          const rtcIbs = doc.totals?.taxes?.ibs ?? 0;
+          const rtcCbs = doc.totals?.taxes?.cbs ?? 0;
+          const rtcIs = doc.totals?.taxes?.is ?? 0;
+          if (rtcIbs <= 0 && rtcCbs <= 0 && rtcIs <= 0) return '';
+          return `
+            <div class="title-sec">REFORMA TRIBUTÁRIA (RTC 2026)</div>
+            <div class="border-all" style="margin-bottom: 4px; font-size: 7.5px;">
+              <div class="grid">
+                ${rtcIbs > 0 ? `
+                  <div class="p-1 border-r" style="flex: 1;"><div style="font-size: 6.5px; color: #555; font-weight: bold;">VALOR DO IBS</div><div class="text-right font-bold">${rtcIbs.toFixed(2)}</div></div>
+                ` : ''}
+                ${rtcCbs > 0 ? `
+                  <div class="p-1 border-r" style="flex: 1;"><div style="font-size: 6.5px; color: #555; font-weight: bold;">VALOR DA CBS</div><div class="text-right font-bold">${rtcCbs.toFixed(2)}</div></div>
+                ` : ''}
+                ${rtcIs > 0 ? `
+                  <div class="p-1" style="flex: 1;"><div style="font-size: 6.5px; color: #555; font-weight: bold;">IMPOSTO SELETIVO</div><div class="text-right font-bold">${rtcIs.toFixed(2)}</div></div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        })()}
+
         <!-- Transportador / Volumes Transportados -->
         <div class="title-sec">TRANSPORTADOR / VOLUMES TRANSPORTADOS</div>
         <div class="border-all" style="margin-bottom: 4px; font-size: 7.5px;">

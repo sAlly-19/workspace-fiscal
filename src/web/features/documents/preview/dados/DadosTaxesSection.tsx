@@ -219,6 +219,84 @@ export function DadosTaxesSection({ doc, isLight }: DadosTaxesSectionProps) {
             </div>
           </div>
         ) : null}
+
+        {/* IBS (Reforma Tributária 2026 - se houver) */}
+        {doc.totals?.taxes?.ibs || doc.taxes?.some((t: any) => t.taxType === 'IBS') ? (
+          <div
+            className={`p-2.5 rounded-lg border ${
+              isLight ? 'bg-blue-50/50 border-blue-200' : 'bg-blue-950/20 border-blue-800/40'
+            }`}
+          >
+            <div className={`text-[9px] uppercase font-bold mb-0.5 ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>
+              IBS
+            </div>
+            <div className={`text-xs font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+              R$ {(doc.totals?.taxes?.ibs ?? (doc.taxes?.find((t: any) => t.taxType === 'IBS')?.amount || 0)).toFixed(2)}
+            </div>
+            {doc.totals?.taxes?.ibsBase ? (
+              <div className={`text-[9px] mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Base: R$ {doc.totals.taxes.ibsBase.toFixed(2)}
+              </div>
+            ) : null}
+            {doc.totals?.taxes?.ibsAliq ? (
+              <div className={`text-[9px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Alíq: {doc.totals.taxes.ibsAliq.toFixed(2)}%
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* CBS (Reforma Tributária 2026 - se houver) */}
+        {doc.totals?.taxes?.cbs || doc.taxes?.some((t: any) => t.taxType === 'CBS') ? (
+          <div
+            className={`p-2.5 rounded-lg border ${
+              isLight ? 'bg-indigo-50/50 border-indigo-200' : 'bg-indigo-950/20 border-indigo-800/40'
+            }`}
+          >
+            <div className={`text-[9px] uppercase font-bold mb-0.5 ${isLight ? 'text-indigo-700' : 'text-indigo-400'}`}>
+              CBS
+            </div>
+            <div className={`text-xs font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+              R$ {(doc.totals?.taxes?.cbs ?? (doc.taxes?.find((t: any) => t.taxType === 'CBS')?.amount || 0)).toFixed(2)}
+            </div>
+            {doc.totals?.taxes?.cbsBase ? (
+              <div className={`text-[9px] mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Base: R$ {doc.totals.taxes.cbsBase.toFixed(2)}
+              </div>
+            ) : null}
+            {doc.totals?.taxes?.cbsAliq ? (
+              <div className={`text-[9px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Alíq: {doc.totals.taxes.cbsAliq.toFixed(2)}%
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Imposto Seletivo (IS) (Reforma Tributária 2026 - se houver) */}
+        {doc.totals?.taxes?.is || doc.taxes?.some((t: any) => t.taxType === 'IS') ? (
+          <div
+            className={`p-2.5 rounded-lg border ${
+              isLight ? 'bg-amber-50/50 border-amber-200' : 'bg-amber-950/20 border-amber-800/40'
+            }`}
+          >
+            <div className={`text-[9px] uppercase font-bold mb-0.5 ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>
+              Imposto Seletivo (IS)
+            </div>
+            <div className={`text-xs font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+              R$ {(doc.totals?.taxes?.is ?? (doc.taxes?.find((t: any) => t.taxType === 'IS')?.amount || 0)).toFixed(2)}
+            </div>
+            {doc.totals?.taxes?.isBase ? (
+              <div className={`text-[9px] mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Base: R$ {doc.totals.taxes.isBase.toFixed(2)}
+              </div>
+            ) : null}
+            {doc.totals?.taxes?.isAliq ? (
+              <div className={`text-[9px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Alíq: {doc.totals.taxes.isAliq.toFixed(2)}%
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

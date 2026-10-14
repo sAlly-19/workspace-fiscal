@@ -48,6 +48,13 @@ export function DanfeNFeView({ doc, theme }: DanfeNFeViewProps) {
   const cofins = doc.totals?.taxes?.cofins ?? (doc.taxes?.find((t: any) => t.taxType === 'COFINS')?.amount || 0);
   const valorTotalNota = doc.totalAmount || doc.totals?.total || 0;
 
+  const valorIbs = doc.totals?.taxes?.ibs ?? (doc.taxes?.find((t: any) => t.taxType === 'IBS')?.amount || 0);
+  const baseIbs = doc.totals?.taxes?.ibsBase;
+  const valorCbs = doc.totals?.taxes?.cbs ?? (doc.taxes?.find((t: any) => t.taxType === 'CBS')?.amount || 0);
+  const baseCbs = doc.totals?.taxes?.cbsBase;
+  const valorIs = doc.totals?.taxes?.is ?? (doc.taxes?.find((t: any) => t.taxType === 'IS')?.amount || 0);
+  const baseIs = doc.totals?.taxes?.isBase;
+
   // Emitente
   const issuerName = doc.issuer?.name || doc.issuerName || 'NOME / RAZÃO SOCIAL';
   const issuerDoc = formatCnpjCpf(doc.issuer?.document || doc.issuerDocument);
@@ -162,6 +169,12 @@ export function DanfeNFeView({ doc, theme }: DanfeNFeViewProps) {
           totalTrib={totalTrib}
           cofins={cofins}
           valorTotalNota={valorTotalNota}
+          valorIbs={valorIbs}
+          baseIbs={baseIbs}
+          valorCbs={valorCbs}
+          baseCbs={baseCbs}
+          valorIs={valorIs}
+          baseIs={baseIs}
         />
         <DanfeTransport transport={transport} transpMod={transpMod} />
         <DanfeItemsTable items={doc.items} />
