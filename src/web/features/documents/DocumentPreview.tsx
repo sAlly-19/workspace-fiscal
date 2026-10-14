@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiFetch } from '../../lib/api';
 import { useWorkspaceStore } from '../../stores/workspace.store';
@@ -6,6 +6,7 @@ import { PreviewToolbar, type PreviewMode } from './preview/PreviewToolbar';
 import { XmlPreviewPane } from './preview/XmlPreviewPane';
 import { DadosView } from './preview/DadosView';
 import { DanfeView } from './preview/DanfeView';
+import { highlightMatches, clearHighlights, setActiveMatch } from './preview/document-search.utils';
 
 export function DocumentPreview({
   docDetails,
@@ -22,6 +23,13 @@ export function DocumentPreview({
   const [loadingXml, setLoadingXml] = useState(false);
   const [copiedXml, setCopiedXml] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+
+  // Busca Local no Documento
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchCurrentIndex, setSearchCurrentIndex] = useState(0);
+  const [searchTotalCount, setSearchTotalCount] = useState(0);
+  const searchMarksRef = useRef<HTMLElement[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const ZOOM_PRESETS = [50, 65, 75, 85, 100, 115, 130, 150, 175, 200];
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -105,7 +113,88 @@ export function DocumentPreview({
     setMode('visualizar');
     setXml('');
     setZoomLevel(100);
+    setSearchTerm('');
+    if (scrollContainerRef.current) {
+      clearHighlights(scrollContainerRef.current);
+    }
+    searchMarksRef.current = [];
+    setSearchTotalCount(0);
+    setSearchCurrentIndex(0);
   }, [docDetails.id]);
+
+  const performSearch = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    if (!searchTerm.trim()) {
+      clearHighlights(scrollContainerRef.current);
+      searchMarksRef.current = [];
+      setSearchTotalCount(0);
+      setSearchCurrentIndex(0);
+      return;
+    }
+
+    const marks = highlightMatches(scrollContainerRef.current, searchTerm);
+    searchMarksRef.current = marks;
+    setSearchTotalCount(marks.length);
+
+    if (marks.length > 0) {
+      setSearchCurrentIndex((prev) => {
+        const validIndex = prev < marks.length ? prev : 0;
+        setActiveMatch(marks, validIndex);
+        return validIndex;
+      });
+    } else {
+      setSearchCurrentIndex(0);
+    }
+  }, [searchTerm]);
+
+  const handleSearchNext = useCallback(() => {
+    const marks = searchMarksRef.current;
+    if (marks.length === 0) return;
+    setSearchCurrentIndex((prev) => {
+      const next = (prev + 1) % marks.length;
+      setActiveMatch(marks, next);
+      return next;
+    });
+  }, []);
+
+  const handleSearchPrev = useCallback(() => {
+    const marks = searchMarksRef.current;
+    if (marks.length === 0) return;
+    setSearchCurrentIndex((prev) => {
+      const prevIdx = (prev - 1 + marks.length) % marks.length;
+      setActiveMatch(marks, prevIdx);
+      return prevIdx;
+    });
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchTerm('');
+    if (scrollContainerRef.current) {
+      clearHighlights(scrollContainerRef.current);
+    }
+    searchMarksRef.current = [];
+    setSearchTotalCount(0);
+    setSearchCurrentIndex(0);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      performSearch();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [searchTerm, mode, xml, performSearch]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (mode === 'xml' && !xml && !loadingXml) {
@@ -217,6 +306,14 @@ export function DocumentPreview({
         protocolStatus={docDetails.protocolStatus}
         hasAuthorizationProtocol={docDetails.hasAuthorizationProtocol}
         documentStatus={docDetails.status}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        searchCurrentIndex={searchCurrentIndex}
+        searchTotalCount={searchTotalCount}
+        onSearchNext={handleSearchNext}
+        onSearchPrev={handleSearchPrev}
+        onSearchClear={handleSearchClear}
+        searchInputRef={searchInputRef}
       />
 
       {/* Content Area with Fluid Transition */}
@@ -241,7 +338,13 @@ export function DocumentPreview({
                 <DanfeView doc={docDetails} theme={currentTheme} />
               </div>
             )}
-            {mode === 'dados' && <DadosView doc={docDetails} theme={currentTheme} />}
+            {mode === 'dados' && (
+              <DadosView
+                doc={docDetails}
+                theme={currentTheme}
+                isSearching={Boolean(searchTerm.trim())}
+              />
+            )}
             {mode === 'xml' && (
               <XmlPreviewPane xml={xml} loadingXml={loadingXml} currentTheme={currentTheme} />
             )}

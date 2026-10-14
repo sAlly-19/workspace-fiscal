@@ -141,13 +141,28 @@ describe('DadosView Submodules Contracts & Rendering Logic', () => {
       expect(DadosItemsTable({ items: [], isLight: false })).toBeNull();
       expect(DadosItemsTable({ items: undefined, isLight: false })).toBeNull();
     });
+
+    it('accepts isSearching prop to auto-expand items beyond initial 50', () => {
+      const items = Array.from({ length: 60 }, (_, i) => ({
+        id: `item-${i}`,
+        description: `Produto ${i}`,
+        quantity: 1,
+        unitPrice: 10,
+        totalPrice: 10,
+      }));
+      const tableEl = React.createElement(DadosItemsTable, { items, isLight: false, isSearching: true });
+      expect(tableEl).toBeDefined();
+      expect(tableEl.props.isSearching).toBe(true);
+      expect(tableEl.props.items).toHaveLength(60);
+    });
   });
 
   describe('DadosView (integrated)', () => {
-    it('instantiates main DadosView with subcomponents in light and dark mode', () => {
-      const darkView = React.createElement(DadosView, { doc: mockDoc, theme: 'dark' });
+    it('instantiates main DadosView with subcomponents in light and dark mode and passes isSearching', () => {
+      const darkView = React.createElement(DadosView, { doc: mockDoc, theme: 'dark', isSearching: true });
       expect(darkView).toBeDefined();
       expect(darkView.props.theme).toBe('dark');
+      expect(darkView.props.isSearching).toBe(true);
 
       const lightView = React.createElement(DadosView, { doc: mockDoc, theme: 'light' });
       expect(lightView).toBeDefined();

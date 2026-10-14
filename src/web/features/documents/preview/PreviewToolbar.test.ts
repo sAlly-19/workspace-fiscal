@@ -64,5 +64,31 @@ describe('PreviewToolbar - Fiscal Status Pill (IMP-019)', () => {
     });
     expect(JSON.stringify(treeNoProt)).toContain('Sem Protocolo');
   });
+
+  describe('In-Page Document Search', () => {
+    it('renders search input with placeholder and counter when search is active', () => {
+      const tree = PreviewToolbar({
+        ...defaultProps,
+        searchTerm: '123456',
+        setSearchTerm: () => {},
+        searchCurrentIndex: 0,
+        searchTotalCount: 4,
+      });
+      const serialized = JSON.stringify(tree);
+      expect(serialized).toContain('Buscar na nota...');
+      expect(serialized).toContain('1/4');
+    });
+
+    it('renders 0/0 when there are no search occurrences', () => {
+      const tree = PreviewToolbar({
+        ...defaultProps,
+        searchTerm: 'termo_sem_match',
+        setSearchTerm: () => {},
+        searchCurrentIndex: 0,
+        searchTotalCount: 0,
+      });
+      expect(JSON.stringify(tree)).toContain('0/0');
+    });
+  });
 });
 

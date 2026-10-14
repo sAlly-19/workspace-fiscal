@@ -9,9 +9,10 @@ import {
 export interface DadosViewProps {
   doc: any;
   theme: string;
+  isSearching?: boolean;
 }
 
-export function DadosView({ doc, theme }: DadosViewProps) {
+export function DadosView({ doc, theme, isSearching }: DadosViewProps) {
   const isLight = theme === 'light';
 
   return (
@@ -20,7 +21,7 @@ export function DadosView({ doc, theme }: DadosViewProps) {
       <DadosPartiesSection doc={doc} isLight={isLight} />
       <DadosBillingSection doc={doc} isLight={isLight} />
       <DadosTaxesSection doc={doc} isLight={isLight} />
-      <DadosItemsTable items={doc.items} isLight={isLight} />
+      <DadosItemsTable items={doc.items} isLight={isLight} isSearching={isSearching} />
     </div>
   );
 }

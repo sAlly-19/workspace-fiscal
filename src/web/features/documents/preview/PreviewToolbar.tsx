@@ -10,7 +10,12 @@ import {
   Check,
   Download,
   Printer,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from 'lucide-react';
+import React from 'react';
 import { motion } from 'motion/react';
 import { resolveFiscalStatus } from './fiscal-status.utils';
 
@@ -52,6 +57,15 @@ export interface PreviewToolbarProps {
   protocolStatus?: string;
   hasAuthorizationProtocol?: boolean;
   documentStatus?: string;
+  // Busca Local na Nota
+  searchTerm?: string;
+  setSearchTerm?: (term: string) => void;
+  searchCurrentIndex?: number;
+  searchTotalCount?: number;
+  onSearchNext?: () => void;
+  onSearchPrev?: () => void;
+  onSearchClear?: () => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function PreviewToolbar({
@@ -74,6 +88,14 @@ export function PreviewToolbar({
   protocolStatus,
   hasAuthorizationProtocol,
   documentStatus,
+  searchTerm,
+  setSearchTerm,
+  searchCurrentIndex,
+  searchTotalCount,
+  onSearchNext,
+  onSearchPrev,
+  onSearchClear,
+  searchInputRef,
 }: PreviewToolbarProps) {
   const statusInfo = resolveFiscalStatus({
     protocolStatus,
@@ -206,6 +228,88 @@ export function PreviewToolbar({
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
+          </div>
+        )}
+
+        {/* In-Document Search Input */}
+        {setSearchTerm && (
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs transition-all ${
+              currentTheme === 'light'
+                ? 'bg-[#f1f5f9] border-[#cbd5e1] text-[#0f172a] focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20'
+                : 'bg-[#09090b] border-[#27272a] text-[#fafafa] focus-within:border-blue-500 focus-within:bg-[#18181b] focus-within:ring-2 focus-within:ring-blue-500/20'
+            }`}
+          >
+            <Search className="w-3.5 h-3.5 opacity-50 shrink-0" />
+            <input
+              ref={searchInputRef as any}
+              type="text"
+              value={searchTerm || ''}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (e.shiftKey) {
+                    onSearchPrev?.();
+                  } else {
+                    onSearchNext?.();
+                  }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onSearchClear?.();
+                  if (searchInputRef && 'current' in searchInputRef && searchInputRef.current) {
+                    searchInputRef.current.blur();
+                  }
+                }
+              }}
+              placeholder="Buscar na nota... (Ctrl+F)"
+              className="bg-transparent border-none outline-none text-xs w-28 sm:w-36 md:w-44 placeholder:opacity-50"
+            />
+            {searchTerm && (
+              <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                <span
+                  className={`text-[10px] font-mono px-1 py-0.5 rounded font-semibold ${
+                    searchTotalCount && searchTotalCount > 0
+                      ? currentTheme === 'light'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-blue-950 text-blue-300'
+                      : currentTheme === 'light'
+                      ? 'bg-slate-200 text-slate-500'
+                      : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  {searchTotalCount && searchTotalCount > 0
+                    ? `${(searchCurrentIndex ?? 0) + 1}/${searchTotalCount}`
+                    : '0/0'}
+                </span>
+                <button
+                  type="button"
+                  onClick={onSearchPrev}
+                  disabled={!searchTotalCount || searchTotalCount === 0}
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  title="Ocorrência Anterior (Shift+Enter / ↑)"
+                >
+                  <ChevronUp className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onSearchNext}
+                  disabled={!searchTotalCount || searchTotalCount === 0}
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  title="Próxima Ocorrência (Enter / ↓)"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onSearchClear}
+                  className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  title="Limpar busca (Esc)"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

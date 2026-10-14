@@ -5,14 +5,25 @@ export const INITIAL_ITEMS_LIMIT = 50;
 export interface DadosItemsTableProps {
   items?: any[];
   isLight: boolean;
+  isSearching?: boolean;
 }
 
-function DadosItemsTableContent({ items, isLight }: { items: any[]; isLight: boolean }) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+function DadosItemsTableContent({
+  items,
+  isLight,
+  isSearching,
+}: {
+  items: any[];
+  isLight: boolean;
+  isSearching?: boolean;
+}) {
+  const [userExpanded, setUserExpanded] = React.useState(false);
 
   React.useEffect(() => {
-    setIsExpanded(false);
+    setUserExpanded(false);
   }, [items]);
+
+  const isExpanded = userExpanded || Boolean(isSearching);
 
   const displayedItems =
     isExpanded || items.length <= INITIAL_ITEMS_LIMIT
@@ -109,11 +120,11 @@ function DadosItemsTableContent({ items, isLight }: { items: any[]; isLight: boo
   );
 }
 
-export function DadosItemsTable({ items, isLight }: DadosItemsTableProps) {
+export function DadosItemsTable({ items, isLight, isSearching }: DadosItemsTableProps) {
   if (!items || items.length === 0) {
     return null;
   }
 
-  return <DadosItemsTableContent items={items} isLight={isLight} />;
+  return <DadosItemsTableContent items={items} isLight={isLight} isSearching={isSearching} />;
 }
 
