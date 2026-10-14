@@ -117,3 +117,4 @@ describe('XML Signature and Authorization Protocol Detection (IMP-019)', () => {
     expect(doc.signatureDigest).toBe('CTE_DIGEST_VALUE=');
   });
 });
+

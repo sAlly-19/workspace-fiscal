@@ -122,3 +122,4 @@ export function extractTotalsRtcTaxes(totalNode: any): TotalsRtcTaxes {
     isBase: isBase !== undefined && isBase > 0 ? isBase : undefined,
   };
 }
+

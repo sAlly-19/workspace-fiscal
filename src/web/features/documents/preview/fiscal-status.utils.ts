@@ -59,3 +59,4 @@ export function resolveFiscalStatus(docOrParams: {
     description: 'XML sem protocolo de autorização oficial (Documento Não Homologado ou Rascunho)',
   };
 }
+

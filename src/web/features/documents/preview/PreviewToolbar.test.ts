@@ -65,3 +65,4 @@ describe('PreviewToolbar - Fiscal Status Pill (IMP-019)', () => {
     expect(JSON.stringify(treeNoProt)).toContain('Sem Protocolo');
   });
 });
+

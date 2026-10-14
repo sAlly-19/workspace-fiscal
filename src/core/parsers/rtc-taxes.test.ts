@@ -186,3 +186,4 @@ describe('Reforma Tributária 2026 (IBS, CBS e Imposto Seletivo)', () => {
     });
   });
 });
+

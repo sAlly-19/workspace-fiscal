@@ -18,11 +18,7 @@ describe('DadosTaxesSection - RTC 2026 and Legacy Tests', () => {
 
     const tree = DadosTaxesSection({ doc: legacyDoc, isLight: true });
     expect(tree).not.toBeNull();
-    // Verify children in grid
-    const grid = (tree as React.ReactElement).props.children[1];
-    const cards = React.Children.toArray(grid.props.children).filter(Boolean);
-    // Should NOT have IBS, CBS or IS cards
-    const textContents = JSON.stringify(cards);
+    const textContents = JSON.stringify(tree);
     expect(textContents).not.toContain('IBS');
     expect(textContents).not.toContain('CBS');
     expect(textContents).not.toContain('Imposto Seletivo');
@@ -49,9 +45,7 @@ describe('DadosTaxesSection - RTC 2026 and Legacy Tests', () => {
 
     const tree = DadosTaxesSection({ doc: rtcDoc, isLight: false });
     expect(tree).not.toBeNull();
-    const grid = (tree as React.ReactElement).props.children[1];
-    const cards = React.Children.toArray(grid.props.children).filter(Boolean);
-    const textContents = JSON.stringify(cards);
+    const textContents = JSON.stringify(tree);
     expect(textContents).toContain('IBS');
     expect(textContents).toContain('CBS');
     expect(textContents).toContain('Imposto Seletivo');

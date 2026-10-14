@@ -73,3 +73,4 @@ describe('DadosHeaderSection - Protocol & Signature Badges (IMP-019)', () => {
     expect(serialized).toContain('Sem Assinatura');
   });
 });
+
