@@ -88,9 +88,14 @@ export interface FiscalDesktopAPI {
   };
 }
 
+import type { DesktopElectronAPI } from '../web/lib/api';
+
+export type { DesktopElectronAPI };
+
 declare global {
   interface Window {
     fiscalApi: FiscalDesktopAPI;
+    api: DesktopElectronAPI;
   }
 }
 

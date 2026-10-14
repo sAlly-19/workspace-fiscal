@@ -55,6 +55,16 @@ const api = {
     ipcRenderer.invoke('fs:writeFile', { filePath, content }),
   readFile: (filePath: string): Promise<string> => ipcRenderer.invoke('fs:readFile', filePath),
 
+  // Local Server Supervisor & Resilient Transport
+  restartServer: (): Promise<{ success: boolean; port?: number }> => ipcRenderer.invoke('server:restart'),
+  getServerStatus: (): Promise<{ running: boolean; port: number; restarts: number; lastError?: string }> =>
+    ipcRenderer.invoke('server:status'),
+  onServerUrlChanged: (cb: (url: string) => void) => {
+    const listener = (_e: unknown, url: string) => cb(url);
+    ipcRenderer.on('server:url-changed', listener);
+    return () => ipcRenderer.removeListener('server:url-changed', listener);
+  },
+
   // Window controls (min/max/close + fullscreen toggle)
   windowControl: (action: 'minimize' | 'maximize' | 'close' | 'fullscreen'): Promise<void> =>
     ipcRenderer.invoke('window:control', action),

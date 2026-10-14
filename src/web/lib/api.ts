@@ -9,64 +9,69 @@ export interface WindowState {
 
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'fullscreen';
 
+export interface DesktopElectronAPI {
+  getApiBaseUrl: () => Promise<string>;
+  getApiToken?: () => Promise<string>;
+  getAppVersion: () => Promise<string>;
+  getAppPaths: () => Promise<{
+    userData: string;
+    documents: string;
+    downloads: string;
+    home: string;
+  }>;
+  openXmlDialog: (options?: { multiSelections?: boolean }) => Promise<{
+    canceled: boolean;
+    filePaths: string[];
+  }>;
+  openDirectory: (options?: { recursive?: boolean; maxFiles?: number }) => Promise<{
+    canceled: boolean;
+    directory: string | null;
+    filePaths: string[];
+    totalFound: number;
+    skipped: number;
+  }>;
+  openImportDialog: () => Promise<{
+    canceled: boolean;
+    results: Array<{ filePath: string; fileName: string; content: string; size: number }>;
+  }>;
+  openBackupDialog: () => Promise<{ canceled: boolean; filePath: string | null }>;
+  saveFileDialog: (options?: {
+    defaultPath?: string;
+    filters?: { name: string; extensions: string[] }[];
+  }) => Promise<{ canceled: boolean; filePath: string | null }>;
+  readFile: (filePath: string) => Promise<string>;
+  writeFile: (filePath: string, content: string | Uint8Array) => Promise<boolean>;
+  windowControl: (action: WindowAction) => Promise<void>;
+  getWindowState: () => Promise<WindowState>;
+  onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
+  checkForUpdates: () => Promise<{
+    currentVersion: string;
+    latestVersion: string;
+    hasUpdate: boolean;
+    releaseName: string;
+    releaseNotes: string;
+    publishedAt: string;
+    releaseUrl: string;
+    downloadUrl: string | null;
+  }>;
+  onUpdateAvailable: (cb: (info: any) => void) => () => void;
+  restartServer?: () => Promise<{ success: boolean; port?: number }>;
+  getServerStatus?: () => Promise<{ running: boolean; port: number; restarts: number; lastError?: string }>;
+  onServerUrlChanged?: (cb: (url: string) => void) => () => void;
+  updater: {
+    check: () => Promise<any>;
+    download: () => Promise<void>;
+    cancel: () => Promise<void>;
+    install: () => Promise<void>;
+    getState: () => Promise<any>;
+    onStatusChange: (cb: (state: any) => void) => () => void;
+    onProgress: (cb: (progress: any) => void) => () => void;
+  };
+}
+
 declare global {
   interface Window {
-    api: {
-      getApiBaseUrl: () => Promise<string>;
-      getApiToken?: () => Promise<string>;
-      getAppVersion: () => Promise<string>;
-      getAppPaths: () => Promise<{
-        userData: string;
-        documents: string;
-        downloads: string;
-        home: string;
-      }>;
-      openXmlDialog: (options?: { multiSelections?: boolean }) => Promise<{
-        canceled: boolean;
-        filePaths: string[];
-      }>;
-      openDirectory: (options?: { recursive?: boolean; maxFiles?: number }) => Promise<{
-        canceled: boolean;
-        directory: string | null;
-        filePaths: string[];
-        totalFound: number;
-        skipped: number;
-      }>;
-      openImportDialog: () => Promise<{
-        canceled: boolean;
-        results: Array<{ filePath: string; fileName: string; content: string; size: number }>;
-      }>;
-      openBackupDialog: () => Promise<{ canceled: boolean; filePath: string | null }>;
-      saveFileDialog: (options?: {
-        defaultPath?: string;
-        filters?: { name: string; extensions: string[] }[];
-      }) => Promise<{ canceled: boolean; filePath: string | null }>;
-      readFile: (filePath: string) => Promise<string>;
-      writeFile: (filePath: string, content: string | Uint8Array) => Promise<boolean>;
-      windowControl: (action: WindowAction) => Promise<void>;
-      getWindowState: () => Promise<WindowState>;
-      onWindowStateChange: (cb: (state: WindowState) => void) => () => void;
-      checkForUpdates: () => Promise<{
-        currentVersion: string;
-        latestVersion: string;
-        hasUpdate: boolean;
-        releaseName: string;
-        releaseNotes: string;
-        publishedAt: string;
-        releaseUrl: string;
-        downloadUrl: string | null;
-      }>;
-      onUpdateAvailable: (cb: (info: any) => void) => () => void;
-      updater: {
-        check: () => Promise<any>;
-        download: () => Promise<void>;
-        cancel: () => Promise<void>;
-        install: () => Promise<void>;
-        getState: () => Promise<any>;
-        onStatusChange: (cb: (state: any) => void) => () => void;
-        onProgress: (cb: (progress: any) => void) => () => void;
-      };
-    };
+    api: DesktopElectronAPI;
   }
 }
 

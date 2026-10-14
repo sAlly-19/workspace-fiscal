@@ -162,28 +162,28 @@ Commit: `feat(danfe): introduce shared view models and harden batch renderers ag
 - Produces: `LocalServerSupervisor` com `start()`, `stop()`, `restart()`, `getStatus()`, controle `isStopping`, e eventos IPC `server:status`, `server:restart`.
 - Types: `window.api.restartServer()` e `window.api.getServerStatus()`.
 
-- [ ] **Step 1: Escrever teste unitário para o `LocalServerSupervisor` (RED)**
+- [x] **Step 1: Escrever teste unitário para o `LocalServerSupervisor` (RED)**
 Criar `electron/serverSupervisor.test.ts` validando:
 - Inicia servidor e reporta porta alocada.
 - Não reinicia em parada intencional (`isStopping = true`).
 - Executa auto-restart com backoff em caso de evento `'error'` ou `'close'` inesperado até 3 tentativas.
 - Reporta status e métricas de restarts.
 
-- [ ] **Step 2: Executar testes para verificar falha (RED)**
+- [x] **Step 2: Executar testes para verificar falha (RED)**
 Run: `npm.cmd test -- electron/serverSupervisor.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar `LocalServerSupervisor`, integrar ao `main.ts` e atualizar tipagens**
+- [x] **Step 3: Implementar `LocalServerSupervisor`, integrar ao `main.ts` e atualizar tipagens**
 1. Implementar `electron/serverSupervisor.ts` com `isStopping` e controle de lifecycle.
 2. Integrar supervisor em `electron/main.ts` substituindo inicialização estática.
 3. Expor `restartServer` e `getServerStatus` em `electron/preload.ts`.
 4. Atualizar tipagens em `src/types/fiscal-api.d.ts` e `src/web/lib/api.ts`.
 
-- [ ] **Step 4: Executar testes para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar testes para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- electron/serverSupervisor.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 4**
+- [x] **Step 5: Commit local da Task 4**
 Commit: `feat(electron): implement LocalServerSupervisor with lifecycle control and IPC bridge`
 
 ---

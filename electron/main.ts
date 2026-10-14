@@ -13,6 +13,7 @@ import { updateService } from '../src/api/services/update.service';
 import { appUpdater } from './updater';
 import { initializeServices, ApplicationContext } from './buscador/services';
 import { registerAllIpcHandlers } from './buscador/ipc';
+import { LocalServerSupervisor } from './serverSupervisor';
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_DEV === '1';
 
@@ -22,7 +23,8 @@ if (!isDev && process.env.NODE_ENV !== 'production') {
   process.env.NODE_ENV = 'production';
 }
 
-let apiServer: { port: number; close: () => void } | null = null;
+let apiSupervisor: LocalServerSupervisor | null = null;
+let currentApiBaseUrl: string = '';
 let mainWindow: BrowserWindow | null = null;
 let fiscalServices: ApplicationContext | null = null;
 let localApiToken: string = '';
@@ -42,7 +44,7 @@ function resolveIconPath(): string | undefined {
   return undefined;
 }
 
-async function startApiServer(): Promise<number> {
+async function createExpressServerInstance(): Promise<{ server: any; port: number }> {
   await initDatabase();
 
   localApiToken = crypto.randomBytes(32).toString('hex');
@@ -65,20 +67,41 @@ async function startApiServer(): Promise<number> {
     });
   }
 
-  return new Promise<number>((resolve) => {
+  return new Promise<{ server: any; port: number }>((resolve) => {
     const server = expressApp.listen(PORT, '127.0.0.1', () => {
       const addr = server.address();
       const port = typeof addr === 'object' && addr ? addr.port : 0;
       console.log(`[API] running on http://127.0.0.1:${port}`);
-      apiServer = { port, close: () => server.close() };
-      resolve(port);
+      resolve({ server, port });
     });
   });
 }
 
+async function startApiSupervisor(): Promise<number> {
+  apiSupervisor = new LocalServerSupervisor(createExpressServerInstance, {
+    onUrlChanged: (newPort) => {
+      currentApiBaseUrl = `http://127.0.0.1:${newPort}`;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('server:url-changed', currentApiBaseUrl);
+      }
+    },
+  });
+  const port = await apiSupervisor.start();
+  currentApiBaseUrl = `http://127.0.0.1:${port}`;
+  return port;
+}
+
 function registerIpcHandlers(apiBaseUrl: string) {
-  ipcMain.handle('api:baseUrl', () => apiBaseUrl);
+  ipcMain.handle('api:baseUrl', () => currentApiBaseUrl || apiBaseUrl);
   ipcMain.handle('auth:get-api-token', () => localApiToken);
+  ipcMain.handle('server:status', () => apiSupervisor?.getStatus());
+  ipcMain.handle('server:restart', async () => {
+    if (apiSupervisor) {
+      const newPort = await apiSupervisor.restart();
+      return { success: true, port: newPort };
+    }
+    return { success: false };
+  });
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:checkForUpdates', async () => updateService.checkLatestRelease());
   ipcMain.handle('app:getPaths', () => ({
@@ -432,8 +455,8 @@ async function createWindow(apiBaseUrl: string) {
 }
 
 app.whenReady().then(async () => {
-  const apiPort = await startApiServer();
-  const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
+  const apiPort = await startApiSupervisor();
+  const apiBaseUrl = currentApiBaseUrl || `http://127.0.0.1:${apiPort}`;
   registerIpcHandlers(apiBaseUrl);
 
   try {
@@ -490,11 +513,11 @@ app.on('before-quit', () => {
       console.error('[Buscador] Database close failed:', err);
     }
   }
-  if (apiServer) {
+  if (apiSupervisor) {
     try {
-      apiServer.close();
+      apiSupervisor.stop();
     } catch (err) {
-      console.error('[shutdown] apiServer.close failed', err);
+      console.error('[shutdown] apiSupervisor.stop failed', err);
     }
   }
   backupService.stopScheduler();
