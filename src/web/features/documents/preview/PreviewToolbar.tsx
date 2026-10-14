@@ -12,6 +12,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { resolveFiscalStatus } from './fiscal-status.utils';
 
 export type PreviewMode = 'visualizar' | 'dados' | 'xml';
 
@@ -47,6 +48,10 @@ export interface PreviewToolbarProps {
   handleCopyXml: () => void;
   handleDownloadXml: () => void;
   handlePrint: () => void;
+  // Status Fiscal (IMP-019)
+  protocolStatus?: string;
+  hasAuthorizationProtocol?: boolean;
+  documentStatus?: string;
 }
 
 export function PreviewToolbar({
@@ -66,7 +71,15 @@ export function PreviewToolbar({
   handleCopyXml,
   handleDownloadXml,
   handlePrint,
+  protocolStatus,
+  hasAuthorizationProtocol,
+  documentStatus,
 }: PreviewToolbarProps) {
+  const statusInfo = resolveFiscalStatus({
+    protocolStatus,
+    hasAuthorizationProtocol,
+    documentStatus,
+  });
   return (
     <div
       className={`min-h-[48px] py-1.5 border-b flex flex-wrap items-center px-3 md:px-4 justify-between shrink-0 print:hidden gap-2 ${
@@ -199,6 +212,17 @@ export function PreviewToolbar({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+        {/* Status Fiscal Pill (IMP-019) */}
+        <div
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${statusInfo.badgeClass}`}
+          title={statusInfo.description}
+        >
+          {statusInfo.category === 'AUTHORIZED' && <span>✓</span>}
+          {statusInfo.category === 'CANCELLED_DENIED' && <span>✕</span>}
+          {statusInfo.category === 'UNAUTHORIZED_OR_DRAFT' && <span>!</span>}
+          <span>{statusInfo.badgeText}</span>
+        </div>
+
         {accessKey && (
           <button
             onClick={handleCopyKey}

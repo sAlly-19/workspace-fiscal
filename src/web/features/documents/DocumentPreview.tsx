@@ -214,6 +214,9 @@ export function DocumentPreview({
         handleCopyXml={handleCopyXml}
         handleDownloadXml={handleDownloadXml}
         handlePrint={handlePrint}
+        protocolStatus={docDetails.protocolStatus}
+        hasAuthorizationProtocol={docDetails.hasAuthorizationProtocol}
+        documentStatus={docDetails.status}
       />
 
       {/* Content Area with Fluid Transition */}
