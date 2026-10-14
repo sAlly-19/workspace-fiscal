@@ -12,13 +12,18 @@ import { BuscadorApp } from './features/buscador/BuscadorApp';
 import { ServerUnreachableOverlay, useServerUnreachable } from './components/ServerUnreachableOverlay';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { UpdatePromptModal } from './components/UpdatePromptModal';
+import { SettingsModal } from './components/SettingsModal';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useWorkspaceStore } from './stores/workspace.store';
+import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 
 type View = 'home' | 'nfview' | 'depreciation' | 'buscador';
 
 export default function App() {
   const [view, setView] = useState<View>('home');
+  const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
   const serverUnreachable = useServerUnreachable();
+  const setIsSettingsOpen = useWorkspaceStore((s) => s.setIsSettingsOpen);
   const {
     isOpen: isUpdateModalOpen,
     updaterState,
@@ -28,6 +33,16 @@ export default function App() {
     installAndRestart,
     checkNow,
   } = useAutoUpdate();
+
+  // Atalhos Globais de Produtividade (IMP-023)
+  useGlobalKeyboardShortcuts({
+    onNavigateHome: () => setView('home'),
+    onNavigateNfView: () => setView('nfview'),
+    onNavigateDepreciation: () => setView('depreciation'),
+    onNavigateBuscador: () => setView('buscador'),
+    onOpenSettings: () => setIsSettingsOpen(true),
+    onOpenHelp: () => setIsWhatsNewOpen(true),
+  });
 
   return (
     <>
@@ -86,7 +101,11 @@ export default function App() {
         visible={serverUnreachable}
         onRetry={() => window.location.reload()}
       />
-      <WhatsNewModal />
+      {view === 'home' && <SettingsModal />}
+      <WhatsNewModal
+        open={isWhatsNewOpen || undefined}
+        onClose={() => setIsWhatsNewOpen(false)}
+      />
       <UpdatePromptModal
         isOpen={isUpdateModalOpen}
         updaterState={updaterState}
