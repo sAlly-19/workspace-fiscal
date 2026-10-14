@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
-interface ConfirmModalProps {
+export interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
   description: string;
@@ -29,10 +30,19 @@ export function ConfirmModal({
   const { settings } = useWorkspaceStore();
   const currentTheme = settings.theme || 'dark';
   const [typed, setTyped] = useState('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) setTyped('');
   }, [isOpen]);
+
+  useDialogFocus(
+    isOpen,
+    dialogRef,
+    requireText ? inputRef : undefined,
+    isLoading ? undefined : onCancel
+  );
 
   if (!isOpen) return null;
 
@@ -40,14 +50,27 @@ export function ConfirmModal({
   const canConfirm = !requireText || typed.trim() === requireText.trim();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !isLoading) {
+          onCancel();
+        }
+      }}
+    >
       <div
-        className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        tabIndex={-1}
+        className={`w-full max-w-md rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 outline-none ${
           isLight
             ? 'bg-white border border-[#cbd5e1] text-[#0f172a] shadow-2xl'
             : 'bg-[#18181b] border border-[#3f3f46] text-white shadow-2xl'
         }`}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
@@ -72,13 +95,14 @@ export function ConfirmModal({
               )}
             </div>
             <div>
-              <h3 className={`text-sm font-bold tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{title}</h3>
+              <h3 id="confirm-modal-title" className={`text-sm font-bold tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>{title}</h3>
               <p className={`text-[11px] mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>Confirmação de ação</p>
             </div>
           </div>
           <button
             onClick={onCancel}
             disabled={isLoading}
+            aria-label="Fechar"
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               isLight
                 ? 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#e2e8f0]'
@@ -102,6 +126,7 @@ export function ConfirmModal({
                 Digite <span className="font-mono text-red-500 font-bold">{requireText}</span> para confirmar
               </label>
               <input
+                ref={inputRef}
                 type="text"
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
