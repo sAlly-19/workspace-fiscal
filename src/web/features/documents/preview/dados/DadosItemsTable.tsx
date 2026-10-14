@@ -1,12 +1,25 @@
+import React from 'react';
+
+export const INITIAL_ITEMS_LIMIT = 50;
+
 export interface DadosItemsTableProps {
   items?: any[];
   isLight: boolean;
 }
 
-export function DadosItemsTable({ items, isLight }: DadosItemsTableProps) {
-  if (!items || items.length === 0) {
-    return null;
-  }
+function DadosItemsTableContent({ items, isLight }: { items: any[]; isLight: boolean }) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsExpanded(false);
+  }, [items]);
+
+  const displayedItems =
+    isExpanded || items.length <= INITIAL_ITEMS_LIMIT
+      ? items
+      : items.slice(0, INITIAL_ITEMS_LIMIT);
+
+  const hasMore = items.length > INITIAL_ITEMS_LIMIT && !isExpanded;
 
   return (
     <div
@@ -48,7 +61,7 @@ export function DadosItemsTable({ items, isLight }: DadosItemsTableProps) {
               isLight ? 'divide-[#e2e8f0] text-[#0f172a]' : 'divide-[#18181b] text-[#fafafa]'
             }`}
           >
-            {items.map((item: any, idx: number) => (
+            {displayedItems.map((item: any, idx: number) => (
               <tr key={item.id || idx} className={isLight ? 'hover:bg-[#f8fafc]' : 'hover:bg-white/5'}>
                 <td className={`px-3 py-2 font-mono ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
                   {item.code || '-'}
@@ -75,7 +88,32 @@ export function DadosItemsTable({ items, isLight }: DadosItemsTableProps) {
           </tbody>
         </table>
       </div>
+      {hasMore && (
+        <div
+          className={`px-4 py-2.5 border-t flex items-center justify-between text-xs ${
+            isLight ? 'bg-[#f8fafc] border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
+          }`}
+        >
+          <span className={isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}>
+            Exibindo {INITIAL_ITEMS_LIMIT} de {items.length} itens
+          </span>
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors cursor-pointer"
+          >
+            Mostrar todos os {items.length} itens
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+export function DadosItemsTable({ items, isLight }: DadosItemsTableProps) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  return <DadosItemsTableContent items={items} isLight={isLight} />;
 }
 
