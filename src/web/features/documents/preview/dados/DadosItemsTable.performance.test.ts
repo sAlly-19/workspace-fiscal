@@ -56,3 +56,4 @@ describe('DadosItemsTable - Performance & Chunking for Large Invoices (IMP-013)'
     expect(DadosItemsTable({ items: undefined, isLight: false })).toBeNull();
   });
 });
+

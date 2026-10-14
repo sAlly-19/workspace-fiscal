@@ -33,3 +33,4 @@ describe('GitHub Actions CI/CD Pipeline Configuration (IMP-007)', () => {
     expect(content).toContain('npm run build');
   });
 });
+
