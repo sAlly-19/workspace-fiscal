@@ -2,6 +2,7 @@ import { desc, eq, and, sql, or, like, gte, lte, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import { activityLogs, LogLevel, LogModule } from '../../db/schema';
 import crypto from 'crypto';
+import { redactSensitiveData, redactSensitiveString } from '../../core/security/dataRedactor';
 
 export interface ActivityLogInput {
   id?: string;
@@ -57,12 +58,20 @@ export class ActivityLogService {
         ? new Date(input.timestamp)
         : new Date();
 
-    const detailsStr =
+    const sanitizedMessage = redactSensitiveString(input.message);
+    const sanitizedDetails =
       input.details === undefined
         ? null
         : typeof input.details === 'string'
-        ? input.details
-        : JSON.stringify(input.details);
+        ? redactSensitiveString(input.details)
+        : redactSensitiveData(input.details);
+
+    const detailsStr =
+      sanitizedDetails === null || sanitizedDetails === undefined
+        ? null
+        : typeof sanitizedDetails === 'string'
+        ? sanitizedDetails
+        : JSON.stringify(sanitizedDetails);
 
     const inserted = await db
       .insert(activityLogs)
@@ -72,7 +81,7 @@ export class ActivityLogService {
         level: input.level,
         module: input.module,
         action: input.action,
-        message: input.message,
+        message: sanitizedMessage,
         details: detailsStr,
         durationMs: input.durationMs ?? null,
       })

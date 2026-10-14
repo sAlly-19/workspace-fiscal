@@ -132,5 +132,34 @@ describe('ActivityLogService', () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed[0].action).toBe('SYNC_TEST');
   });
+
+  it('redige dados sensíveis LGPD em details e message antes de persistir (IMP-018)', async () => {
+    const entry = await service.record({
+      level: 'INFO',
+      module: 'COMPANIES',
+      action: 'UPDATE_CREDENTIALS',
+      message: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig alterado',
+      details: {
+        companyId: 'uuid-123',
+        password: 'plain-text-pass',
+        certPassword: 'pfx-password-123',
+        token: 'local-workspace-token',
+        sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      },
+    });
+
+    expect(entry.message).toContain('Bearer [REDACTED]');
+    expect(entry.message).not.toContain('sig alterado');
+    expect(entry.details.companyId).toBe('uuid-123');
+    expect(entry.details.password).toBe('[REDACTED]');
+    expect(entry.details.certPassword).toBe('[REDACTED]');
+    expect(entry.details.token).toBe('[REDACTED]');
+    expect(entry.details.sha256).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+
+    // Confirma que no banco SQLite e na listagem os dados também estão redigidos
+    const list = await service.list();
+    expect(list.logs[0].details.password).toBe('[REDACTED]');
+  });
 });
+
 
