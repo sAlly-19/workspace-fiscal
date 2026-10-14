@@ -34,6 +34,182 @@ export interface DocumentListPaneProps {
   onTriggerUploadXml: () => void;
 }
 
+export const INITIAL_BATCH_SIZE = 50;
+export const BATCH_INCREMENT = 30;
+
+interface DocumentCardItemProps {
+  doc: any;
+  isSelected: boolean;
+  isChecked: boolean;
+  currentTheme: string;
+  onSelectDocument: (id: string, label?: string) => void;
+  onToggleDocSelection: (id: string) => void;
+  onSetMovingDocId: (id: string) => void;
+  onTriggerSingleDelete: (id: string, docLabel: string) => void;
+}
+
+const DocumentCardItem = React.memo(function DocumentCardItem({
+  doc,
+  isSelected,
+  isChecked,
+  currentTheme,
+  onSelectDocument,
+  onToggleDocSelection,
+  onSetMovingDocId,
+  onTriggerSingleDelete,
+}: DocumentCardItemProps) {
+  return (
+    <div
+      data-doc-id={doc.id}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/fiscal-document-id', doc.id);
+      }}
+      onClick={() => onSelectDocument(doc.id, `${doc.type} ${doc.number || ''}`)}
+      className={`p-2.5 rounded-lg border transition-all cursor-pointer relative group ${
+        isSelected
+          ? currentTheme === 'light'
+            ? 'bg-blue-50 border-blue-500 shadow-xs ring-1 ring-blue-500/30'
+            : 'bg-[#1e1e24] border-blue-500 shadow-xs'
+          : isChecked
+          ? currentTheme === 'light'
+            ? 'bg-blue-50/70 border-blue-300'
+            : 'bg-blue-950/20 border-blue-500/50'
+          : currentTheme === 'light'
+          ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9] hover:border-[#cbd5e1]'
+          : 'bg-[#141418] border-[#27272a] hover:bg-[#18181f] hover:border-[#3f3f46]'
+      }`}
+      title="Clique para visualizar o DANFE ou arraste para uma pasta do workspace"
+    >
+      {/* Top Row: Multi-select Checkbox + Type & Date */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleDocSelection(doc.id);
+            }}
+            className={`transition-colors cursor-pointer ${
+              currentTheme === 'light'
+                ? 'text-[#94a3b8] hover:text-[#0f172a]'
+                : 'text-[#71717a] hover:text-white'
+            }`}
+          >
+            {isChecked ? (
+              <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <span
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+              isSelected
+                ? 'bg-blue-600 text-white'
+                : currentTheme === 'light'
+                ? 'bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0]'
+                : 'bg-[#27272a] text-[#a1a1aa]'
+            }`}
+          >
+            {doc.type || 'NF-e'}
+          </span>
+        </div>
+        <span
+          className={`text-[11px] ${
+            currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'
+          }`}
+        >
+          {doc.issueDate ? new Date(doc.issueDate).toLocaleDateString('pt-BR') : '-'}
+        </span>
+      </div>
+
+      {/* Number & Series */}
+      <div
+        className={`text-xs font-bold mb-0.5 flex items-center justify-between pl-5 ${
+          currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'
+        }`}
+      >
+        <span>Nº {doc.number || 'S/N'}</span>
+        {doc.series && (
+          <span
+            className={`text-[10px] font-normal ${
+              currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'
+            }`}
+          >
+            Série {doc.series}
+          </span>
+        )}
+      </div>
+
+      {/* Issuer Name */}
+      <div
+        className={`text-[11px] truncate mb-2 font-medium pl-5 ${
+          currentTheme === 'light' ? 'text-[#475569]' : 'text-[#a1a1aa]'
+        }`}
+        title={doc.issuerName || 'Não Informado'}
+      >
+        {doc.issuerName || 'Não Informado'}
+      </div>
+
+      {/* Bottom Row: Total & Actions */}
+      <div
+        className={`flex items-center justify-between pt-1.5 pl-5 border-t ${
+          currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]/70'
+        }`}
+      >
+        <span
+          className={`text-xs font-bold ${
+            currentTheme === 'light' ? 'text-green-600' : 'text-green-400'
+          }`}
+        >
+          {doc.totalAmount ? `R$ ${doc.totalAmount.toFixed(2)}` : 'R$ 0,00'}
+        </span>
+
+        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetMovingDocId(doc.id);
+            }}
+            className={`p-1 rounded transition-all cursor-pointer ${
+              currentTheme === 'light'
+                ? 'hover:bg-blue-600 hover:text-white text-[#64748b]'
+                : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
+            }`}
+            title="Mover para outra pasta"
+          >
+            <MoveRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectDocument(doc.id);
+              setTimeout(() => window.print(), 150);
+            }}
+            className={`p-1 rounded transition-all cursor-pointer ${
+              currentTheme === 'light'
+                ? 'hover:bg-blue-600 hover:text-white text-[#64748b]'
+                : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
+            }`}
+            title="Imprimir DANFE"
+          >
+            <Printer className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onTriggerSingleDelete(doc.id, `Nº ${doc.number || 'S/N'}`);
+            }}
+            className="p-1 rounded hover:bg-red-500/20 hover:text-red-500 text-[#71717a] transition-all cursor-pointer"
+            title="Remover documento"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function DocumentListPane({
   listWidth,
   currentTheme,
@@ -55,6 +231,38 @@ export function DocumentListPane({
   onTriggerSingleDelete,
   onTriggerUploadXml,
 }: DocumentListPaneProps) {
+  const [renderedCount, setRenderedCount] = React.useState(INITIAL_BATCH_SIZE);
+
+  // Reset limit whenever folder or search filter changes
+  React.useEffect(() => {
+    setRenderedCount(INITIAL_BATCH_SIZE);
+  }, [selectedFolderName, searchQuery, filteredDocuments]);
+
+  // If selected document is beyond initial batch, expand to ensure it is visible
+  const selectedIndex = selectedDocumentId
+    ? filteredDocuments.findIndex((d) => d.id === selectedDocumentId)
+    : -1;
+  const effectiveRenderedCount =
+    selectedIndex >= renderedCount
+      ? Math.min(filteredDocuments.length, selectedIndex + 1)
+      : renderedCount;
+
+  const visibleDocuments = filteredDocuments.slice(0, effectiveRenderedCount);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 300) {
+      if (effectiveRenderedCount < filteredDocuments.length) {
+        setRenderedCount((prev) =>
+          Math.min(
+            filteredDocuments.length,
+            Math.max(prev, effectiveRenderedCount) + BATCH_INCREMENT
+          )
+        );
+      }
+    }
+  };
+
   return (
     <div
       style={{ width: `${listWidth}px` }}
@@ -177,7 +385,10 @@ export function DocumentListPane({
       )}
 
       {/* Document Cards List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+      <div
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-2 space-y-1.5"
+      >
         {isDocsLoading && filteredDocuments.length === 0 ? (
           <>
             {Array.from({ length: 6 }).map((_, i) => (
@@ -185,162 +396,19 @@ export function DocumentListPane({
             ))}
           </>
         ) : (
-          filteredDocuments.map((doc) => {
-            const isSelected = selectedDocumentId === doc.id;
-            const isChecked = selectedDocIds.includes(doc.id);
-
-            return (
-              <div
-                key={doc.id}
-                data-doc-id={doc.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/fiscal-document-id', doc.id);
-                }}
-                onClick={() => onSelectDocument(doc.id, `${doc.type} ${doc.number || ''}`)}
-                className={`p-2.5 rounded-lg border transition-all cursor-pointer relative group ${
-                  isSelected
-                    ? currentTheme === 'light'
-                      ? 'bg-blue-50 border-blue-500 shadow-xs ring-1 ring-blue-500/30'
-                      : 'bg-[#1e1e24] border-blue-500 shadow-xs'
-                    : isChecked
-                    ? currentTheme === 'light'
-                      ? 'bg-blue-50/70 border-blue-300'
-                      : 'bg-blue-950/20 border-blue-500/50'
-                    : currentTheme === 'light'
-                    ? 'bg-white border-[#e2e8f0] hover:bg-[#f1f5f9] hover:border-[#cbd5e1]'
-                    : 'bg-[#141418] border-[#27272a] hover:bg-[#18181f] hover:border-[#3f3f46]'
-                }`}
-                title="Clique para visualizar o DANFE ou arraste para uma pasta do workspace"
-              >
-                {/* Top Row: Multi-select Checkbox + Type & Date */}
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleDocSelection(doc.id);
-                      }}
-                      className={`transition-colors cursor-pointer ${
-                        currentTheme === 'light'
-                          ? 'text-[#94a3b8] hover:text-[#0f172a]'
-                          : 'text-[#71717a] hover:text-white'
-                      }`}
-                    >
-                      {isChecked ? (
-                        <CheckSquare className="w-3.5 h-3.5 text-blue-500" />
-                      ) : (
-                        <Square className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        isSelected
-                          ? 'bg-blue-600 text-white'
-                          : currentTheme === 'light'
-                          ? 'bg-[#f1f5f9] text-[#475569] border border-[#e2e8f0]'
-                          : 'bg-[#27272a] text-[#a1a1aa]'
-                      }`}
-                    >
-                      {doc.type || 'NF-e'}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[11px] ${
-                      currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'
-                    }`}
-                  >
-                    {doc.issueDate ? new Date(doc.issueDate).toLocaleDateString('pt-BR') : '-'}
-                  </span>
-                </div>
-
-                {/* Number & Series */}
-                <div
-                  className={`text-xs font-bold mb-0.5 flex items-center justify-between pl-5 ${
-                    currentTheme === 'light' ? 'text-[#0f172a]' : 'text-white'
-                  }`}
-                >
-                  <span>Nº {doc.number || 'S/N'}</span>
-                  {doc.series && (
-                    <span
-                      className={`text-[10px] font-normal ${
-                        currentTheme === 'light' ? 'text-[#64748b]' : 'text-[#71717a]'
-                      }`}
-                    >
-                      Série {doc.series}
-                    </span>
-                  )}
-                </div>
-
-                {/* Issuer Name */}
-                <div
-                  className={`text-[11px] truncate mb-2 font-medium pl-5 ${
-                    currentTheme === 'light' ? 'text-[#475569]' : 'text-[#a1a1aa]'
-                  }`}
-                  title={doc.issuerName || 'Não Informado'}
-                >
-                  {doc.issuerName || 'Não Informado'}
-                </div>
-
-                {/* Bottom Row: Total & Actions */}
-                <div
-                  className={`flex items-center justify-between pt-1.5 pl-5 border-t ${
-                    currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]/70'
-                  }`}
-                >
-                  <span
-                    className={`text-xs font-bold ${
-                      currentTheme === 'light' ? 'text-green-600' : 'text-green-400'
-                    }`}
-                  >
-                    {doc.totalAmount ? `R$ ${doc.totalAmount.toFixed(2)}` : 'R$ 0,00'}
-                  </span>
-
-                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSetMovingDocId(doc.id);
-                      }}
-                      className={`p-1 rounded transition-all cursor-pointer ${
-                        currentTheme === 'light'
-                          ? 'hover:bg-blue-600 hover:text-white text-[#64748b]'
-                          : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
-                      }`}
-                      title="Mover para outra pasta"
-                    >
-                      <MoveRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectDocument(doc.id);
-                        setTimeout(() => window.print(), 150);
-                      }}
-                      className={`p-1 rounded transition-all cursor-pointer ${
-                        currentTheme === 'light'
-                          ? 'hover:bg-blue-600 hover:text-white text-[#64748b]'
-                          : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
-                      }`}
-                      title="Imprimir DANFE"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTriggerSingleDelete(doc.id, `Nº ${doc.number || 'S/N'}`);
-                      }}
-                      className="p-1 rounded hover:bg-red-500/20 hover:text-red-500 text-[#71717a] transition-all cursor-pointer"
-                      title="Remover documento"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
+          visibleDocuments.map((doc) => (
+            <DocumentCardItem
+              key={doc.id}
+              doc={doc}
+              isSelected={selectedDocumentId === doc.id}
+              isChecked={selectedDocIds.includes(doc.id)}
+              currentTheme={currentTheme}
+              onSelectDocument={onSelectDocument}
+              onToggleDocSelection={onToggleDocSelection}
+              onSetMovingDocId={onSetMovingDocId}
+              onTriggerSingleDelete={onTriggerSingleDelete}
+            />
+          ))
         )}
 
         {/* Empty state for documents list */}
