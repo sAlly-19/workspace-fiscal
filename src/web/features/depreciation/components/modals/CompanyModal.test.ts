@@ -35,3 +35,4 @@ describe('Depreciation CompanyModal (IMP-012)', () => {
     expect(element.props.editing.state).toBe('SP');
   });
 });
+

@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
       documentNumber,
       description,
       acquisitionValue,
-      ncm: ncm || null,
+      ncm: ncm || undefined,
       categoryId: categoryId || null,
       categoryName,
       annualRate,
@@ -107,7 +107,7 @@ router.post('/:id/dispose', async (req, res) => {
     const date = disposedAt || new Date();
     // Não permite baixa antes da aquisição
     if (date < new Date((asset as any).acquisitionDate)) return res.status(400).json({ error: 'Data de baixa não pode ser anterior à aquisição' });
-    const updated = await assetsRepository.dispose(req.params.id, date, reason || null);
+    const updated = await assetsRepository.dispose(req.params.id, date, reason || undefined);
 
     // F11: Gera entry residual final na competência da baixa, se solicitado e se a regra da empresa permitir
     let residualEntry: { competence: string; depreciationValue: number; accumulatedValue: number; currentValue: number } | null = null;

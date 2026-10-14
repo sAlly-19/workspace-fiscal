@@ -3,21 +3,21 @@ import { BRAZILIAN_UFS, ValidationResult } from './types';
 
 export interface CreateCompanyInput {
   name: string;
-  tradeName?: string | null;
-  document?: string | null;
-  cnpj?: string | null;
-  state?: string | null;
-  city?: string | null;
+  tradeName?: string;
+  document?: string;
+  cnpj?: string;
+  state?: string;
+  city?: string;
   depreciationRule?: 'MONTH_OF_ACQUISITION' | 'NEXT_MONTH' | 'PROPORTIONAL';
 }
 
 export interface UpdateCompanyInput {
   name?: string;
-  tradeName?: string | null;
-  document?: string | null;
-  cnpj?: string | null;
-  state?: string | null;
-  city?: string | null;
+  tradeName?: string;
+  document?: string;
+  cnpj?: string;
+  state?: string;
+  city?: string;
   depreciationRule?: 'MONTH_OF_ACQUISITION' | 'NEXT_MONTH' | 'PROPORTIONAL';
 }
 
@@ -93,11 +93,11 @@ export function validateCreateCompany(
     success: true,
     data: {
       name: b.name.trim(),
-      tradeName: b.tradeName ? String(b.tradeName).trim() : null,
-      document: cleanCnpj || null,
-      cnpj: cleanCnpj || null,
-      state: stateUf,
-      city: b.city ? String(b.city).trim() : null,
+      tradeName: b.tradeName ? String(b.tradeName).trim() : undefined,
+      document: cleanCnpj,
+      cnpj: cleanCnpj,
+      state: stateUf || undefined,
+      city: b.city ? String(b.city).trim() : undefined,
       depreciationRule: b.depreciationRule,
     },
   };
@@ -127,7 +127,7 @@ export function validateUpdateCompany(
   }
 
   if (b.tradeName !== undefined) {
-    data.tradeName = b.tradeName ? String(b.tradeName).trim() : null;
+    data.tradeName = b.tradeName ? String(b.tradeName).trim() : undefined;
   }
 
   const rawDoc = b.document !== undefined ? b.document : b.cnpj;
@@ -166,7 +166,7 @@ export function validateUpdateCompany(
   }
 
   if (b.city !== undefined) {
-    data.city = b.city ? String(b.city).trim() : null;
+    data.city = b.city ? String(b.city).trim() : undefined;
   }
 
   if (errors.length > 0) {

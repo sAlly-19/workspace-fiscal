@@ -37,3 +37,4 @@ describe('ConfirmModal component accessibility and contracts (IMP-021)', () => {
     expect(element.props.requireText).toBe('CONFIRMAR');
   });
 });
+

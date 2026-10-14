@@ -7,3 +7,4 @@ export const BRAZILIAN_UFS = new Set([
   'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ]);
+

@@ -116,3 +116,4 @@ export function useGlobalKeyboardShortcuts(options: GlobalKeyboardShortcutsOptio
     options.enabled,
   ]);
 }
+
