@@ -1,34 +1,15 @@
-import { escapeHtml } from '../../../api/utils/escapeHtml';
 import {
+  escapeHtml,
   formatDate,
   formatTime,
   formatCnpjCpf,
   formatCep,
   formatPhone,
+  formatRole,
+  formatUnit,
 } from '../helpers';
 
-export function formatRole(role: string): string {
-  const map: Record<string, string> = {
-    '0': 'Remetente',
-    '1': 'Expedidor',
-    '2': 'Recebedor',
-    '3': 'Destinatário',
-    '4': 'Outros',
-  };
-  return map[role] || 'Remetente';
-}
-
-export function formatUnit(unit: string): string {
-  const map: Record<string, string> = {
-    '00': 'M3',
-    '01': 'KG',
-    '02': 'TON',
-    '03': 'UN',
-    '04': 'LT',
-    '05': 'MMBTU',
-  };
-  return map[unit] || unit;
-}
+export { formatRole, formatUnit };
 
 /** CT-e — DACTE (Conhecimento de Transporte Eletrônico, padrão oficial SEFAZ) */
 export function renderDanfeDACTEHtml(doc: any, _pageIndex: number, _totalPages: number): string {

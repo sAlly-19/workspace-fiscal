@@ -1,5 +1,5 @@
-import { escapeHtml } from '../../../api/utils/escapeHtml';
 import {
+  escapeHtml,
   formatDate,
   formatTime,
   formatMoney,

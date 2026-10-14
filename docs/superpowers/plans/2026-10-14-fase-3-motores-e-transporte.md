@@ -85,24 +85,24 @@ Commit: `feat(parsers): unify xml number parsing and add sefaz summary document 
 **Interfaces:**
 - Produces: `escapeHtml(value: unknown): string`, `escapeAttr(value: unknown): string`, `formatRole(role: string): string`, `formatUnit(unit: string): string` em `src/core/danfe/helpers.ts`.
 
-- [ ] **Step 1: Escrever testes para escapeHtml e formatadores canônicos (RED)**
+- [x] **Step 1: Escrever testes para escapeHtml e formatadores canônicos (RED)**
 Criar `src/core/utils/escapeHtml.test.ts` cobrindo caracteres `<, >, &, ", ', \`` e valores nulos/numéricos.
 
-- [ ] **Step 2: Executar testes para verificar falha (RED)**
+- [x] **Step 2: Executar testes para verificar falha (RED)**
 Run: `npm.cmd test -- src/core/utils/escapeHtml.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar `src/core/utils/escapeHtml.ts` e reorganizar reexportações**
+- [x] **Step 3: Implementar `src/core/utils/escapeHtml.ts` e reorganizar reexportações**
 1. Mover implementação canônica para `src/core/utils/escapeHtml.ts`.
 2. Fazer `src/api/utils/escapeHtml.ts` reexportar do Core.
 3. Mover `formatRole` e `formatUnit` para `src/core/danfe/helpers.ts` e reexportar em `dacte.helpers.ts`.
 4. Atualizar `src/core/danfe/renderers/danfe-cte.renderer.ts` para usar helpers centralizados.
 
-- [ ] **Step 4: Executar testes para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar testes para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/core/utils/escapeHtml.test.ts src/core/danfe/danfe-html.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 2**
+- [x] **Step 5: Commit local da Task 2**
 Commit: `refactor(danfe): centralize formatters and escapeHtml in core layer`
 
 ---
