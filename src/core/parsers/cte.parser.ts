@@ -113,8 +113,16 @@ export class CTeParser extends FiscalParser {
     const infCTeNorm = infCte.infCTeNorm || {};
     const compl = infCte.compl || {};
     
+    // Assinatura
+    const sig = cte.Signature || jsonObj.cteProc?.Signature || jsonObj.Signature;
+    const hasSignature = !!(sig?.SignedInfo && sig?.SignatureValue);
+    const signatureDigest = sig?.SignedInfo?.Reference?.DigestValue ? String(sig.SignedInfo.Reference.DigestValue) : undefined;
+
     // Protocolo
-    const protCTe = jsonObj.cteProc?.protCTe?.infProt || {};
+    const protCTe = jsonObj.cteProc?.protCTe?.infProt || jsonObj.protCTe?.infProt || {};
+    const hasAuthorizationProtocol = !!(protCTe && protCTe.nProt);
+    const protocolStatus = protCTe.cStat ? String(protCTe.cStat) : undefined;
+    const protocolStatusDescription = protCTe.xMotivo ? String(protCTe.xMotivo) : undefined;
     const protocol = protCTe.nProt ? `${protCTe.nProt} - ${protCTe.dhRecbto || ''}` : undefined;
 
     // Access key
@@ -185,6 +193,11 @@ export class CTeParser extends FiscalParser {
       issueDate: ide.dhEmi ? new Date(ide.dhEmi) : undefined,
       operationNature: ide.natOp ? String(ide.natOp) : 'PRESTACAO DE SERVICO DE TRANSPORTE',
       protocol,
+      hasSignature,
+      hasAuthorizationProtocol,
+      protocolStatus,
+      protocolStatusDescription,
+      signatureDigest,
       status: 'VALID',
       issuer: emitParty,
       recipient: destParty,

@@ -211,6 +211,11 @@ export interface FiscalDocument {
   exitTime?: string;
   operationNature?: string;
   protocol?: string;
+  hasSignature?: boolean;
+  hasAuthorizationProtocol?: boolean;
+  protocolStatus?: string;
+  protocolStatusDescription?: string;
+  signatureDigest?: string;
   status: DocumentStatus;
   issuer?: Party;
   recipient?: Party;

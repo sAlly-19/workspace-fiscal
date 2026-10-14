@@ -179,8 +179,16 @@ export class NFeParser extends FiscalParser {
     const rawId = infNFe['@_Id'] || '';
     const accessKey = rawId.replace(/^NFe/, '');
 
+    // Extract Signature
+    const sig = nfe.Signature || jsonObj.nfeProc?.Signature || jsonObj.Signature;
+    const hasSignature = !!(sig?.SignedInfo && sig?.SignatureValue);
+    const signatureDigest = sig?.SignedInfo?.Reference?.DigestValue ? String(sig.SignedInfo.Reference.DigestValue) : undefined;
+
     // Extract Protocol
     const infProt = jsonObj.nfeProc?.protNFe?.infProt || jsonObj.protNFe?.infProt;
+    const hasAuthorizationProtocol = !!(infProt && infProt.nProt);
+    const protocolStatus = infProt?.cStat ? String(infProt.cStat) : undefined;
+    const protocolStatusDescription = infProt?.xMotivo ? String(infProt.xMotivo) : undefined;
     let protocol: string | undefined;
     if (infProt && infProt.nProt) {
       let protDateStr = '';
@@ -204,6 +212,11 @@ export class NFeParser extends FiscalParser {
       exitTime: ide.dhSaiEnt ? new Date(ide.dhSaiEnt).toLocaleTimeString('pt-BR') : (ide.hSaiEnt ? String(ide.hSaiEnt) : undefined),
       operationNature: ide.natOp ? String(ide.natOp) : undefined,
       protocol,
+      hasSignature,
+      hasAuthorizationProtocol,
+      protocolStatus,
+      protocolStatusDescription,
+      signatureDigest,
       status: 'VALID',
       issuer: this.parseParty(emit),
       recipient: dest && Object.keys(dest).length > 0 ? this.parseParty(dest) : undefined,
