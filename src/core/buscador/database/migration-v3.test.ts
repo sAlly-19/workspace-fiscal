@@ -176,4 +176,70 @@ describe('database migration v2 to v3', () => {
 
     db.close();
   });
+
+  it('handles pre-existing documents_v3 table gracefully without failing migration', async () => {
+    const dbPath = temporaryDatabasePath();
+    await createVersion2Database(dbPath);
+    // Artificially simulate an aborted previous migration leaving documents_v3
+    const SQL = await getSqlModule();
+    const data = fs.readFileSync(dbPath);
+    const rawDb = new SQL.Database(data);
+    rawDb.run('CREATE TABLE documents_v3 (id INTEGER PRIMARY KEY);');
+    fs.writeFileSync(dbPath, Buffer.from(rawDb.export()));
+    rawDb.close();
+
+    // DatabaseManager.create(dbPath) must succeed without throwing table documents_v3 already exists
+    const db = await DatabaseManager.create(dbPath);
+    expect(db.queryOne<{ user_version: number }>('PRAGMA user_version;')?.user_version).toBe(3);
+    expect(db.hasTable('documents')).toBe(true);
+    db.close();
+  });
+
+  it('recovers data when documents was dropped and documents_v3 was not yet renamed', async () => {
+    const dbPath = temporaryDatabasePath();
+    await createVersion2Database(dbPath);
+    const SQL = await getSqlModule();
+    const data = fs.readFileSync(dbPath);
+    const rawDb = new SQL.Database(data);
+    rawDb.run(`
+      CREATE TABLE documents_v3 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        document_type TEXT NOT NULL,
+        environment TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        nsu TEXT NOT NULL,
+        schema_type TEXT NOT NULL,
+        access_key TEXT NOT NULL,
+        content_hash TEXT,
+        document_number TEXT,
+        series TEXT,
+        issue_date TEXT,
+        received_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        issuer_cnpj TEXT,
+        issuer_name TEXT,
+        recipient_cnpj TEXT,
+        recipient_name TEXT,
+        total_value REAL DEFAULT 0,
+        xml_path TEXT,
+        pdf_path TEXT,
+        xml_status TEXT NOT NULL DEFAULT 'XML_DISPONIVEL',
+        pdf_status TEXT NOT NULL DEFAULT 'PDF_INDISPONIVEL',
+        situacao_fiscal TEXT DEFAULT 'AUTORIZADA',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+      INSERT INTO documents_v3 (company_id, document_type, environment, origin, nsu, schema_type, access_key)
+      VALUES (1, 'NFE', 'production', 'SEFAZ_DISTRIBUTION', '123', 'procNFe_v4.00', '${'9'.repeat(44)}');
+      DROP TABLE documents;
+    `);
+    fs.writeFileSync(dbPath, Buffer.from(rawDb.export()));
+    rawDb.close();
+
+    const db = await DatabaseManager.create(dbPath);
+    expect(db.hasTable('documents')).toBe(true);
+    const doc = db.queryOne<{ access_key: string }>('SELECT access_key FROM documents WHERE access_key = ?;', ['9'.repeat(44)]);
+    expect(doc?.access_key).toBe('9'.repeat(44));
+    db.close();
+  });
 });

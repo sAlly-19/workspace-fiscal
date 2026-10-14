@@ -62,7 +62,43 @@ export class DatabaseManager {
     return this.queryAll<{ name: string }>(`PRAGMA table_info(${table});`).some((row) => row.name === column);
   }
 
+  private getTableCount(table: string): number {
+    try {
+      const res = this.queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM ${table};`);
+      return res ? Number(res.count) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private cleanupOrRecoverMigrationTables(): void {
+    const handlePair = (targetTable: string, tempTable: string) => {
+      const hasTarget = this.hasTable(targetTable);
+      const hasTemp = this.hasTable(tempTable);
+      if (!hasTemp) return;
+
+      if (!hasTarget) {
+        this.db.exec(`ALTER TABLE ${tempTable} RENAME TO ${targetTable};`);
+      } else {
+        const targetCount = this.getTableCount(targetTable);
+        const tempCount = this.getTableCount(tempTable);
+        if (targetCount === 0 && tempCount > 0) {
+          this.db.exec(`DROP TABLE ${targetTable};`);
+          this.db.exec(`ALTER TABLE ${tempTable} RENAME TO ${targetTable};`);
+        } else {
+          this.db.exec(`DROP TABLE IF EXISTS ${tempTable};`);
+        }
+      }
+    };
+
+    handlePair('documents', 'documents_v3');
+    handlePair('documents', 'documents_v2');
+    handlePair('distribution_state', 'distribution_state_v3');
+    handlePair('distribution_state', 'distribution_state_v2');
+  }
+
   private initSchema(): void {
+    this.cleanupOrRecoverMigrationTables();
     this.db.exec(INITIAL_SCHEMA_SQL);
     this.runMigrations();
     try {
@@ -74,6 +110,7 @@ export class DatabaseManager {
   }
 
   private runMigrations(): void {
+    this.cleanupOrRecoverMigrationTables();
     this.db.pragma('foreign_keys = OFF');
     try {
       if (!this.hasColumn('companies', 'uf')) {
@@ -152,6 +189,7 @@ export class DatabaseManager {
   }
 
   private migrateDistributionState(): void {
+    this.db.exec('DROP TABLE IF EXISTS distribution_state_v2;');
     this.db.exec(`CREATE TABLE distribution_state_v2 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')),
@@ -174,6 +212,7 @@ export class DatabaseManager {
   }
 
   private migrateDocuments(): void {
+    this.db.exec('DROP TABLE IF EXISTS documents_v2;');
     this.db.exec(`CREATE TABLE documents_v2 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE')), nsu TEXT NOT NULL,
@@ -193,6 +232,7 @@ export class DatabaseManager {
   }
 
   private migrateDistributionStateV3(): void {
+    this.db.exec('DROP TABLE IF EXISTS distribution_state_v3;');
     this.db.exec(`CREATE TABLE distribution_state_v3 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
@@ -219,6 +259,7 @@ export class DatabaseManager {
       "SELECT value FROM app_settings WHERE key = 'sefaz_environment';"
     )?.value === 'production' ? 'production' : 'homologation';
 
+    this.db.exec('DROP TABLE IF EXISTS documents_v3;');
     this.db.exec(`CREATE TABLE documents_v3 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
       document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),

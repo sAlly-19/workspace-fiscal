@@ -64,9 +64,25 @@ export async function initializeServices(userDataPath: string): Promise<Applicat
     await migrateLegacyBuscadorDatabase(legacyDbPath, dbPath);
   } catch (migErr) {
     console.error('Falha na migração do banco legado do Buscador:', migErr);
+    try {
+      if (fs.existsSync(legacyDbPath)) {
+        fs.renameSync(legacyDbPath, `${legacyDbPath}.failed-${Date.now()}.bak`);
+      }
+    } catch {}
   }
 
-  const db = await getDatabase(dbPath);
+  let db: Awaited<ReturnType<typeof getDatabase>>;
+  try {
+    db = await getDatabase(dbPath);
+  } catch (dbErr) {
+    console.error('Falha crítica ao abrir banco do Buscador, tentando recuperação com fallback:', dbErr);
+    if (fs.existsSync(dbPath)) {
+      try {
+        fs.renameSync(dbPath, `${dbPath}.corrupted-${Date.now()}.bak`);
+      } catch {}
+    }
+    db = await getDatabase(dbPath);
+  }
   const companyRepo = new CompanyRepository(db);
   const certRepo = new CertificateRepository(db);
   const distStateRepo = new DistributionStateRepository(db);

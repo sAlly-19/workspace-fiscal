@@ -141,7 +141,7 @@ export async function migrateLegacyBuscadorDatabase(
       // 4. Documentos
       const targetDocTable = targetDb.hasTable('buscador_documents') ? 'buscador_documents' : 'documents';
       const hasLegacyDocs = targetDb.queryOne<{ name: string }>(
-        "SELECT name FROM legacy.sqlite_master WHERE type = 'table' AND (name = 'buscador_documents' OR name = 'documents');"
+        "SELECT name FROM legacy.sqlite_master WHERE type = 'table' AND (name = 'buscador_documents' OR name = 'documents' OR name = 'documents_v3') ORDER BY CASE name WHEN 'buscador_documents' THEN 1 WHEN 'documents' THEN 2 ELSE 3 END ASC;"
       )?.name;
 
       if (hasLegacyDocs) {
