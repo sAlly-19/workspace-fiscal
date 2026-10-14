@@ -2,6 +2,7 @@ import { FiscalParser } from './base.parser';
 import { FiscalDocument, DocumentType, Party, FiscalItem, FiscalTotals, Address, FiscalBilling, FiscalTransport } from '../fiscal.types';
 import crypto from 'crypto';
 import { parseFiscalNumber } from './utils/xml-number.utils';
+import { extractItemRtcTaxes, extractTotalsRtcTaxes } from './utils/rtc-taxes.utils';
 
 export class NFeParser extends FiscalParser {
   parse(xmlContent: string, rawXmlPath: string, batchId?: string): FiscalDocument {
@@ -210,7 +211,7 @@ export class NFeParser extends FiscalParser {
       additionalInfo: infNFe.infAdic?.infCpl ? String(infNFe.infAdic.infCpl) : undefined,
       fiscoInfo: infNFe.infAdic?.infAdFisco ? String(infNFe.infAdic.infAdFisco) : undefined,
       items: this.parseItems(det),
-      totals: this.parseTotals(total, infNFe.total?.ISSQNtot),
+      totals: this.parseTotals(total, infNFe.total?.ISSQNtot, infNFe.total),
       billing: this.parseBilling(infNFe.cobr, infNFe.pag),
       rawXmlPath,
       batchId,
@@ -346,7 +347,7 @@ export class NFeParser extends FiscalParser {
       let ipiAliq = 0;
       const ipi = imp.IPI?.IPITrib || imp.IPI || {};
       if (ipi.vIPI !== undefined) ipiValue = parseFloat(ipi.vIPI) || 0;
-      if (ipi.pIPI !== undefined) ipiAliq = parseFloat(ipi.pIPI) || 0;
+      const rtcTaxes = extractItemRtcTaxes(imp);
 
       return {
         code: prod.cProd !== undefined && prod.cProd !== null ? String(prod.cProd) : undefined,
@@ -364,11 +365,12 @@ export class NFeParser extends FiscalParser {
         icmsValue,
         ipiValue,
         ipiAliq,
+        ...rtcTaxes,
       };
     });
   }
 
-  private parseTotals(total: any, issqnTotal?: any): FiscalTotals {
+  private parseTotals(total: any, issqnTotal?: any, rawTotalNode?: any): FiscalTotals {
     const icms = parseFloat(total.vICMS) || 0;
     const icmsBase = parseFloat(total.vBC) || 0;
     const icmsSt = parseFloat(total.vST) || 0;
@@ -382,7 +384,8 @@ export class NFeParser extends FiscalParser {
     const icmsUfDest = parseFloat(total.vICMSUFDest) || 0;
     const icmsUfRemet = parseFloat(total.vICMSUFRemet) || 0;
     const fcpUfDest = parseFloat(total.vFCPUFDest) || 0;
-    const totalTaxes = parseFloat(total.vTotTrib) || (icms + icmsSt + ipi + pis + cofins + iss + ii);
+    const rtcTotals = extractTotalsRtcTaxes(rawTotalNode || total);
+    const totalTaxes = parseFloat(total.vTotTrib) || (icms + icmsSt + ipi + pis + cofins + iss + ii + (rtcTotals.ibs || 0) + (rtcTotals.cbs || 0) + (rtcTotals.is || 0));
 
     return {
       products: parseFloat(total.vProd) || (issqnTotal ? parseFloat(issqnTotal.vServ) || 0 : 0),
@@ -407,6 +410,7 @@ export class NFeParser extends FiscalParser {
         icmsUfDest,
         icmsUfRemet,
         fcpUfDest,
+        ...rtcTotals,
         totalTaxes,
       },
       total: parseFloat(total.vNF) || (issqnTotal ? parseFloat(issqnTotal.vServ) || 0 : 0),

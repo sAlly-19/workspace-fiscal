@@ -1,5 +1,6 @@
 import { FiscalTotals, FiscalBilling } from '../../fiscal.types';
 import { parseCteNumber } from './cte-number.utils';
+import { extractTotalsRtcTaxes } from '../utils/rtc-taxes.utils';
 
 export function parseIcms(imp: any): {
   cst?: string;
@@ -71,7 +72,8 @@ export function parseTotals(
   const inss = parseCteNumber(tribFed.vINSS) || 0;
   const ir = parseCteNumber(tribFed.vIR) || 0;
   const csll = parseCteNumber(tribFed.vCSLL) || 0;
-  const totalTaxes = parseCteNumber(imp.vTotTrib) || (icms.value + pis + cofins + inss + ir + csll);
+  const rtcTotals = extractTotalsRtcTaxes(imp);
+  const totalTaxes = parseCteNumber(imp.vTotTrib) || (icms.value + pis + cofins + inss + ir + csll + (rtcTotals.ibs || 0) + (rtcTotals.cbs || 0) + (rtcTotals.is || 0));
 
   return {
     products: 0,
@@ -86,6 +88,7 @@ export function parseTotals(
       inss,
       ir,
       csll,
+      ...rtcTotals,
       totalTaxes,
     },
   };

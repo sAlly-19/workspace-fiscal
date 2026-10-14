@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { FiscalDocument, Address } from '../../fiscal.types';
 import { parseNfseNumber } from './nfse-number.utils';
+import { extractTotalsRtcTaxes } from '../utils/rtc-taxes.utils';
 
 /**
  * Sefin Nacional / Padrão Nacional SPED NFS-e
@@ -159,6 +160,7 @@ export function parseSefinNacional(inf: any, rawXmlPath: string, batchId?: strin
         ir,
         csll,
         outrasRetencoes: outrasRet,
+        ...extractTotalsRtcTaxes(valores),
         totalTaxes,
       },
       total: valTotal || valServ,

@@ -38,6 +38,16 @@ export interface FiscalItem {
   icmsAliq?: number;
   ipiValue?: number;
   ipiAliq?: number;
+  // Reforma Tributária RTC 2026 (EC 132/2023)
+  ibsBase?: number;
+  ibsAliq?: number;
+  ibsValue?: number;
+  cbsBase?: number;
+  cbsAliq?: number;
+  cbsValue?: number;
+  isBase?: number;
+  isAliq?: number;
+  isValue?: number;
 }
 
 export interface FiscalTaxes {
@@ -62,6 +72,16 @@ export interface FiscalTaxes {
   icmsUfRemet?: number;
   fcpUfDest?: number;
   outrasRetencoes?: number;
+  // Reforma Tributária RTC 2026 (EC 132/2023)
+  ibs?: number;
+  ibsBase?: number;
+  ibsAliq?: number;
+  cbs?: number;
+  cbsBase?: number;
+  cbsAliq?: number;
+  is?: number;
+  isBase?: number;
+  isAliq?: number;
   totalTaxes?: number;
   [key: string]: number | boolean | undefined;
 }
