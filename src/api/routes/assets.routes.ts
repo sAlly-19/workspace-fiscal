@@ -5,7 +5,8 @@ import { depreciationService } from '../services/depreciation.service';
 import { db } from '../../db';
 import { depreciationEntries } from '../../db/schema';
 import { eq } from 'drizzle-orm';
-import { generateSchedule, parseBRLToCents } from '../../core/depreciation/calculate';
+import { generateSchedule } from '../../core/depreciation/calculate';
+import { validateCreateAsset, validateUpdateAsset, validateDisposeAsset } from '../validators';
 import crypto from 'crypto';
 
 const router = Router();
@@ -34,23 +35,12 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { companyId, supplier, acquisitionDate, documentNumber, description, acquisitionValue, ncm, categoryId, annualRate } = req.body;
-    if (!companyId) return res.status(400).json({ error: 'Empresa obrigatória' });
-    if (!supplier || !supplier.trim()) return res.status(400).json({ error: 'Fornecedor obrigatório' });
-    if (!acquisitionDate) return res.status(400).json({ error: 'Data de aquisição obrigatória' });
-    if (!documentNumber || !documentNumber.trim()) return res.status(400).json({ error: 'Nº da Nota obrigatório' });
-    if (!description || !description.trim()) return res.status(400).json({ error: 'Descrição obrigatória' });
-    if (acquisitionValue === undefined || acquisitionValue === null) return res.status(400).json({ error: 'Valor de aquisição obrigatório' });
-    const cents = typeof acquisitionValue === 'number' && acquisitionValue > 1000 ? acquisitionValue : parseBRLToCents(String(acquisitionValue));
-    // Se valor vier como "5000.00" => parseBRL vai converter correto. Se já for centavos int, detecta?
-    // Heurística: se string contém , ou . e valor < 1e6, usa parse. Se number > 100000 (centavos) mantém.
-    let finalCents: number;
-    if (typeof acquisitionValue === 'string') finalCents = parseBRLToCents(acquisitionValue);
-    else if (typeof acquisitionValue === 'number' && acquisitionValue < 1000000 && String(acquisitionValue).includes('.')) finalCents = Math.round(acquisitionValue*100);
-    else finalCents = Number(acquisitionValue);
+    const validation = validateCreateAsset(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
+    }
 
-    if (isNaN(finalCents) || finalCents <=0) return res.status(400).json({ error: 'Valor inválido' });
-    if (!annualRate || isNaN(Number(annualRate)) || Number(annualRate)<=0 || Number(annualRate)>100) return res.status(400).json({ error: 'Taxa anual inválida' });
+    const { companyId, supplier, acquisitionDate, documentNumber, description, acquisitionValue, ncm, categoryId, annualRate } = validation.data;
 
     let categoryName: string | null = null;
     if (categoryId) {
@@ -61,14 +51,14 @@ router.post('/', async (req, res) => {
     const created = await assetsRepository.create({
       companyId,
       supplier,
-      acquisitionDate: new Date(acquisitionDate),
+      acquisitionDate,
       documentNumber,
       description,
-      acquisitionValue: finalCents,
+      acquisitionValue,
       ncm: ncm || null,
       categoryId: categoryId || null,
       categoryName,
-      annualRate: Number(annualRate),
+      annualRate,
     });
     res.status(201).json(created);
   } catch (e) {
@@ -79,29 +69,23 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const data: any = {};
-    if (req.body.supplier) data.supplier = req.body.supplier;
-    if (req.body.acquisitionDate) data.acquisitionDate = new Date(req.body.acquisitionDate);
-    if (req.body.documentNumber) data.documentNumber = req.body.documentNumber;
-    if (req.body.description) data.description = req.body.description;
-    if (req.body.acquisitionValue !== undefined) {
-      const v = req.body.acquisitionValue;
-      if (typeof v === 'string') data.acquisitionValue = parseBRLToCents(v);
-      else data.acquisitionValue = Math.round(Number(v)*100) > 100000 ? Number(v) : Math.round(Number(v)*100);
+    const validation = validateUpdateAsset(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
     }
-    if (req.body.ncm !== undefined) data.ncm = req.body.ncm;
-    if (req.body.categoryId !== undefined) {
-      data.categoryId = req.body.categoryId;
-      if (req.body.categoryId) {
-        const cat = await categoriesRepository.findById(req.body.categoryId);
+
+    const data: any = { ...validation.data };
+    if (validation.data.categoryId !== undefined) {
+      if (validation.data.categoryId) {
+        const cat = await categoriesRepository.findById(validation.data.categoryId);
         data.categoryName = cat?.name || null;
       } else {
-        data.categoryName = req.body.categoryName || null;
+        data.categoryName = (req.body as any).categoryName || null;
       }
     }
-    if (req.body.annualRate !== undefined) data.annualRate = Number(req.body.annualRate);
 
     const updated = await assetsRepository.update(req.params.id, data);
+    if (!updated) return res.status(404).json({ error: 'Bem não encontrado' });
     res.json(updated);
   } catch (e) {
     console.error(e);
@@ -111,12 +95,16 @@ router.patch('/:id', async (req, res) => {
 
 router.post('/:id/dispose', async (req, res) => {
   try {
-    const { disposedAt, reason, generateResidual } = req.body;
+    const validation = validateDisposeAsset(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
+    }
+
+    const { disposedAt, reason, generateResidual } = validation.data;
     const asset = await assetsRepository.findById(req.params.id);
     if (!asset) return res.status(404).json({ error: 'Bem não encontrado' });
     if ((asset as any).status === 'DISPOSED') return res.status(400).json({ error: 'Bem já baixado' });
-    const date = disposedAt ? new Date(disposedAt) : new Date();
-    if (isNaN(date.getTime())) return res.status(400).json({ error: 'Data de baixa inválida' });
+    const date = disposedAt || new Date();
     // Não permite baixa antes da aquisição
     if (date < new Date((asset as any).acquisitionDate)) return res.status(400).json({ error: 'Data de baixa não pode ser anterior à aquisição' });
     const updated = await assetsRepository.dispose(req.params.id, date, reason || null);

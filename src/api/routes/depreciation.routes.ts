@@ -1,15 +1,18 @@
 import { Router } from 'express';
 import { depreciationService } from '../services/depreciation.service';
+import { validateMonthlyDepreciationQuery, validateExportDepreciationInput } from '../validators';
 
 const router = Router();
 
 // GET /api/depreciation/monthly?companyId=xxx&competence=2026-08
 router.get('/monthly', async (req, res) => {
   try {
-    const { companyId, competence } = req.query;
-    if (!companyId || !competence) return res.status(400).json({ error: 'companyId e competence obrigatórios (YYYY-MM)' });
-    if (!/^\d{4}-\d{2}$/.test(competence as string)) return res.status(400).json({ error: 'Competência inválida (use YYYY-MM)' });
-    const data = await depreciationService.getMonthlyDepreciation(companyId as string, competence as string);
+    const validation = validateMonthlyDepreciationQuery(req.query);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
+    }
+    const { companyId, competence } = validation.data;
+    const data = await depreciationService.getMonthlyDepreciation(companyId, competence);
     res.json(data);
   } catch (e: any) {
     console.error('[Depreciation/monthly]', e);
@@ -30,8 +33,11 @@ router.get('/asset/:id/history', async (req, res) => {
 // POST /api/depreciation/export  { companyId, competence, separator, numericFormat, dateFormat, columns, force }
 router.post('/export', async (req, res) => {
   try {
-    const { companyId, competence, separator, numericFormat, dateFormat, columns, force } = req.body;
-    if (!companyId || !competence) return res.status(400).json({ error: 'companyId e competence obrigatórios' });
+    const validation = validateExportDepreciationInput(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
+    }
+    const { companyId, competence, separator, numericFormat, dateFormat, columns, force } = validation.data;
     // Verifica se já exportado
     const existing = await depreciationService.getMonthlyDepreciation(companyId, competence);
     if (existing.isExported && !force) {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { categoriesRepository } from '../repositories/categories.repository';
+import { validateCreateCategory, validateUpdateCategory } from '../validators';
 
 const router = Router();
 
@@ -15,12 +16,11 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, defaultRate, companyId } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
-    if (defaultRate === undefined || isNaN(Number(defaultRate)) || Number(defaultRate) <=0 || Number(defaultRate) >100) {
-      return res.status(400).json({ error: 'Taxa padrão inválida (0-100)' });
+    const validation = validateCreateCategory(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
     }
-    const created = await categoriesRepository.create({ name, defaultRate: Number(defaultRate), companyId });
+    const created = await categoriesRepository.create(validation.data);
     res.status(201).json(created);
   } catch (e) {
     res.status(500).json({ error: 'Erro ao criar categoria' });
@@ -29,7 +29,12 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const updated = await categoriesRepository.update(req.params.id, { name: req.body.name, defaultRate: req.body.defaultRate ? Number(req.body.defaultRate) : undefined });
+    const validation = validateUpdateCategory(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Dados de entrada inválidos', details: validation.errors });
+    }
+    const updated = await categoriesRepository.update(req.params.id, validation.data);
+    if (!updated) return res.status(404).json({ error: 'Categoria não encontrada' });
     res.json(updated);
   } catch (e) {
     res.status(500).json({ error: 'Erro ao atualizar categoria' });
