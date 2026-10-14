@@ -205,24 +205,24 @@ Commit: `feat(electron): implement LocalServerSupervisor with lifecycle control 
   - `ServerUnreachableOverlay`: polling automático com auto-recuperação (`wsf:api-recovered`) e reinício via IPC.
   - IPC: verificação estrita de `event.senderFrame === mainWindow.webContents.mainFrame` em `electron/main.ts` e validação com `pathSanitizer` em `security.ts`.
 
-- [ ] **Step 1: Escrever testes para `/api/health` enriquecido e auto-recuperação do overlay (RED)**
-Criar `src/api/routes/health.test.ts` e atualizar `ServerUnreachableOverlay.test.tsx` validando payload de saúde do SQLite e emissão do evento `wsf:api-recovered`.
+- [x] **Step 1: Escrever testes para `/api/health` enriquecido e auto-recuperação do overlay (RED)**
+Criar `src/api/routes/health.test.ts` e atualizar `ServerUnreachableOverlay.test.ts` validando payload de saúde do SQLite e emissão do evento `wsf:api-recovered`.
 
-- [ ] **Step 2: Executar testes para verificar falha (RED)**
+- [x] **Step 2: Executar testes para verificar falha (RED)**
 Run: `npm.cmd test -- src/api/routes/health.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implementar rota enriquecida, auto-recuperação e blindagem IPC**
+- [x] **Step 3: Implementar rota enriquecida, auto-recuperação e blindagem IPC**
 1. Enriquecer `GET /api/health` em `src/api/app.ts` com probe SQLite síncrono e métricas.
 2. Atualizar `ServerUnreachableOverlay.tsx` e `src/web/lib/api.ts` para polling e auto-recuperação sem reload destrutivo.
 3. Blindar os handlers nativos de `electron/main.ts` com validação de senderFrame.
 4. Integrar `isApprovedFolder` em `electron/buscador/ipc/security.ts` com `pathSanitizer.ts`.
 
-- [ ] **Step 4: Executar testes para verificar aprovação (GREEN)**
+- [x] **Step 4: Executar testes para verificar aprovação (GREEN)**
 Run: `npm.cmd test -- src/api/routes/health.test.ts`
 Expected: PASS com 100% de sucesso.
 
-- [ ] **Step 5: Commit local da Task 5**
+- [x] **Step 5: Commit local da Task 5**
 Commit: `feat(transport): enrich health endpoint, auto-reconnect overlay and harden IPC handlers`
 
 ---

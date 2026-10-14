@@ -92,10 +92,28 @@ async function startApiSupervisor(): Promise<number> {
 }
 
 function registerIpcHandlers(apiBaseUrl: string) {
+  function registerVerifiedHandler(
+    channel: string,
+    handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any
+  ) {
+    ipcMain.removeHandler(channel);
+    ipcMain.handle(channel, async (event, ...args) => {
+      if (
+        !mainWindow ||
+        mainWindow.isDestroyed() ||
+        event.sender !== mainWindow.webContents ||
+        event.senderFrame !== mainWindow.webContents.mainFrame
+      ) {
+        throw new Error('Origem IPC não autorizada.');
+      }
+      return handler(event, ...args);
+    });
+  }
+
   ipcMain.handle('api:baseUrl', () => currentApiBaseUrl || apiBaseUrl);
   ipcMain.handle('auth:get-api-token', () => localApiToken);
-  ipcMain.handle('server:status', () => apiSupervisor?.getStatus());
-  ipcMain.handle('server:restart', async () => {
+  registerVerifiedHandler('server:status', () => apiSupervisor?.getStatus());
+  registerVerifiedHandler('server:restart', async () => {
     if (apiSupervisor) {
       const newPort = await apiSupervisor.restart();
       return { success: true, port: newPort };
@@ -110,7 +128,14 @@ function registerIpcHandlers(apiBaseUrl: string) {
     downloads: app.getPath('downloads'),
   }));
 
-  ipcMain.handle(
+  const userAuthorizedFiles = new Set<string>();
+  const userAuthorizedWriteFiles = new Set<string>();
+
+  const trackReadFile = (filePath: string) => {
+    userAuthorizedFiles.add(path.resolve(filePath));
+  };
+
+  registerVerifiedHandler(
     'dialog:openDirectory',
     async (_e, options: { recursive?: boolean; maxFiles?: number } = {}) => {
       if (!mainWindow || mainWindow.isDestroyed()) {
@@ -161,7 +186,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     }
   );
 
-  ipcMain.handle('dialog:openXml', async (_e, options: { multiSelections?: boolean }) => {
+  registerVerifiedHandler('dialog:openXml', async (_e, options: { multiSelections?: boolean }) => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       return { canceled: true, filePaths: [] as string[] };
     }
@@ -180,7 +205,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     return { canceled: result.canceled, filePaths: result.filePaths };
   });
 
-  ipcMain.handle('dialog:openImport', async () => {
+  registerVerifiedHandler('dialog:openImport', async () => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       return { canceled: true, results: [] };
     }
@@ -225,7 +250,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     return { canceled: false, results };
   });
 
-  ipcMain.handle('dialog:openBackup', async () => {
+  registerVerifiedHandler('dialog:openBackup', async () => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       return { canceled: true, filePath: null };
     }
@@ -244,7 +269,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     return { canceled: false, filePath: result.filePaths[0] };
   });
 
-  ipcMain.handle(
+  registerVerifiedHandler(
     'dialog:saveFile',
     async (_e, options: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {
       const result = await dialog.showSaveDialog(mainWindow!, {
@@ -258,18 +283,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     }
   );
 
-  // IPC handlers `fs:readFile` / `fs:writeFile` operam EXCLUSIVAMENTE sobre
-  // paths previamente autorizados via `dialog:openXml` / `dialog:openImport` /
-  // `dialog:saveFile`. A whitelist abaixo é populada quando o usuário escolhe
-  // arquivos via dialog e validada em toda chamada subsequente.
-  const userAuthorizedFiles = new Set<string>();
-  const userAuthorizedWriteFiles = new Set<string>();
-
-  const trackReadFile = (filePath: string) => {
-    userAuthorizedFiles.add(path.resolve(filePath));
-  };
-
-  ipcMain.handle(
+  registerVerifiedHandler(
     'fs:readFile',
     async (_e, filePath: string): Promise<{ ok: true; content: string } | { ok: false; error: string }> => {
       if (!filePath || typeof filePath !== 'string') {
@@ -293,7 +307,7 @@ function registerIpcHandlers(apiBaseUrl: string) {
     }
   );
 
-  ipcMain.handle(
+  registerVerifiedHandler(
     'fs:writeFile',
     async (
       _e,

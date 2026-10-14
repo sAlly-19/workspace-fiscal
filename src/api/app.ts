@@ -18,6 +18,7 @@ import { mutationRateLimiter, readRateLimiter, requestLogger } from './middlewar
 import { errorHandler } from './middleware/errorHandler';
 import { localAuthMiddleware } from './middleware/localAuth';
 import { logger } from './utils/logger';
+import { rawClient } from '../db';
 
 /**
  * Cria e configura a aplicação Express base compartilhada entre
@@ -53,8 +54,39 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'nf-view-api' });
+  app.get('/api/health', async (_req, res) => {
+    try {
+      const journalRes = await rawClient.execute('PRAGMA journal_mode;');
+      const journalMode = (journalRes.rows?.[0]?.[0] as string) || 'unknown';
+      await rawClient.execute('SELECT 1;');
+
+      const mem = process.memoryUsage();
+      res.json({
+        status: 'ok',
+        service: 'nf-view-api',
+        version: '3.5.1',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        database: {
+          connected: true,
+          journalMode,
+        },
+        memory: {
+          rssMb: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
+          heapUsedMb: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
+        },
+      });
+    } catch (err: any) {
+      res.status(503).json({
+        status: 'degraded',
+        service: 'nf-view-api',
+        timestamp: new Date().toISOString(),
+        database: {
+          connected: false,
+          error: err?.message || String(err),
+        },
+      });
+    }
   });
 
   // Autenticação local e controle de tráfego

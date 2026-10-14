@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { apiUrl } from '../lib/api';
 
 interface Props {
   /** Quando definido, exibe o overlay. */
@@ -8,6 +9,52 @@ interface Props {
 }
 
 export function ServerUnreachableOverlay({ visible, onRetry }: Props) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const checkHealthAndRecover = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl('/api/health'), { method: 'GET' });
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('wsf:api-recovered'));
+        return true;
+      }
+    } catch {
+      // still unreachable
+    }
+    return false;
+  }, []);
+
+  // Polling automático enquanto o overlay estiver visível
+  useEffect(() => {
+    if (!visible) return;
+
+    const interval = setInterval(async () => {
+      const recovered = await checkHealthAndRecover();
+      if (recovered) {
+        clearInterval(interval);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [visible, checkHealthAndRecover]);
+
+  const handleManualRetry = async () => {
+    setIsRetrying(true);
+    try {
+      if (typeof window !== 'undefined' && window.api?.restartServer) {
+        await window.api.restartServer();
+      }
+      const recovered = await checkHealthAndRecover();
+      if (!recovered && onRetry) {
+        onRetry();
+      }
+    } catch {
+      if (onRetry) onRetry();
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {visible && (
@@ -32,15 +79,15 @@ export function ServerUnreachableOverlay({ visible, onRetry }: Props) {
             </h2>
             <p className="text-xs text-[#a1a1aa] leading-relaxed mb-4">
               O motor de banco de dados e API local está iniciando ou enfrentou um erro temporário.
+              Tentando reconectar automaticamente a cada 2.5s...
             </p>
-            {onRetry && (
-              <button
-                onClick={onRetry}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-md transition-all cursor-pointer"
-              >
-                Tentar novamente
-              </button>
-            )}
+            <button
+              onClick={handleManualRetry}
+              disabled={isRetrying}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 active:scale-95 text-white text-xs font-semibold rounded-lg shadow-md transition-all cursor-pointer"
+            >
+              {isRetrying ? 'Reiniciando motor...' : 'Tentar novamente'}
+            </button>
           </motion.div>
         </motion.div>
       )}
@@ -48,14 +95,21 @@ export function ServerUnreachableOverlay({ visible, onRetry }: Props) {
   );
 }
 
-/** Hook auxiliar: escuta eventos de falha de fetch do api.ts */
+/** Hook auxiliar: escuta eventos de falha e recuperação de fetch do api.ts */
 export function useServerUnreachable(): boolean {
   const [unreachable, setUnreachable] = useState(false);
 
   useEffect(() => {
     const onUnreachable = () => setUnreachable(true);
+    const onRecovered = () => setUnreachable(false);
+
     window.addEventListener('wsf:api-unreachable', onUnreachable);
-    return () => window.removeEventListener('wsf:api-unreachable', onUnreachable);
+    window.addEventListener('wsf:api-recovered', onRecovered);
+
+    return () => {
+      window.removeEventListener('wsf:api-unreachable', onUnreachable);
+      window.removeEventListener('wsf:api-recovered', onRecovered);
+    };
   }, []);
 
   return unreachable;

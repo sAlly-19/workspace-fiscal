@@ -29,15 +29,21 @@ export function requireString(value: unknown, label: string, maxLength = 500): s
   return value.trim();
 }
 
+import { isPathSafe } from '../../../src/core/security/pathSanitizer';
+
 export function approveFolder(folder: string): string {
+  if (!folder || !path.isAbsolute(folder)) throw new Error('Caminho inseguro detectado.');
   const resolved = path.resolve(folder);
   approvedFolders.add(resolved.toLowerCase());
   return resolved;
 }
 
 export function isApprovedFolder(folder: string, configuredFolder?: string): boolean {
-  if (!path.isAbsolute(folder)) return false;
+  if (!folder || !path.isAbsolute(folder)) return false;
   const resolved = path.resolve(folder).toLowerCase();
   const configured = configuredFolder?.trim() ? path.resolve(configuredFolder).toLowerCase() : '';
-  return approvedFolders.has(resolved) || Boolean(configured && configured === resolved);
+  if (configured && (configured === resolved || isPathSafe(configured, resolved))) {
+    return true;
+  }
+  return approvedFolders.has(resolved);
 }

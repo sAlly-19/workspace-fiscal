@@ -177,3 +177,17 @@ export function prefetchApiBaseUrl(): void {
 export function isElectron(): boolean {
   return typeof window !== 'undefined' && !!window.api;
 }
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('wsf:api-recovered', () => {
+    _cachedApiBaseUrl = null;
+    prefetchApiBaseUrl();
+  });
+  if (window.api?.onServerUrlChanged) {
+    window.api.onServerUrlChanged((newUrl: string) => {
+      _cachedApiBaseUrl = newUrl;
+      (window as any).apiBaseUrl = newUrl;
+      window.dispatchEvent(new CustomEvent('wsf:api-recovered'));
+    });
+  }
+}
