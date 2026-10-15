@@ -46,7 +46,7 @@ export interface WorkspaceTreeNodeProps {
   onImportToFolder?: (folderId: string | null) => void;
 }
 
-export function WorkspaceTreeNode({
+export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
   node,
   depth = 0,
   currentTheme,
@@ -346,5 +346,6 @@ export function WorkspaceTreeNode({
       )}
     </div>
   );
-}
+});
+
 
