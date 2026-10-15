@@ -28,6 +28,7 @@ describe('GitHub Actions CI/CD Pipeline Configuration (IMP-007)', () => {
     expect(content).toContain('actions/checkout@v4');
     expect(content).toContain('actions/setup-node@v4');
     expect(content).toContain('npm ci');
+    expect(content).toContain('npm audit --omit=dev --audit-level=high');
     expect(content).toContain('npm run lint');
     expect(content).toContain('npm test');
     expect(content).toContain('npm run build');

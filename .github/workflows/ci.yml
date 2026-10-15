@@ -31,6 +31,9 @@ jobs:
       - name: Instalar dependências determinísticas
         run: npm ci
 
+      - name: Auditoria de Segurança de Dependências de Produção
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Validação de Tipagem TypeScript (Lint)
         run: npm run lint
 
