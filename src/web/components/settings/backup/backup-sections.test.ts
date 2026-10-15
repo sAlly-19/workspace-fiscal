@@ -25,6 +25,13 @@ describe('Backup Settings Sub-components Contracts', () => {
       depreciationEntries: 100,
       depreciationExports: 1,
     },
+    buscador: {
+      documents: 50,
+      certificates: 2,
+      events: 5,
+      distributionStates: 2,
+      storageXmlFiles: 45,
+    },
     settings: {
       count: 12,
     },
@@ -37,7 +44,7 @@ describe('Backup Settings Sub-components Contracts', () => {
 
       const element = React.createElement(BackupCreateSection, {
         isLight: false,
-        selectedModules: ['NF_VIEW', 'DEPRECIATION'],
+        selectedModules: ['NF_VIEW', 'DEPRECIATION', 'BUSCADOR'],
         toggleCreateModule,
         stats: mockStats,
         creatingBackup: false,
@@ -45,8 +52,10 @@ describe('Backup Settings Sub-components Contracts', () => {
       });
 
       expect(element).toBeDefined();
-      expect(element.props.selectedModules).toHaveLength(2);
+      expect(element.props.selectedModules).toHaveLength(3);
+      expect(element.props.selectedModules).toContain('BUSCADOR');
       expect(element.props.stats?.nfView.documents).toBe(150);
+      expect(element.props.stats?.buscador.documents).toBe(50);
       expect(element.props.creatingBackup).toBe(false);
     });
 

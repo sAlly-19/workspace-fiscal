@@ -1,10 +1,16 @@
 import { db } from '../../db';
 import { documents, documentItems } from '../../db/schema';
-import { eq, sql, count, sum } from 'drizzle-orm';
+import { eq, inArray, sql, count, sum } from 'drizzle-orm';
 
 export class AnalyticsRepository {
   async getDashboardStats(batchId?: string) {
-    let whereClause = batchId ? eq(documents.batchId, batchId) : undefined;
+    let whereClause: any = undefined;
+    if (batchId && batchId !== 'all') {
+      const { workspaceRepository } = await import('./workspace.repository');
+      const descendants = await workspaceRepository.getFolderDescendantIds(batchId);
+      const targetFolderIds = [batchId, ...descendants];
+      whereClause = inArray(documents.batchId, targetFolderIds);
+    }
     
     // Total stats
     const [totals] = await db

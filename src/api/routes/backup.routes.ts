@@ -105,7 +105,7 @@ router.post('/restore', upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Nenhum caminho ou arquivo de backup fornecido.' });
   }
 
-  let modulesToRestore: BackupModule[] = ['NF_VIEW', 'DEPRECIATION', 'SETTINGS'];
+  let modulesToRestore: BackupModule[] = ['NF_VIEW', 'DEPRECIATION', 'BUSCADOR', 'SETTINGS'];
   if (req.body?.modules) {
     try {
       const parsed = typeof req.body.modules === 'string' ? JSON.parse(req.body.modules) : req.body.modules;

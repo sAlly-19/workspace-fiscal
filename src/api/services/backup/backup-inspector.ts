@@ -100,6 +100,9 @@ export async function inspectBackup(filePath: string): Promise<BackupInspectionR
     if (manifest.modules.includes('NF_VIEW') && !zip.getEntry('data/nf_view.json')) {
       return { valid: false, error: 'Arquivo corrompido: dados de NF View ausentes no pacote.' };
     }
+    if (manifest.modules.includes('BUSCADOR') && !zip.getEntry('data/buscador.json')) {
+      return { valid: false, error: 'Arquivo corrompido: dados do Buscador ausentes no pacote.' };
+    }
     if (manifest.modules.includes('SETTINGS') && !zip.getEntry('data/settings.json')) {
       return { valid: false, error: 'Arquivo corrompido: dados de Configurações ausentes no pacote.' };
     }

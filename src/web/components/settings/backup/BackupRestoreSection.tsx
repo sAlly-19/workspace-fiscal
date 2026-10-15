@@ -106,7 +106,7 @@ export function BackupRestoreSection({
                 <span className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
                   Escolha os módulos a restaurar deste backup:
                 </span>
-                <div className="grid grid-cols-3 gap-2 mt-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                   {inspection.modules?.map((mod) => (
                     <label
                       key={mod}
@@ -126,7 +126,13 @@ export function BackupRestoreSection({
                       }`}
                     >
                       <span className="font-bold">
-                        {mod === 'NF_VIEW' ? 'NF View' : mod === 'DEPRECIATION' ? 'Depreciação' : 'Configurações'}
+                        {mod === 'NF_VIEW'
+                          ? 'NF View'
+                          : mod === 'DEPRECIATION'
+                          ? 'Depreciação'
+                          : mod === 'BUSCADOR'
+                          ? 'Buscador NF'
+                          : 'Configurações'}
                       </span>
                       <input
                         type="checkbox"

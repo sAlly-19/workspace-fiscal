@@ -1,6 +1,6 @@
 import path from 'path';
 
-export type BackupModule = 'NF_VIEW' | 'DEPRECIATION' | 'SETTINGS';
+export type BackupModule = 'NF_VIEW' | 'DEPRECIATION' | 'BUSCADOR' | 'SETTINGS';
 
 export interface BackupSettings {
   enabled: boolean;
@@ -31,6 +31,12 @@ export interface BackupManifest {
     documentEvents?: number;
     storageXmlFiles?: number;
     applicationSettings?: number;
+    buscadorDocuments?: number;
+    certificates?: number;
+    distributionStates?: number;
+    nfseEvents?: number;
+    queryHistory?: number;
+    storageBuscadorXmlFiles?: number;
   };
 }
 
@@ -62,6 +68,13 @@ export interface DatabaseStats {
     assets: number;
     depreciationEntries: number;
     depreciationExports: number;
+  };
+  buscador: {
+    documents: number;
+    certificates: number;
+    events: number;
+    distributionStates: number;
+    storageXmlFiles: number;
   };
   settings: {
     count: number;

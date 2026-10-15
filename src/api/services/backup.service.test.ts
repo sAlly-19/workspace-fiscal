@@ -330,5 +330,91 @@ describe('Backup and Restore Service - Scenarios A to F', () => {
       })
     ).rejects.toThrow(/checksum SHA-256 divergente/);
   });
+
+  it('Cenário I: Backup seletivo do BUSCADOR e restauração em banco unificado', async () => {
+    const uniqueNum = Math.floor(Date.now() % 100000) + 1000;
+    const buscCnpj = `88${Date.now().toString().slice(-12)}`;
+    const compId = `comp_busc_${Date.now()}`;
+
+    // 1. Cria empresa e dados do Buscador
+    await rawClient.execute({
+      sql: `INSERT INTO "companies" (id, numeric_id, name, cnpj, is_active) VALUES (?, ?, ?, ?, 1);`,
+      args: [compId, uniqueNum, 'Empresa Buscador', buscCnpj],
+    });
+    await rawClient.execute({
+      sql: `INSERT INTO "certificates" (company_id, subject, issuer, thumbprint, valid_from, valid_to, provider, has_private_key)
+            VALUES (?, 'Cert Teste', 'AC Raiz', 'THUMB_BUSCADOR_123', '2026-01-01', '2027-01-01', 'windows_store', 1);`,
+      args: [uniqueNum],
+    });
+    await rawClient.execute({
+      sql: `INSERT INTO "distribution_state" (company_id, document_type, environment, last_nsu, max_nsu, status)
+            VALUES (?, 'NFE', 'homologation', '000000000000100', '000000000000200', 'IDLE');`,
+      args: [uniqueNum],
+    });
+    await rawClient.execute({
+      sql: `INSERT INTO "buscador_documents" (
+              company_id, document_type, environment, origin, nsu, schema_type, access_key,
+              document_number, xml_status, pdf_status, situacao_fiscal
+            ) VALUES (
+              ?, 'NFE', 'homologation', 'SEFAZ_DISTRIBUTION', '000000000000100', 'procNFe_v4.00', '35260111222333000199550010000000011000000011',
+              '1001', 'XML_DISPONIVEL', 'PDF_INDISPONIVEL', 'AUTORIZADA'
+            );`,
+      args: [uniqueNum],
+    });
+
+    // 2. Cria backup com módulo BUSCADOR
+    const backupRes = await backupService.createBackup({
+      modules: ['BUSCADOR'],
+      customDestination: testDir,
+      customFilename: 'backup_buscador.wfb',
+    });
+
+    expect(fs.existsSync(backupRes.path)).toBe(true);
+    expect(backupRes.manifest.modules).toContain('BUSCADOR');
+
+    // 3. Inspeciona o arquivo
+    const inspection = await backupService.inspectBackup(backupRes.path);
+    expect(inspection.valid).toBe(true);
+    expect(inspection.modules).toContain('BUSCADOR');
+
+    // 4. Limpa as tabelas do Buscador
+    await rawClient.execute('DELETE FROM "buscador_documents";');
+    await rawClient.execute('DELETE FROM "certificates";');
+    await rawClient.execute('DELETE FROM "distribution_state";');
+
+    const emptyDocs = await rawClient.execute('SELECT COUNT(*) as c FROM "buscador_documents";');
+    expect(Number((emptyDocs.rows[0] as any).c)).toBe(0);
+
+    // 5. Restaura o backup do módulo BUSCADOR
+    const restoreRes = await backupService.restoreBackup({
+      filePath: backupRes.path,
+      modulesToRestore: ['BUSCADOR'],
+    });
+
+    expect(restoreRes.success).toBe(true);
+    expect(restoreRes.restoredModules).toContain('BUSCADOR');
+
+    // 6. Valida que os dados foram restaurados
+    const restoredDocs = await rawClient.execute({
+      sql: 'SELECT * FROM "buscador_documents" WHERE company_id = ?;',
+      args: [uniqueNum],
+    });
+    expect(restoredDocs.rows).toHaveLength(1);
+    expect((restoredDocs.rows[0] as any).access_key).toBe('35260111222333000199550010000000011000000011');
+
+    const restoredCerts = await rawClient.execute({
+      sql: 'SELECT * FROM "certificates" WHERE company_id = ?;',
+      args: [uniqueNum],
+    });
+    expect(restoredCerts.rows).toHaveLength(1);
+    expect((restoredCerts.rows[0] as any).thumbprint).toBe('THUMB_BUSCADOR_123');
+
+    const restoredDist = await rawClient.execute({
+      sql: 'SELECT * FROM "distribution_state" WHERE company_id = ?;',
+      args: [uniqueNum],
+    });
+    expect(restoredDist.rows).toHaveLength(1);
+    expect((restoredDist.rows[0] as any).last_nsu).toBe('000000000000100');
+  });
 });
 

@@ -28,6 +28,7 @@ export function BackupSettingsTab({ isLight }: BackupSettingsTabProps) {
   const [selectedModules, setSelectedModules] = useState<BackupModule[]>([
     'NF_VIEW',
     'DEPRECIATION',
+    'BUSCADOR',
     'SETTINGS',
   ]);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -39,6 +40,7 @@ export function BackupSettingsTab({ isLight }: BackupSettingsTabProps) {
   const [modulesToRestore, setModulesToRestore] = useState<BackupModule[]>([
     'NF_VIEW',
     'DEPRECIATION',
+    'BUSCADOR',
     'SETTINGS',
   ]);
   const [restoring, setRestoring] = useState(false);
@@ -184,7 +186,7 @@ export function BackupSettingsTab({ isLight }: BackupSettingsTabProps) {
       setInspection(inspectData);
       if (inspectData.modules && Array.isArray(inspectData.modules)) {
         if (inspectData.isLegacy) {
-          setModulesToRestore(['NF_VIEW', 'DEPRECIATION', 'SETTINGS']);
+          setModulesToRestore(['NF_VIEW', 'DEPRECIATION', 'BUSCADOR', 'SETTINGS']);
         } else {
           setModulesToRestore(inspectData.modules.filter((m) => m !== 'FULL_DATABASE') as BackupModule[]);
         }

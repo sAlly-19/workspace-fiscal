@@ -30,6 +30,25 @@ export class WorkspaceRepository {
     }).where(eq(folders.id, id)).returning();
   }
 
+  // Gather all descendant folder IDs recursively for a given folder
+  async getFolderDescendantIds(folderId: string): Promise<string[]> {
+    const allFolders = await db.query.folders.findMany({
+      columns: { id: true, parentId: true },
+    });
+
+    const getDescendants = (parentId: string): string[] => {
+      const children = allFolders.filter((f) => f.parentId === parentId);
+      const list: string[] = [];
+      for (const child of children) {
+        list.push(child.id);
+        list.push(...getDescendants(child.id));
+      }
+      return list;
+    };
+
+    return getDescendants(folderId);
+  }
+
   // Delete a folder and recursively its subfolders & unassign or delete documents
   async deleteFolder(id: string) {
     // 1. Find all folders
@@ -105,6 +124,17 @@ export class WorkspaceRepository {
         rootFolders.push(node);
       }
     });
+
+    // Rollup document counts from leaves up to roots
+    const rollupCounts = (node: FolderNode): number => {
+      let total = node.documentCount || 0;
+      for (const child of node.children) {
+        total += rollupCounts(child);
+      }
+      node.documentCount = total;
+      return total;
+    };
+    rootFolders.forEach(rollupCounts);
 
     return rootFolders;
   }

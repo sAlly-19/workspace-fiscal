@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
+import { getFolderAndDescendantIds } from '../stores/workspace/workspace.utils';
 import { DocumentPreview } from '../features/documents/DocumentPreview';
 import { WorkspaceTree } from '../features/workspace/WorkspaceTree';
 import { TitleBar } from '../components/TitleBar';
@@ -181,6 +182,12 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     window.addEventListener('mouseup', onMouseUp);
   }, [isTreeCollapsed, treeWidth]);
 
+  // Allowed folder IDs (including selected folder and all its recursive subfolders)
+  const allowedFolderIds = useMemo(
+    () => getFolderAndDescendantIds(selectedFolderId, folders),
+    [selectedFolderId, folders]
+  );
+
   // Filter documents by search and by selected workspace folder
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
@@ -190,7 +197,12 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
       (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesFolder = selectedFolderId === null ? true : doc.batchId === selectedFolderId;
+    const matchesFolder =
+      allowedFolderIds === null
+        ? true
+        : doc.batchId
+        ? allowedFolderIds.has(doc.batchId)
+        : false;
 
     return matchesSearch && matchesFolder;
   });

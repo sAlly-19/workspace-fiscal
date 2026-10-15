@@ -1,4 +1,4 @@
-import { db } from '../../../db';
+import { db, rawClient } from '../../../db';
 import type { DatabaseStats } from './backup.types';
 
 export async function getDatabaseStats(): Promise<DatabaseStats> {
@@ -35,6 +35,35 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     if (d.rawXmlPath) xmlCount++;
   }
 
+  let buscadorDocsCount = 0;
+  let certsCount = 0;
+  let eventsBuscadorCount = 0;
+  let distStatesCount = 0;
+  let buscadorXmlCount = 0;
+
+  try {
+    const tableRes = await rawClient.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('buscador_documents', 'certificates', 'distribution_state', 'nfse_events');");
+    const existingTables = new Set(tableRes.rows.map((r: any) => r.name));
+
+    if (existingTables.has('buscador_documents')) {
+      const bdocs = await rawClient.execute('SELECT COUNT(*) as c, COUNT(xml_path) as xc FROM buscador_documents;');
+      buscadorDocsCount = Number((bdocs.rows[0] as any)?.c || 0);
+      buscadorXmlCount = Number((bdocs.rows[0] as any)?.xc || 0);
+    }
+    if (existingTables.has('certificates')) {
+      const certs = await rawClient.execute('SELECT COUNT(*) as c FROM certificates;');
+      certsCount = Number((certs.rows[0] as any)?.c || 0);
+    }
+    if (existingTables.has('distribution_state')) {
+      const dist = await rawClient.execute('SELECT COUNT(*) as c FROM distribution_state;');
+      distStatesCount = Number((dist.rows[0] as any)?.c || 0);
+    }
+    if (existingTables.has('nfse_events')) {
+      const evs = await rawClient.execute('SELECT COUNT(*) as c FROM nfse_events;');
+      eventsBuscadorCount = Number((evs.rows[0] as any)?.c || 0);
+    }
+  } catch {}
+
   return {
     nfView: {
       documents: docsCount.length,
@@ -51,6 +80,13 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       assets: assetsCount.length,
       depreciationEntries: depEntriesCount.length,
       depreciationExports: depExportsCount.length,
+    },
+    buscador: {
+      documents: buscadorDocsCount,
+      certificates: certsCount,
+      events: eventsBuscadorCount,
+      distributionStates: distStatesCount,
+      storageXmlFiles: buscadorXmlCount,
     },
     settings: {
       count: settingsCount.length,

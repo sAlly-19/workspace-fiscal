@@ -34,7 +34,7 @@ export function BackupCreateSection({
           Selecione quais módulos do Workspace Fiscal você deseja incluir no arquivo de backup portátil:
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* NF View Card */}
           <label
             onClick={() => toggleCreateModule('NF_VIEW')}
@@ -92,6 +92,36 @@ export function BackupCreateSection({
             </div>
             <div className={`text-[10px] font-mono mt-2 pt-2 border-t border-white/10 ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
               {stats ? `${stats.depreciation.assets} bens · ${stats.depreciation.companies} empresas` : 'Calculando...'}
+            </div>
+          </label>
+
+          {/* Buscador NF Card */}
+          <label
+            onClick={() => toggleCreateModule('BUSCADOR')}
+            className={`p-3 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+              selectedModules.includes('BUSCADOR')
+                ? 'border-blue-500 bg-blue-500/10'
+                : isLight
+                  ? 'border-[#cbd5e1] bg-white opacity-60'
+                  : 'border-[#27272a] bg-[#18181b] opacity-60'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>Buscador NF</span>
+                <input
+                  type="checkbox"
+                  checked={selectedModules.includes('BUSCADOR')}
+                  onChange={() => {}}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+              </div>
+              <p className={`text-[11px] mt-1.5 leading-relaxed ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
+                Documentos sincronizados da SEFAZ/ADN, certificados A1, estados de distribuição e consultas.
+              </p>
+            </div>
+            <div className={`text-[10px] font-mono mt-2 pt-2 border-t border-white/10 ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+              {stats?.buscador ? `${stats.buscador.documents} docs · ${stats.buscador.certificates} certs` : 'Calculando...'}
             </div>
           </label>
 

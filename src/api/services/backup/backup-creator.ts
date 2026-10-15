@@ -37,7 +37,7 @@ export async function createBackup(
 
   const modules = options.modules && options.modules.length > 0
     ? options.modules
-    : (['NF_VIEW', 'DEPRECIATION', 'SETTINGS'] as BackupModule[]);
+    : (['NF_VIEW', 'DEPRECIATION', 'BUSCADOR', 'SETTINGS'] as BackupModule[]);
 
   // 1. Força flush do WAL antes da leitura
   try {
@@ -162,7 +162,120 @@ export async function createBackup(
     addFileWithChecksum('data/nf_view.json', Buffer.from(JSON.stringify(nfViewPayload, null, 2), 'utf-8'));
   }
 
-  // 4. Extrai configurações gerais
+  // 4. Extrai dados do módulo BUSCADOR
+  if (modules.includes('BUSCADOR')) {
+    const tableRes = await rawClient.execute(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('buscador_documents', 'certificates', 'distribution_state', 'nfse_events', 'query_history', 'app_settings', 'companies');"
+    );
+    const existingTables = new Set(tableRes.rows.map((r: any) => r.name));
+
+    let buscadorDocs: any[] = [];
+    let certsList: any[] = [];
+    let distStatesList: any[] = [];
+    let nfseEventsList: any[] = [];
+    let queryHistoryList: any[] = [];
+    let appSettingsList: any[] = [];
+    let buscadorCompanies: any[] = [];
+
+    if (existingTables.has('buscador_documents')) {
+      const res = await rawClient.execute('SELECT * FROM "buscador_documents";');
+      buscadorDocs = res.rows as any[];
+    }
+    if (existingTables.has('certificates')) {
+      const res = await rawClient.execute('SELECT * FROM "certificates";');
+      certsList = res.rows as any[];
+    }
+    if (existingTables.has('distribution_state')) {
+      const res = await rawClient.execute('SELECT * FROM "distribution_state";');
+      distStatesList = res.rows as any[];
+    }
+    if (existingTables.has('nfse_events')) {
+      const res = await rawClient.execute('SELECT * FROM "nfse_events";');
+      nfseEventsList = res.rows as any[];
+    }
+    if (existingTables.has('query_history')) {
+      const res = await rawClient.execute('SELECT * FROM "query_history";');
+      queryHistoryList = res.rows as any[];
+    }
+    if (existingTables.has('app_settings')) {
+      const res = await rawClient.execute("SELECT * FROM \"app_settings\" WHERE key LIKE '%sefaz%' OR key LIKE '%nfse%';");
+      appSettingsList = res.rows as any[];
+    }
+    if (existingTables.has('companies')) {
+      const res = await rawClient.execute('SELECT * FROM "companies";');
+      buscadorCompanies = res.rows as any[];
+    }
+
+    manifestStats.buscadorDocuments = buscadorDocs.length;
+    manifestStats.certificates = certsList.length;
+    manifestStats.distributionStates = distStatesList.length;
+    manifestStats.nfseEvents = nfseEventsList.length;
+    manifestStats.queryHistory = queryHistoryList.length;
+
+    // Compacta arquivos físicos XML/PDF do Buscador caso existam em disco
+    let buscadorXmlCount = 0;
+    const docPayloads: any[] = [];
+    for (const doc of buscadorDocs) {
+      let xmlRelPath: string | null = null;
+      let pdfRelPath: string | null = null;
+      if (doc.xml_path && existsSync(doc.xml_path)) {
+        try {
+          const content = await fs.readFile(doc.xml_path);
+          const base = path.basename(doc.xml_path);
+          xmlRelPath = `storage/buscador/${base}`;
+          addFileWithChecksum(xmlRelPath, content);
+          buscadorXmlCount++;
+        } catch {}
+      }
+      if (doc.pdf_path && existsSync(doc.pdf_path)) {
+        try {
+          const content = await fs.readFile(doc.pdf_path);
+          const base = path.basename(doc.pdf_path);
+          pdfRelPath = `storage/buscador/${base}`;
+          addFileWithChecksum(pdfRelPath, content);
+        } catch {}
+      }
+      docPayloads.push({
+        ...doc,
+        _backup_xml_entry: xmlRelPath,
+        _backup_pdf_entry: pdfRelPath,
+      });
+    }
+
+    const eventPayloads: any[] = [];
+    for (const ev of nfseEventsList) {
+      let xmlRelPath: string | null = null;
+      if (ev.xml_path && existsSync(ev.xml_path)) {
+        try {
+          const content = await fs.readFile(ev.xml_path);
+          const base = path.basename(ev.xml_path);
+          xmlRelPath = `storage/buscador/${base}`;
+          addFileWithChecksum(xmlRelPath, content);
+          buscadorXmlCount++;
+        } catch {}
+      }
+      eventPayloads.push({
+        ...ev,
+        _backup_xml_entry: xmlRelPath,
+      });
+    }
+
+    manifestStats.storageBuscadorXmlFiles = buscadorXmlCount;
+
+    const buscadorPayload = {
+      companies: buscadorCompanies,
+      documents: docPayloads,
+      certificates: certsList,
+      distributionStates: distStatesList,
+      nfseEvents: eventPayloads,
+      queryHistory: queryHistoryList,
+      appSettings: appSettingsList,
+    };
+
+    addFileWithChecksum('data/buscador.json', Buffer.from(JSON.stringify(buscadorPayload, null, 2), 'utf-8'));
+  }
+
+  // 5. Extrai configurações gerais
   if (modules.includes('SETTINGS')) {
     const settingsList = await db.query.applicationSettings.findMany();
     manifestStats.applicationSettings = settingsList.length;
@@ -266,7 +379,7 @@ export async function createSafetyBackup(
   const safetyFilename = `safety-backup-before-restore-${stamp}.wfb`;
   const res = await createBackup(
     {
-      modules: ['NF_VIEW', 'DEPRECIATION', 'SETTINGS'],
+      modules: ['NF_VIEW', 'DEPRECIATION', 'BUSCADOR', 'SETTINGS'],
       customDestination: destination,
       customFilename: safetyFilename,
     },

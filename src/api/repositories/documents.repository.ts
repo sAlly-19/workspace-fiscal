@@ -50,7 +50,10 @@ export class DocumentsRepository {
   async findAll(batchId?: string, search?: string, limit?: number, offset?: number) {
     const conditions: any[] = [];
     if (batchId && batchId !== 'all') {
-      conditions.push(eq(documents.batchId, batchId));
+      const { workspaceRepository } = await import('./workspace.repository');
+      const descendants = await workspaceRepository.getFolderDescendantIds(batchId);
+      const targetFolderIds = [batchId, ...descendants];
+      conditions.push(inArray(documents.batchId, targetFolderIds));
     }
     if (search && search.trim()) {
       const term = `%${search.trim()}%`;

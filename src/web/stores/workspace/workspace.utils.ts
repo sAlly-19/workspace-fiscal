@@ -1,5 +1,5 @@
 import { apiFetch } from '../../lib/api';
-import { AppSettings } from './workspace.types';
+import { AppSettings, FolderNode } from './workspace.types';
 
 export function readUrlParams(): { folderId: string | null; folderName: string; search: string } {
   if (typeof window === 'undefined') return { folderId: null, folderName: 'Todos os Documentos', search: '' };
@@ -88,5 +88,37 @@ export async function safeFetchJson<T>(
     }
   }
   return null;
+}
+
+export function getFolderAndDescendantIds(
+  folderId: string | null,
+  folders: FolderNode[]
+): Set<string> | null {
+  if (!folderId || folderId === 'all') return null;
+  const result = new Set<string>();
+  result.add(folderId);
+
+  const findAndAdd = (nodes: FolderNode[]): boolean => {
+    for (const node of nodes) {
+      if (node.id === folderId) {
+        const addAll = (children?: FolderNode[]) => {
+          if (!children) return;
+          for (const c of children) {
+            result.add(c.id);
+            addAll(c.children);
+          }
+        };
+        addAll(node.children);
+        return true;
+      }
+      if (node.children?.length) {
+        if (findAndAdd(node.children)) return true;
+      }
+    }
+    return false;
+  };
+
+  findAndAdd(folders);
+  return result;
 }
 

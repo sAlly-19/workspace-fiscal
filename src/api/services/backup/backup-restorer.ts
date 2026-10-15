@@ -354,6 +354,191 @@ export async function restoreBackup(
       }
     }
 
+    // RESTAURAÇÃO: BUSCADOR
+    if (modules.includes('BUSCADOR')) {
+      const buscEntry = zip.getEntry('data/buscador.json');
+      if (!buscEntry) throw new Error('Dados do Buscador não encontrados no arquivo de backup.');
+      const buscData = JSON.parse(buscEntry.getData().toString('utf-8'));
+
+      const tableRes = await rawClient.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('buscador_documents', 'certificates', 'distribution_state', 'nfse_events', 'query_history', 'app_settings', 'companies');"
+      );
+      const existingTables = new Set(tableRes.rows.map((r: any) => r.name));
+
+      // Se DEPRECIATION não foi restaurado, garante que as empresas do Buscador existam no banco
+      if (!modules.includes('DEPRECIATION') && Array.isArray(buscData.companies)) {
+        for (const c of buscData.companies) {
+          const compCheck = await rawClient.execute({
+            sql: 'SELECT id, numeric_id FROM "companies" WHERE cnpj = ? OR numeric_id = ? OR id = ?;',
+            args: [c.cnpj || '', c.numeric_id || 0, c.id || ''],
+          });
+          if (compCheck.rows.length === 0) {
+            await rawClient.execute({
+              sql: 'INSERT INTO "companies" (id, numeric_id, name, cnpj, uf, state, is_active) VALUES (?, ?, ?, ?, ?, ?, ?);',
+              args: [c.id, c.numeric_id || null, c.name || 'Empresa', c.cnpj || null, c.uf || '35', c.state || 'SP', c.is_active ? 1 : 0],
+            });
+          }
+        }
+      }
+
+      // Limpa tabelas do Buscador
+      if (existingTables.has('buscador_documents')) {
+        await rawClient.execute('DELETE FROM "buscador_documents";');
+      }
+      if (existingTables.has('certificates')) {
+        await rawClient.execute('DELETE FROM "certificates";');
+      }
+      if (existingTables.has('distribution_state')) {
+        await rawClient.execute('DELETE FROM "distribution_state";');
+      }
+      if (existingTables.has('nfse_events')) {
+        await rawClient.execute('DELETE FROM "nfse_events";');
+      }
+      if (existingTables.has('query_history')) {
+        await rawClient.execute('DELETE FROM "query_history";');
+      }
+
+      // Restaura certificates
+      if (existingTables.has('certificates') && Array.isArray(buscData.certificates)) {
+        for (const cert of buscData.certificates) {
+          await rawClient.execute({
+            sql: `INSERT OR REPLACE INTO "certificates" (
+              id, company_id, subject, issuer, serial_number, thumbprint, valid_from, valid_to,
+              provider, has_private_key, extracted_cnpj, extracted_cpf
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            args: [
+              cert.id, cert.company_id, cert.subject, cert.issuer, cert.serial_number || null,
+              cert.thumbprint, cert.valid_from, cert.valid_to, cert.provider || 'windows_store',
+              cert.has_private_key !== undefined ? cert.has_private_key : 1,
+              cert.extracted_cnpj || null, cert.extracted_cpf || null,
+            ],
+          });
+        }
+      }
+
+      // Restaura distribution_state
+      if (existingTables.has('distribution_state') && Array.isArray(buscData.distributionStates)) {
+        for (const ds of buscData.distributionStates) {
+          await rawClient.execute({
+            sql: `INSERT OR REPLACE INTO "distribution_state" (
+              id, company_id, document_type, environment, last_nsu, max_nsu,
+              last_query_at, status, last_error, last_cstat, next_query_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            args: [
+              ds.id, ds.company_id, ds.document_type, ds.environment || 'homologation',
+              ds.last_nsu || '000000000000000', ds.max_nsu || '000000000000000',
+              ds.last_query_at || null, ds.status || 'IDLE', ds.last_error || null,
+              ds.last_cstat || null, ds.next_query_at || null,
+            ],
+          });
+        }
+      }
+
+      // Restaura buscador_documents e arquivos XML se inclusos
+      if (existingTables.has('buscador_documents') && Array.isArray(buscData.documents)) {
+        for (const doc of buscData.documents) {
+          let resolvedXmlPath = doc.xml_path || null;
+          let resolvedPdfPath = doc.pdf_path || null;
+
+          if (doc._backup_xml_entry) {
+            const entry = zip.getEntry(doc._backup_xml_entry);
+            if (entry) {
+              const targetPath = doc.xml_path || path.join(process.cwd(), 'data', 'documents', path.basename(doc._backup_xml_entry));
+              await fs.mkdir(path.dirname(targetPath), { recursive: true });
+              await fs.writeFile(targetPath, entry.getData());
+              resolvedXmlPath = targetPath;
+            }
+          }
+          if (doc._backup_pdf_entry) {
+            const entry = zip.getEntry(doc._backup_pdf_entry);
+            if (entry) {
+              const targetPath = doc.pdf_path || path.join(process.cwd(), 'data', 'documents', path.basename(doc._backup_pdf_entry));
+              await fs.mkdir(path.dirname(targetPath), { recursive: true });
+              await fs.writeFile(targetPath, entry.getData());
+              resolvedPdfPath = targetPath;
+            }
+          }
+
+          await rawClient.execute({
+            sql: `INSERT INTO "buscador_documents" (
+              id, company_id, document_type, environment, origin, nsu, schema_type, access_key,
+              content_hash, document_number, series, issue_date, received_at,
+              issuer_cnpj, issuer_name, recipient_cnpj, recipient_name, total_value,
+              xml_path, pdf_path, xml_status, pdf_status, situacao_fiscal
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            args: [
+              doc.id, doc.company_id, doc.document_type, doc.environment || 'homologation',
+              doc.origin || 'SEFAZ_DISTRIBUTION', doc.nsu, doc.schema_type, doc.access_key,
+              doc.content_hash || null, doc.document_number || null, doc.series || null,
+              doc.issue_date || null, doc.received_at || new Date().toISOString(),
+              doc.issuer_cnpj || null, doc.issuer_name || null, doc.recipient_cnpj || null, doc.recipient_name || null,
+              doc.total_value !== undefined ? doc.total_value : 0,
+              resolvedXmlPath, resolvedPdfPath,
+              doc.xml_status || 'XML_DISPONIVEL', doc.pdf_status || 'PDF_INDISPONIVEL',
+              doc.situacao_fiscal || 'AUTORIZADA',
+            ],
+          });
+        }
+      }
+
+      // Restaura nfse_events
+      if (existingTables.has('nfse_events') && Array.isArray(buscData.nfseEvents)) {
+        for (const ev of buscData.nfseEvents) {
+          let resolvedXmlPath = ev.xml_path;
+          if (ev._backup_xml_entry) {
+            const entry = zip.getEntry(ev._backup_xml_entry);
+            if (entry) {
+              const targetPath = ev.xml_path || path.join(process.cwd(), 'data', 'documents', path.basename(ev._backup_xml_entry));
+              await fs.mkdir(path.dirname(targetPath), { recursive: true });
+              await fs.writeFile(targetPath, entry.getData());
+              resolvedXmlPath = targetPath;
+            }
+          }
+          await rawClient.execute({
+            sql: `INSERT OR REPLACE INTO "nfse_events" (
+              id, company_id, document_id, environment, access_key, nsu, event_identifier,
+              event_type, event_sequence, event_date, schema_type, xml_path, content_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            args: [
+              ev.id, ev.company_id, ev.document_id || null, ev.environment || 'homologation',
+              ev.access_key, ev.nsu || null, ev.event_identifier || null, ev.event_type,
+              ev.event_sequence || null, ev.event_date || null, ev.schema_type,
+              resolvedXmlPath, ev.content_hash,
+            ],
+          });
+        }
+      }
+
+      // Restaura query_history
+      if (existingTables.has('query_history') && Array.isArray(buscData.queryHistory)) {
+        for (const qh of buscData.queryHistory) {
+          await rawClient.execute({
+            sql: `INSERT OR REPLACE INTO "query_history" (
+              id, company_id, document_type, environment, query_type,
+              last_nsu_before, last_nsu_after, max_nsu, documents_received,
+              status, cstat, xmotivo, error_message, queried_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            args: [
+              qh.id, qh.company_id, qh.document_type, qh.environment || 'homologation', qh.query_type,
+              qh.last_nsu_before, qh.last_nsu_after, qh.max_nsu, qh.documents_received,
+              qh.status, qh.cstat || null, qh.xmotivo || null, qh.error_message || null,
+              qh.queried_at || new Date().toISOString(),
+            ],
+          });
+        }
+      }
+
+      // Restaura app_settings do Buscador
+      if (existingTables.has('app_settings') && Array.isArray(buscData.appSettings)) {
+        for (const s of buscData.appSettings) {
+          await rawClient.execute({
+            sql: 'INSERT OR REPLACE INTO "app_settings" (key, value, updated_at) VALUES (?, ?, datetime(\'now\', \'localtime\'));',
+            args: [s.key, s.value],
+          });
+        }
+      }
+    }
+
     // RESTAURAÇÃO: CONFIGURAÇÕES
     if (modules.includes('SETTINGS')) {
       const setEntry = zip.getEntry('data/settings.json');
