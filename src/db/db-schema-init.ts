@@ -311,6 +311,8 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_docs_type" ON "documents"("type");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_docs_issuer" ON "documents"("issuer_document");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_docs_number" ON "documents"("number");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_documents_batch_type" ON "documents"("batch_id", "type");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_documents_batch_issue_date" ON "documents"("batch_id", "issue_date");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_items_document" ON "document_items"("document_id");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_taxes_document" ON "document_taxes"("document_id");');
   await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_categories_company" ON "categories"("company_id");');

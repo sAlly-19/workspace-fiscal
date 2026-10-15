@@ -25,11 +25,16 @@ describe('Database Modules', () => {
     expect(backups.length).toBe(0);
   });
 
-  it('can create in-memory db client and execute basic pragma', async () => {
+  it('creates composite indexes on documents for recursive folder queries (IMP-T04)', async () => {
+    const { initSchemaAndMigrations } = await import('./db-schema-init');
     const client = createDbClient(':memory:');
-    const res = await client.execute('SELECT 1 as val;');
-    expect(res.rows.length).toBe(1);
-    expect((res.rows[0] as any).val ?? (res.rows[0] as any)[0]).toBe(1);
+    await initSchemaAndMigrations(client);
+
+    const res = await client.execute("PRAGMA index_list('documents');");
+    const indexNames = res.rows.map((row: any) => row.name || row[1]);
+
+    expect(indexNames).toContain('idx_documents_batch_type');
+    expect(indexNames).toContain('idx_documents_batch_issue_date');
   });
 });
 
