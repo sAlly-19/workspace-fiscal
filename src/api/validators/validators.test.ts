@@ -9,9 +9,15 @@ import {
   validateUpdateCategory,
   validateMonthlyDepreciationQuery,
   validateExportDepreciationInput,
+  validateCreateFolder,
+  validateUpdateFolder,
+  validateBulkDeleteDocuments,
+  validateBulkMoveDocuments,
+  validateDedupePolicy,
+  validateSeenVersion,
 } from './index';
 
-describe('API Input Contract Validators (IMP-011)', () => {
+describe('API Input Contract Validators (IMP-011 / IMP-T03)', () => {
   describe('Company Validator', () => {
     it('approves valid company creation data', () => {
       const result = validateCreateCompany({
@@ -186,6 +192,154 @@ describe('API Input Contract Validators (IMP-011)', () => {
         numericFormat: 'CURRENCY', // inválido
       });
       expect(invalid.success).toBe(false);
+    });
+  });
+
+  describe('Workspace Validator', () => {
+    it('validates valid folder creation', () => {
+      const valid = validateCreateFolder({ name: 'Notas Fiscais 2026', parentId: 'parent-123' });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.name).toBe('Notas Fiscais 2026');
+        expect(valid.data.parentId).toBe('parent-123');
+      }
+    });
+
+    it('rejects empty or excessively long folder names for creation', () => {
+      const empty = validateCreateFolder({ name: '   ' });
+      expect(empty.success).toBe(false);
+      if (!empty.success) {
+        expect(empty.errors).toContain('O nome da pasta é obrigatório.');
+      }
+
+      const tooLong = validateCreateFolder({ name: 'a'.repeat(256) });
+      expect(tooLong.success).toBe(false);
+      if (!tooLong.success) {
+        expect(tooLong.errors).toContain('O nome da pasta deve ter no máximo 255 caracteres.');
+      }
+    });
+
+    it('validates folder rename and rejects empty or oversized names', () => {
+      const valid = validateUpdateFolder({ name: 'Novo Nome' });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.name).toBe('Novo Nome');
+      }
+
+      const empty = validateUpdateFolder({ name: '' });
+      expect(empty.success).toBe(false);
+      if (!empty.success) {
+        expect(empty.errors).toContain('O novo nome da pasta é obrigatório.');
+      }
+
+      const invalidBody = validateUpdateFolder(null);
+      expect(invalidBody.success).toBe(false);
+      if (!invalidBody.success) {
+        expect(invalidBody.errors).toContain('O novo nome da pasta é obrigatório.');
+      }
+    });
+  });
+
+  describe('Documents Validator', () => {
+    it('validates bulk delete with valid string array of IDs', () => {
+      const valid = validateBulkDeleteDocuments({ ids: ['doc-1', 'doc-2'] });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.ids).toEqual(['doc-1', 'doc-2']);
+      }
+    });
+
+    it('rejects bulk delete with empty, non-array or non-string items', () => {
+      const empty = validateBulkDeleteDocuments({ ids: [] });
+      expect(empty.success).toBe(false);
+      if (!empty.success) {
+        expect(empty.errors).toContain('Lista de IDs inválida para exclusão.');
+      }
+
+      const invalidType = validateBulkDeleteDocuments({ ids: ['doc-1', 123] });
+      expect(invalidType.success).toBe(false);
+      if (!invalidType.success) {
+        expect(invalidType.errors).toContain('Todos os IDs devem ser strings não-vazias.');
+      }
+
+      const notAnObject = validateBulkDeleteDocuments(undefined);
+      expect(notAnObject.success).toBe(false);
+    });
+
+    it('validates bulk move with valid ids and folderId', () => {
+      const valid = validateBulkMoveDocuments({ ids: ['doc-1'], folderId: 'folder-1' });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.ids).toEqual(['doc-1']);
+        expect(valid.data.folderId).toBe('folder-1');
+      }
+
+      const validNullFolder = validateBulkMoveDocuments({ ids: ['doc-1'], folderId: null });
+      expect(validNullFolder.success).toBe(true);
+      if (validNullFolder.success) {
+        expect(validNullFolder.data.folderId).toBeNull();
+      }
+    });
+
+    it('rejects bulk move with invalid folderId or empty ids', () => {
+      const emptyIds = validateBulkMoveDocuments({ ids: [], folderId: 'folder-1' });
+      expect(emptyIds.success).toBe(false);
+      if (!emptyIds.success) {
+        expect(emptyIds.errors).toContain('Lista de IDs inválida para mover.');
+      }
+
+      const invalidFolder = validateBulkMoveDocuments({ ids: ['doc-1'], folderId: 12345 });
+      expect(invalidFolder.success).toBe(false);
+      if (!invalidFolder.success) {
+        expect(invalidFolder.errors).toContain('folderId inválido.');
+      }
+    });
+  });
+
+  describe('Settings Validator', () => {
+    it('validates dedupe policy IGNORE, OVERWRITE, and CREATE_VERSION', () => {
+      expect(validateDedupePolicy({ policy: 'IGNORE' }).success).toBe(true);
+      expect(validateDedupePolicy({ policy: 'OVERWRITE' }).success).toBe(true);
+      expect(validateDedupePolicy({ policy: 'CREATE_VERSION' }).success).toBe(true);
+    });
+
+    it('rejects invalid or missing dedupe policy', () => {
+      const invalid = validateDedupePolicy({ policy: 'RANDOM' });
+      expect(invalid.success).toBe(false);
+      if (!invalid.success) {
+        expect(invalid.errors).toContain('Política inválida. Use IGNORE, OVERWRITE ou CREATE_VERSION.');
+      }
+
+      const missing = validateDedupePolicy({});
+      expect(missing.success).toBe(false);
+
+      const nullBody = validateDedupePolicy(null);
+      expect(nullBody.success).toBe(false);
+    });
+
+    it('validates seen version with string up to 50 chars', () => {
+      const valid = validateSeenVersion({ version: '3.5.2' });
+      expect(valid.success).toBe(true);
+      if (valid.success) {
+        expect(valid.data.version).toBe('3.5.2');
+      }
+    });
+
+    it('rejects empty or overly long seen version', () => {
+      const empty = validateSeenVersion({ version: '   ' });
+      expect(empty.success).toBe(false);
+      if (!empty.success) {
+        expect(empty.errors).toContain('Versão obrigatória');
+      }
+
+      const tooLong = validateSeenVersion({ version: 'v'.repeat(51) });
+      expect(tooLong.success).toBe(false);
+      if (!tooLong.success) {
+        expect(tooLong.errors).toContain('Versão deve ter no máximo 50 caracteres');
+      }
+
+      const nonObject = validateSeenVersion(null);
+      expect(nonObject.success).toBe(false);
     });
   });
 });

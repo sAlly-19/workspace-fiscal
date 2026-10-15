@@ -3,6 +3,7 @@ import { documentsRepository } from '../repositories/documents.repository';
 import { storageService } from '../services/storage.service';
 import { enrichDocumentFromXml } from '../services/document-enricher.service';
 import { generateDanfeBatchHtml } from '../../core/danfe';
+import { validateBulkDeleteDocuments, validateBulkMoveDocuments } from '../validators';
 
 const router = Router();
 
@@ -24,10 +25,11 @@ router.get('/', async (req, res) => {
 
 router.post('/bulk-delete', async (req, res) => {
   try {
-    const { ids } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'Lista de IDs inválida para exclusão.' });
+    const validation = validateBulkDeleteDocuments(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
+    const { ids } = validation.data;
     // Coleta paths antes de deletar para limpar storage
     const docs = await documentsRepository.findByIds(ids);
     await documentsRepository.deleteMany(ids);
@@ -43,11 +45,12 @@ router.post('/bulk-delete', async (req, res) => {
 
 router.post('/bulk-move', async (req, res) => {
   try {
-    const { ids, folderId } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'Lista de IDs inválida para mover.' });
+    const validation = validateBulkMoveDocuments(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
-    await documentsRepository.moveManyToFolder(ids, folderId || null);
+    const { ids, folderId } = validation.data;
+    await documentsRepository.moveManyToFolder(ids, folderId);
     res.json({ success: true, count: ids.length });
   } catch (error) {
     console.error('[DocumentsRoute] Error bulk moving documents:', error);

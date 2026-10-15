@@ -3,11 +3,9 @@ import { db } from '../../db';
 import { applicationSettings } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../utils/logger';
+import { validateDedupePolicy, validateSeenVersion } from '../validators';
 
 const router = Router();
-
-const VALID = ['IGNORE', 'OVERWRITE', 'CREATE_VERSION'] as const;
-type DedupePolicy = typeof VALID[number];
 
 router.get('/dedupe-policy', async (_req, res) => {
   try {
@@ -27,11 +25,11 @@ router.get('/dedupe-policy', async (_req, res) => {
 
 router.put('/dedupe-policy', async (req, res) => {
   try {
-    const { policy } = req.body as { policy?: string };
-    if (!policy || !VALID.includes(policy as DedupePolicy)) {
-      res.status(400).json({ error: 'Política inválida. Use IGNORE, OVERWRITE ou CREATE_VERSION.' });
-      return;
+    const validation = validateDedupePolicy(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
+    const { policy } = validation.data;
     const value = JSON.stringify({ policy });
     const existing = await db.query.applicationSettings.findFirst({
       where: eq(applicationSettings.key, 'import_dedupe_policy'),
@@ -68,8 +66,11 @@ router.get('/seen-version', async (_req, res) => {
 
 router.post('/seen-version', async (req, res) => {
   try {
-    const { version } = req.body as { version?: string };
-    if (!version) return res.status(400).json({ error: 'Versão obrigatória' });
+    const validation = validateSeenVersion(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
+    }
+    const { version } = validation.data;
     const existing = await db.query.applicationSettings.findFirst({
       where: eq(applicationSettings.key, 'seen_app_version'),
     });

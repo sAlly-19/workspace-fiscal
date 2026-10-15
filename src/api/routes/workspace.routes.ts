@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { workspaceRepository } from '../repositories/workspace.repository';
+import { validateCreateFolder, validateUpdateFolder } from '../validators';
 import crypto from 'crypto';
 
 const router = Router();
@@ -18,12 +19,12 @@ router.get('/', async (req, res) => {
 // Create a new folder (Root or Child)
 router.post('/folders', async (req, res) => {
   try {
-    const { name, parentId } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'O nome da pasta é obrigatório.' });
+    const validation = validateCreateFolder(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
     const id = crypto.randomUUID();
-    const [folder] = await workspaceRepository.createFolder(id, name.trim(), parentId || null);
+    const [folder] = await workspaceRepository.createFolder(id, validation.data.name, validation.data.parentId);
     res.status(201).json(folder);
   } catch (error) {
     console.error('[WorkspaceRoute] Error creating folder:', error);
@@ -34,11 +35,11 @@ router.post('/folders', async (req, res) => {
 // Rename a folder
 router.patch('/folders/:id', async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'O novo nome da pasta é obrigatório.' });
+    const validation = validateUpdateFolder(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
-    const [updated] = await workspaceRepository.updateFolder(req.params.id, name.trim());
+    const [updated] = await workspaceRepository.updateFolder(req.params.id, validation.data.name);
     if (!updated) {
       return res.status(404).json({ error: 'Pasta não encontrada.' });
     }

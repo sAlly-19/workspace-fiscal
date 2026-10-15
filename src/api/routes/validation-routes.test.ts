@@ -135,4 +135,89 @@ describe('Validation Routes Integration (IMP-011)', () => {
       expect(json.details).toBeDefined();
     });
   });
+
+  describe('Workspace Validation (IMP-T03)', () => {
+    it('returns 400 on folder creation with empty name', async () => {
+      const res = await fetch(`${baseUrl}/api/workspace/folders`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ name: '' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('O nome da pasta é obrigatório.');
+      expect(Array.isArray(json.details)).toBe(true);
+      expect(json.details).toContain('O nome da pasta é obrigatório.');
+    });
+
+    it('returns 400 on folder rename with empty name', async () => {
+      const res = await fetch(`${baseUrl}/api/workspace/folders/any-id`, {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ name: '   ' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('O novo nome da pasta é obrigatório.');
+      expect(Array.isArray(json.details)).toBe(true);
+    });
+  });
+
+  describe('Documents Validation (IMP-T03)', () => {
+    it('returns 400 on bulk delete with empty IDs list', async () => {
+      const res = await fetch(`${baseUrl}/api/documents/bulk-delete`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ ids: [] }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('Lista de IDs inválida para exclusão.');
+      expect(Array.isArray(json.details)).toBe(true);
+    });
+
+    it('returns 400 on bulk move with invalid payload', async () => {
+      const res = await fetch(`${baseUrl}/api/documents/bulk-move`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ ids: [], folderId: 'f-1' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('Lista de IDs inválida para mover.');
+      expect(Array.isArray(json.details)).toBe(true);
+    });
+  });
+
+  describe('Settings Validation (IMP-T03)', () => {
+    it('returns 400 on invalid dedupe policy', async () => {
+      const res = await fetch(`${baseUrl}/api/settings/dedupe-policy`, {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ policy: 'NOT_VALID_OPTION' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('Política inválida. Use IGNORE, OVERWRITE ou CREATE_VERSION.');
+      expect(Array.isArray(json.details)).toBe(true);
+    });
+
+    it('returns 400 on empty seen-version payload', async () => {
+      const res = await fetch(`${baseUrl}/api/settings/seen-version`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ version: '   ' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe('Versão obrigatória');
+      expect(Array.isArray(json.details)).toBe(true);
+    });
+  });
 });
