@@ -7,6 +7,17 @@ import { importService } from '../services/import.service';
 import { sanitizeFileName } from '../../core/security/pathSanitizer';
 
 const router = Router();
+
+export const BATCH_YIELD_INTERVAL = 25;
+
+/**
+ * Cede cooperativamente o Event Loop para manter rotas como /api/health e I/O
+ * responsivos mesmo durante importações em massa (IMP-T06).
+ */
+export async function yieldEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 // Limite de 100MB para pacotes ZIP e 10MB para XMLs individuais
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -76,8 +87,11 @@ router.post(['/', '/upload'], upload.array('files'), async (req, res) => {
     // Processa os arquivos em segundo plano
     (async () => {
       try {
-        for (const file of unpackedFiles) {
-          await importService.processFile(job.id, file, batchId);
+        for (let i = 0; i < unpackedFiles.length; i++) {
+          await importService.processFile(job.id, unpackedFiles[i], batchId);
+          if ((i + 1) % BATCH_YIELD_INTERVAL === 0) {
+            await yieldEventLoop();
+          }
         }
       } catch (loopErr) {
         console.error('[ImportRoute] Error during file processing loop:', loopErr);
@@ -224,7 +238,8 @@ router.post('/paths', async (req, res) => {
       const MAX_SIZE = 10 * 1024 * 1024;
       try {
         // 1. Processa arquivos XML em disco
-        for (const filePath of targetXmlPaths) {
+        for (let i = 0; i < targetXmlPaths.length; i++) {
+          const filePath = targetXmlPaths[i];
           try {
             const stat = await fs.promises.stat(filePath);
             if (!stat.isFile() || stat.size === 0 || stat.size > MAX_SIZE) {
@@ -249,14 +264,21 @@ router.post('/paths', async (req, res) => {
             console.error(`[ImportRoute] Erro ao ler ${filePath}:`, fileErr);
             await importService.incrementProcessed(job.id);
           }
+          if ((i + 1) % BATCH_YIELD_INTERVAL === 0) {
+            await yieldEventLoop();
+          }
         }
 
         // 2. Processa arquivos extraídos de ZIPs
-        for (const file of inMemoryFiles) {
+        for (let j = 0; j < inMemoryFiles.length; j++) {
+          const file = inMemoryFiles[j];
           try {
             await importService.processFile(job.id, file, batchId);
           } catch (zipFileErr) {
             console.error('[ImportRoute] Erro ao processar arquivo de ZIP:', zipFileErr);
+          }
+          if ((j + 1) % BATCH_YIELD_INTERVAL === 0) {
+            await yieldEventLoop();
           }
         }
       } catch (err) {

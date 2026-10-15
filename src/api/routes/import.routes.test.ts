@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import { createApp } from '../app';
 
@@ -50,5 +50,14 @@ describe('Import Routes', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toContain('Rota API não encontrada');
+  });
+
+  it('exports BATCH_YIELD_INTERVAL=25 and yields via setImmediate (IMP-T06)', async () => {
+    const { BATCH_YIELD_INTERVAL, yieldEventLoop } = await import('./import.routes');
+    expect(BATCH_YIELD_INTERVAL).toBe(25);
+    const setImmediateSpy = vi.spyOn(global, 'setImmediate');
+    await yieldEventLoop();
+    expect(setImmediateSpy).toHaveBeenCalled();
+    setImmediateSpy.mockRestore();
   });
 });
