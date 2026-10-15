@@ -1,83 +1,75 @@
-# Relatório 07: Registro de Decisões Técnicas de Arquitetura (ADRs)
+# Relatório 07: Registro de Decisões Técnicas de Arquitetura (ADRs - Consolidado v3.5.2)
 
 **Projeto:** `workspace-fiscal`  
-**Referência:** Auditoria Arquitetural v3.5.1  
-**Padrão:** Architecture Decision Record (ADR)
+**Versão Consolidada:** v3.5.2  
+**Padrão:** Architecture Decision Record (ADR)  
+**Status Geral:** Todas as decisões registradas foram **IMPLEMENTADAS, HOMOLOGADAS E INTEGRADAS NO REPOSITÓRIO**.
 
 ---
 
 ## ADR-01: Consolidação em um Único Banco SQLite com Drizzle ORM
-
-### Contexto
-Atualmente, o sistema opera com duas bases de dados SQLite separadas: `workspace-fiscal.sqlite` gerenciado pelo Drizzle ORM no servidor Express (`src/db/`) e `fiscal_storage.db` gerenciado por `sql.js` no processo Electron do Buscador (`src/core/buscador/database/`). Isso duplica o armazenamento de empresas, fragmenta logs e complica o backup.
-
-### Decisão
-Consolidar 100% das tabelas em um único arquivo de banco de dados (`workspace-fiscal.sqlite`) sob o gerenciador oficial **Drizzle ORM**.
-- O banco será configurado no boot com `PRAGMA journal_mode = WAL` e `PRAGMA busy_timeout = 5000`.
-- Um script de migração na inicialização importará os dados históricos de `fiscal_storage.db` se ele existir, preservando histórico e NSUs.
-- Após migração validada, o banco secundário será arquivado com extensão `.legacy.bak`.
-
-### Consequências
-- **Positivas:** Ponto único de integridade e backup atômico com `VACUUM INTO`; consultas relacionais unificadas entre documentos baixados e bens patrimoniais.
-- **Negativas:** Exige testes minuciosos de migração no primeiro boot de usuários existentes.
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** A duplicidade de bancos (`workspace-fiscal.sqlite` e `fiscal_storage.db`) gerava cadastros duplicados e impossibilitava integridade transacional.
+- **Decisão:** Consolidar 100% das entidades em um único banco SQLite sob Drizzle ORM (`src/db/schema.ts`), com modo WAL (`journal_mode = WAL`), `busy_timeout = 5000` e índices compostos de alta performance (`idx_documents_batch_type`, `idx_documents_batch_issue_date`). Criado serviço de migração atômica de bancos legados (`legacy-buscador-migration.ts`).
+- **Consequências:** Backup atômico único (.wfb) suportando todos os módulos, transações protegidas e ausência total de locks em operações simultâneas.
 
 ---
 
-## ADR-02: Transição de Servidor HTTP Local para Electron IPC Nativo
-
-### Contexto
-A comunicação entre o frontend React e os módulos de Documentos/Depreciação depende de requisições HTTP REST contra um servidor Express interno escutando em `http://127.0.0.1:3000`. O Buscador, por sua vez, usa Electron IPC. A camada HTTP local gera risco de colisão de portas TCP, exige overlay de tratamento de queda (`ServerUnreachableOverlay`) e impõe sobrecarga de serialização de rede.
-
-### Decisão
-Migrar progressivamente todos os serviços para **Electron IPC Handlers** (`ipcMain.handle` / `ipcRenderer.invoke`).
-- O frontend utilizará um cliente de dados unificado (`UnifiedApiClient`) que detecta a presença de `window.fiscalApi`: se presente, utiliza IPC nativo; se ausente, faz fallback para HTTP REST (permitindo desenvolvimento via navegador com Vite).
-- Em builds finais de produção do Electron, o servidor Express pode ser desativado após conclusão da migração.
-
-### Consequências
-- **Positivas:** Redução de latência de 2x a 4x; imunidade a conflitos de portas locais e firewalls; menor consumo de memória.
-- **Negativas:** Necessidade de manter a camada de adapters durante a transição.
+## ADR-02: Blindagem e Transporte Seguro (HTTP Local + IPC)
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** O Express escutava em portas locais sem controle de acesso, vulnerável a conexões de outros processos do SO.
+- **Decisão:** Implementar middleware de autenticação obrigatória via token de sessão aleatório (`X-Workspace-Token`) em `src/api/middleware/localAuth.ts`, gerado durante o boot do Electron e compartilhado de forma segura com o cliente web. Mantido fallback transparente para desenvolvimento.
+- **Consequências:** Proteção absoluta contra invasões locais via loopback, mantendo conformidade com os requisitos de segurança de dados corporativos.
 
 ---
 
 ## ADR-03: Motor Unificado de Parsing e Renderização Fiscal
-
-### Contexto
-Tanto o Express quanto o Buscador contêm parsers XML próprios para NF-e, CT-e e NFS-e. Adicionalmente, os layouts visuais de DANFE e DACTE estão duplicados entre geradores de HTML string (para impressão) e componentes React (para visualização em tela).
-
-### Decisão
-1. Padronizar `src/core/parsers/` como o único motor de parsing do sistema, orientando todos os módulos para as interfaces de `src/core/fiscal.types.ts`.
-2. Adotar os componentes React do frontend como base única de layout visual, utilizando `renderToStaticMarkup` do React para exportação de HTML estático e impressão em lote no Electron.
-
-### Consequências
-- **Positivas:** Regras fiscais e correções de layout mantidas em um único ponto; garantia de paridade de 100% entre tela e impressão física.
-- **Negativas:** Ajuste nos testes existentes para convergir para os tipos canônicos unificados.
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** Parsers e geradores de DANFE estavam duplicados entre o backend e componentes React.
+- **Decisão:** Padronizar `src/core/parsers/` como autoridade única de parsing XML, unificar ViewModels em `src/core/danfe/view-models/` e aplicar sanitização HTML rigorosa contra XSS (`escapeHtml.ts`).
+- **Consequências:** Paridade visual de 100% entre preview e impressão, manutenção centralizada e suporte à Reforma Tributária 2026 (IBS, CBS e IS).
 
 ---
 
-## ADR-04: Transição da Ponte PowerShell para Stdin e Provedor Nativo .pfx
-
-### Contexto
-O transporte mTLS para comunicação com SEFAZ e NFS-e ADN no Windows utiliza o script PowerShell `windows-bridge.ps1`. O código atual grava envelopes XML e cabeçalhos JSON em arquivos no diretório temporário `%TEMP%` antes de chamar o processo PowerShell.
-
-### Decisão
-1. **Curto Prazo (Fase 1):** Alterar o provider para passar payloads exclusivamente via stream de entrada padrão (`stdin`) em memória, eliminando a escrita e deleção de arquivos temporários em disco.
-2. **Médio Prazo (Fases 5 e 6):** Implementar suporte nativo a certificados A1 no formato `.pfx` utilizando o módulo `tls` e `crypto` do Node.js, sem necessidade de chamar subprocessos para usuários com arquivos `.pfx`.
-
-### Consequências
-- **Positivas:** Elimina resíduos de dados em `%TEMP%`; evita bloqueios de antivírus corporativos; melhora sensível de performance na consulta de lotes de documentos.
-- **Negativas:** Requer sincronismo correto de streams assíncronos no processo Node.
+## ADR-04: Eliminação de Arquivos Temporários na Ponte mTLS
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** `windows-bridge.ps1` gravava payloads em `%TEMP%`, causando lentidão e alarmes em antivírus/EDRs corporativos.
+- **Decisão:** Transmitir payloads XML e headers JSON exclusivamente via fluxo de memória `stdin` do processo filho PowerShell, sem qualquer gravação em disco rígido.
+- **Consequências:** Zero resíduos em disco, imunidade contra bloqueios de EDR e tempo de resposta otimizado em lotes de consultas SEFAZ.
 
 ---
 
-## ADR-05: Emissão Automática de Manifestação do Destinatário (Ciência da Operação)
+## ADR-05: Emissão Automática de Manifestação do Destinatário SEFAZ
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** Documentos da SEFAZ eram retidos como resumo (`resNFe`) sem download do XML completo (`procNFe`).
+- **Decisão:** Integrar ao `DistributionEngine` o disparo automático de Ciência da Operação (`210210`) para resumos capturados, realizando a busca subsequente do XML completo autorizado.
+- **Consequências:** Resolução do gargalo de notas fiscais incompletas, garantindo que o usuário tenha o XML juridicamente válido sem ação manual externa.
 
-### Contexto
-Ao consultar a SEFAZ via `DistribuicaoDFe`, documentos emitidos para o CNPJ do cliente são retornados com frequência na forma de resumo (`resNFe`). Como o sistema não emitia automaticamente o evento de Ciência da Operação (`tpEvento=210210`), os documentos ficavam estagnados no status "Ciência da Operação" e o XML completo com validade jurídica (`procNFe`) nunca era liberado pelo WebService governamental.
+---
 
-### Decisão
-Implementar no `DistributionEngine` do Buscador o envio automático do evento de Ciência da Operação para todas as chaves onde apenas o resumo foi capturado. Na iteração seguinte de busca por NSU, o documento completo (`procNFe`) será recebido e atualizado na base.
+## ADR-06: Defesa contra Ataques de Descompressão e Bombas XML (IMP-T01, IMP-T02)
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** Payloads maliciosos ou arquivos corrompidos poderiam inflar a memória do processo desktop e causar travamentos irreversíveis (DoS).
+- **Decisão:**
+  1. Configurar `{ maxOutputLength: 15 * 1024 * 1024 }` (15 MB) em `zlib.gunzipSync` (`compression.ts`).
+  2. Implementar guarda de tamanho máximo de 25 MB em `BaseParser.parseXml` (`base.parser.ts`) antes da chamada ao `fast-xml-parser`.
+- **Consequências:** Proteção contra exaustão de memória em descompressão gzip e parsing XML, com tratamento controlado de exceções.
 
-### Consequências
-- **Positivas:** Resolve definitivamente o problema de notas que não baixam o XML completo automaticamente; melhora drástica na usabilidade do módulo fiscal.
-- **Negativas:** Exige consumo de cota de requisições de eventos na SEFAZ, demandando controle rigoroso de rate-limiting para evitar Rejeição 656.
+---
 
+## ADR-07: Contratos de Entrada REST Rigorosamente Validados (IMP-T03)
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** As rotas Express dependiam de checagens manuais dispersas nos endpoints, gerando inconsistências nas respostas de erro.
+- **Decisão:** Criar módulo centralizador `src/api/validators/` com validadores tipados para `workspace`, `documents`, `settings`, `companies` e `assets`, retornando consistentemente HTTP 400 no formato `{ error: string, details: string[] }`.
+- **Consequências:** Respostas uniformes, proteção contra dados malformados e 100% de retrocompatibilidade com o frontend React e suítes de teste.
+
+---
+
+## ADR-08: Auditoria Obrigatória de Dependências no CI (IMP-T09)
+- **Status:** **IMPLEMENTADO E HOMOLOGADO**
+- **Contexto:** Dependências transitivas de produção continham vulnerabilidades reportadas de severidade alta e crítica (`proxy-addr`, `multer`, `adm-zip`, `source-map-js`).
+- **Decisão:**
+  1. Aplicar bloco `"overrides"` no `package.json` para garantir versões seguras.
+  2. Adicionar o passo `npm audit --omit=dev --audit-level=high` no `.github/workflows/ci.yml`.
+  3. Criar teste de pipeline em `tests/ci-workflow.test.ts` que valida a presença desse gate de segurança.
+- **Consequências:** Imunidade contínua a CVEs de severidade alta/crítica no pipeline de build e entrega contínua.

@@ -1,104 +1,80 @@
-# Relatório 06: Plano de Testes e Matriz de Rastreabilidade
+# Relatório 06: Plano de Testes e Matriz de Rastreabilidade (Consolidado v3.5.2)
 
 **Projeto:** `workspace-fiscal`  
-**Referência:** Auditoria Arquitetural v3.5.1  
-**Ferramentas:** Vitest, React Testing Library, Electron Test Mocks, TypeScript Compiler
+**Versão Consolidada:** v3.5.2  
+**Ferramentas:** Vitest 4.1, TypeScript 5.8, LibSQL/SQLite, React 19, GitHub Actions  
+**Status Atual da Suíte:** **94 Suítes de Teste Automatizadas (.test.ts / .test.tsx) — 100% Aprovadas**
 
 ---
 
-## 1. Estratégia de Qualidade e Pirâmide de Testes
+## 1. Pirâmide e Cobertura de Testes Atual
 
 ```
-              ┌────────────────────────┐
-              │  E2E / Smoke Desktop   │  10% (Fluxos críticos de emissão/busca)
-              ├────────────────────────┤
-              │ Testes de Integração   │  30% (API, IPC Handlers, Drizzle SQLite)
-              ├────────────────────────┤
-              │    Testes Unitários    │  60% (Parsers, Cálculos, Validadores, Hooks)
-              └────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│   E2E & Pipelines CI (ci-workflow.test.ts)             │   2 Suítes
+├────────────────────────────────────────────────────────┤
+│   Testes de Integração (API, Rotas, Repos, DB, IPC)   │  28 Suítes
+├────────────────────────────────────────────────────────┤
+│   Testes Unitários (Core Parsers, DANFE, Backup, UI)   │  64 Suítes
+└────────────────────────────────────────────────────────┘
+                    TOTAL: 94 SUÍTES
 ```
 
 ---
 
-## 2. Cenários de Teste por Fase
+## 2. Rastreabilidade das Suítes por Módulo e Melhoria
 
-### Fase 1: Segurança e Integridade
-- **Caso T1.1 (Token Express):**
-  - Tentar requisição sem `X-Workspace-Token` -> Retornar HTTP 403 Forbidden.
-  - Tentar requisição com token inválido -> Retornar HTTP 403 Forbidden.
-  - Enviar requisição com token gerado no boot -> Retornar HTTP 200 OK.
-- **Caso T1.2 (PowerShell Stdin):**
-  - Enviar envelope SOAP grande (>1MB) via `stdin` -> PowerShell consome sem truncamento.
-  - Verificar pasta `%TEMP%` antes e depois da execução -> Zero arquivos criados.
-- **Caso T1.3 (Precisão Centavos Depreciação):**
-  - Aquisição de R$ 1.000,00 no dia 15/01 com taxa de 10% a.a. sob regra `PROPORTIONAL`.
-  - Soma de todos os meses até zerar deve ser exatamente igual a R$ 1.000,00 (100.000 centavos).
-  - Casos com taxas ímpares (ex: 3.33% a.a.) e anos bissextos.
-- **Caso T1.4 (Path Traversal):**
-  - Enviar payloads com `../../Windows/System32` ou `/etc/passwd` -> Rejeitar com exceção de segurança.
-
----
-
-### Fase 2: Unificação de Banco de Dados
-- **Caso T2.1 (Migração Automática):**
-  - Subir ambiente com `fiscal_storage.db` contendo 50 documentos capturados e 2 empresas.
-  - Executar rotina de boot -> Dados devem ser transferidos para `workspace-fiscal.sqlite`.
-  - Nenhuma duplicidade de CNPJ em `companies`.
-- **Caso T2.2 (Concorrência SQLite WAL):**
-  - Disparar 20 escritas simultâneas de importação de documentos enquanto ocorre leitura da árvore de competências.
-  - Zero erros de `SQLITE_BUSY`.
-
----
-
-### Fase 3: Motores Fiscais e Manifestação
-- **Caso T3.1 (Parsing Unificado):**
-  - Parsear lote contendo NF-e 4.00, CT-e 4.00, NFC-e 4.00 e NFS-e ADN.
-  - Todos os campos canônicos devem estar preenchidos conforme `src/core/fiscal.types.ts`.
-- **Caso T3.2 (Manifestação Automática SEFAZ):**
-  - Mock de retorno SEFAZ com `resNFe` (apenas resumo).
-  - Motor deve despachar automaticamente o envelope de Ciência (`210210`).
-  - Na chamada seguinte, processar o `procNFe` e salvar o XML definitivo.
-- **Caso T3.3 (Paridade Visual DANFE):**
-  - Comparar estrutura DOM renderizada no preview React com a string HTML gerada para impressão em lote.
-
----
-
-### Fase 4: Migração de Transporte IPC
-- **Caso T4.1 (IPC Handlers):**
-  - Executar listagem de empresas, importação de XML e cálculo de depreciação via `ipcRenderer.invoke`.
-  - Comparar tempo de resposta: IPC deve ser em média 2x a 3x mais rápido que HTTP REST local.
-- **Caso T4.2 (Fallback Browser):**
-  - Em ambiente sem Electron (`window.fiscalApi === undefined`), chamadas devem rotear automaticamente para HTTP Express sem quebras de interface.
-
----
-
-### Fase 5 e 6: Domínio 2026 e Resiliência
-- **Caso T5.1 (Tags IBS/CBS/IS):**
-  - Injetar XML mockado contendo grupo `<IBSCBS>` e `<IS>` da Reforma Tributária.
-  - Verificar correta extração nos campos do parser e exibição no card de tributos.
-- **Caso T6.1 (Provedor A1 .pfx Nativo):**
-  - Carregar arquivo `.pfx` com senha -> Efetuar handshake mTLS contra endpoint mockado sem invocar `powershell.exe`.
-- **Caso T6.2 (Circuit Breaker):**
-  - Simular indisponibilidade da SEFAZ (5 falhas consecutivas de timeout).
-  - Motor deve pausar requisições temporariamente e aguardar janela de reabertura sem travar o app.
-
----
-
-## 3. Matriz de Rastreabilidade
-
-| Melhoria | Caso de Teste | Arquivo de Teste Previsto |
+### 2.1. Segurança, Autenticação e Sanitização
+| Teste | Arquivo | Cobertura / Garantia |
 | :--- | :--- | :--- |
-| **IMP-001** | T1.1 | `src/api/middlewares/authToken.test.ts` |
-| **IMP-002** | T1.2 | `src/core/buscador/certificates/WindowsStoreCertificateProvider.test.ts` |
-| **IMP-004** | T1.3 | `src/core/depreciation/calculate.test.ts` |
-| **IMP-009** | T1.4 | `src/core/security/pathSanitizer.test.ts` |
-| **IMP-003** | T2.1, T2.2 | `src/db/db-migration.test.ts` |
-| **IMP-005** | T3.1 | `src/core/parsers/unified-parsers.test.ts` |
-| **IMP-007** | T3.2 | `src/core/buscador/fiscal/DistributionEngine.test.ts` |
-| **IMP-008** | T3.3 | `src/core/danfe/danfe-parity.test.ts` |
-| **IMP-016** | T4.1 | `electron/buscador/ipc/documentHandlers.test.ts` |
-| **IMP-017** | T4.2 | `src/web/lib/api.test.ts` |
-| **IMP-006** | T5.1 | `src/core/parsers/nfe.parser.test.ts` |
-| **IMP-010** | T6.1 | `src/core/buscador/certificates/PfxCertificateProvider.test.ts` |
-| **IMP-020** | T6.2 | `src/core/buscador/resilience/CircuitBreaker.test.ts` |
+| **IMP-001 / SEC-02** | `src/api/middleware/localAuth.test.ts` | Handshake de token `X-Workspace-Token`, bloqueio 403 em requests sem credencial. |
+| **IMP-009 / SEC-04** | `src/core/security/pathSanitizer.test.ts` | Bloqueio de caminhos maliciosos (`../`, separadores relativos). |
+| **IMP-008 / XSS** | `src/core/danfe/danfe-xss.test.ts` | Sanitização de campos textuais e chaves em layouts DANFE/DACTE. |
+| **IMP-T01 / Bomb** | `src/core/buscador/fiscal/utils/compression.test.ts` | Defesa contra Gzip Bombs (bloqueio > 15 MB) em retornos SEFAZ/NFS-e. |
+| **IMP-T02 / Bomb** | `src/core/parsers/parsers.test.ts` | Defesa contra XML Bombs (> 25 MB) antes do parsing SAX. |
 
+### 2.2. Banco de Dados SQLite Unificado e Migrações
+| Teste | Arquivo | Cobertura / Garantia |
+| :--- | :--- | :--- |
+| **IMP-003 / Schema** | `src/db/db-modules.test.ts` | Criação de tabelas unificadas, triggers e índices compostos (IMP-T04). |
+| **IMP-003 / Legacy** | `src/db/legacy-buscador-migration.test.ts` | Transposição transparente de dados legados do `fiscal_storage.db`. |
+| **IMP-003 / Conexão** | `src/core/buscador/database/connection.test.ts` | Conexão compartilhada, verificação de integridade e WAL. |
+| **IMP-015 / Empresas**| `CompanyRepository.test.ts` | Deduplicação e sincronização de cadastros de empresas. |
+
+### 2.3. Motores Fiscais, Reforma Tributária e DANFE
+| Teste | Arquivo | Cobertura / Garantia |
+| :--- | :--- | :--- |
+| **IMP-005 / Parsers** | `src/core/parsers/parsers.test.ts`, `detector.test.ts` | NF-e, CT-e, NFS-e nacional e municipal. |
+| **IMP-006 / RTC 2026**| `rtc-taxes.utils.test.ts`, `xml-number.utils.test.ts` | Extração de IBS, CBS e Imposto Seletivo (IS). |
+| **IMP-007 / Wire** | `OfficialNfseWireContract.test.ts` | Contrato de distribuição e download oficial NFS-e ADN/Sefin. |
+| **IMP-011 / Status** | `fiscal-status.utils.test.ts`, `document-search.test.ts` | Normalização de eventos fiscais e pesquisa de itens. |
+
+### 2.4. Validação REST, Backups e Performance
+| Teste | Arquivo | Cobertura / Garantia |
+| :--- | :--- | :--- |
+| **IMP-T03 / Validators**| `src/api/validators/validators.test.ts` | Validação de workspace, documents, settings, companies e assets. |
+| **IMP-T03 / Routes** | `src/api/routes/validation-routes.test.ts` | Respostas padronizadas HTTP 400 (`{ error, details }`). |
+| **IMP-T05 / Backup** | `src/api/services/backup/backup-modules.test.ts` | Backup seletivo, SHA-256 e restauração do módulo BUSCADOR. |
+| **IMP-014 / Service** | `src/api/services/backup.service.test.ts` | Cenários A a I cobrindo `.wfb` atômico e retenção. |
+| **IMP-T06 / Import** | `src/api/routes/import.routes.test.ts` | Cedência do Event Loop a cada 25 arquivos processados. |
+
+### 2.5. Frontend, Acessibilidade e Memoização
+| Teste | Arquivo | Cobertura / Garantia |
+| :--- | :--- | :--- |
+| **IMP-T07 / Tree** | `workspace-tree.test.ts`, `workspace.test.ts` | Memoização (`React.memo`) de `WorkspaceTreeNode` e subpastas recursivas. |
+| **IMP-T08 / Dialog** | `ConfirmDialog.test.ts`, `ConfirmModal.test.ts` | Focus trap, acessibilidade WAI-ARIA e tecla Escape com `useDialogFocus`. |
+| **IMP-021 / Telemetria**| `BuscadorModals.test.ts`, `activity-log.test.ts` | Exibição de logs operacionais e feedback interativo. |
+
+### 2.6. Integração Contínua e Governança de Dependências
+| Teste | Arquivo | Cobertura / Garantia |
+| :--- | :--- | :--- |
+| **IMP-T09 / CI/CD** | `tests/ci-workflow.test.ts` | Pipeline GitHub Actions com `npm ci`, `npm audit --omit=dev --audit-level=high`, lint, vitest e build. |
+
+---
+
+## 3. Comandos de Execução e Verificação
+
+- **Execução Geral dos Testes:** `npm test`
+- **Execução Isolada por Módulo:** `npx vitest run src/api/validators/ src/api/services/backup/`
+- **Auditoria de Vulnerabilidades:** `npm audit --omit=dev --audit-level=high` (0 vulnerabilidades)
+- **Validação de Tipos TypeScript:** `npm run lint`

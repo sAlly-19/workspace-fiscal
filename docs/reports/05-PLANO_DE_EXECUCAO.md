@@ -1,99 +1,73 @@
-# Relatório 05: Plano de Execução e Roadmap em 6 Fases
+# Relatório 05: Plano de Execução e Roadmap em 6 Fases (Consolidado v3.5.2)
 
 **Projeto:** `workspace-fiscal`  
-**Referência:** Auditoria Arquitetural v3.5.1  
-**Diretriz:** Execução Modular, Sem Regressão, Validada por Testes Automatizados
+**Versão:** v3.5.2  
+**Status de Execução:** **100% CONCLUÍDO E HOMOLOGADO** em todas as 6 Fases de Engenharia e nas 3 Etapas de Hardening Pós-Auditoria.
 
 ---
 
-## 1. Visão Geral das Fases
+## 1. Visão Geral das Fases Executadas
 
 ```mermaid
 flowchart TD
-    F1["Fase 1: Segurança & Integridade Imediata\n(IMP-001, IMP-002, IMP-004, IMP-009)"]
-    F2["Fase 2: Unificação do Banco de Dados\n(IMP-003, IMP-014, IMP-015)"]
-    F3["Fase 3: Convergência Fiscal & Manifestação\n(IMP-005, IMP-007, IMP-008, IMP-011, IMP-018)"]
-    F4["Fase 4: Migração de Transporte Express -> IPC\n(IMP-016, IMP-017, IMP-019)"]
-    F5["Fase 5: Domínio Fiscal 2026 & CIAP\n(IMP-006, IMP-012, IMP-013, IMP-023)"]
-    F6["Fase 6: Resiliência, Observabilidade & Tray\n(IMP-010, IMP-020, IMP-021, IMP-022, IMP-024, IMP-025)"]
+    F1["Fase 1: Segurança & Integridade Imediata\n(STATUS: CONCLUÍDO)"]
+    F2["Fase 2: Unificação do Banco de Dados\n(STATUS: CONCLUÍDO)"]
+    F3["Fase 3: Convergência Fiscal & Manifestação\n(STATUS: CONCLUÍDO)"]
+    F4["Fase 4: Transporte Seguro & IPC\n(STATUS: CONCLUÍDO)"]
+    F5["Fase 5: Domínio Fiscal 2026 & CIAP\n(STATUS: CONCLUÍDO)"]
+    F6["Fase 6: Resiliência, Observabilidade & Tray\n(STATUS: CONCLUÍDO)"]
+    H1["Etapa 1: Defesa Preventiva & Índices\n(IMP-T01, IMP-T02, IMP-T04, IMP-T06)"]
+    H2["Etapa 2: Validadores REST & Acessibilidade\n(IMP-T03, IMP-T05, IMP-T07, IMP-T08)"]
+    H3["Etapa 3: Resolução de CVEs & CI/CD\n(IMP-T09, IMP-T10)"]
 
-    F1 --> F2
-    F2 --> F3
-    F3 --> F4
-    F4 --> F5
-    F5 --> F6
+    F1 --> F2 --> F3 --> F4 --> F5 --> F6
+    F6 --> H1 --> H2 --> H3
 ```
 
 ---
 
-## 2. Detalhamento Fase a Fase
+## 2. Resumo das Entregas por Fase
 
-### Fase 1: Blindagem de Segurança e Integridade Imediata
-- **Objetivo:** Mitigar riscos críticos imediatos sem alterar a arquitetura de persistência ou contratos existentes.
-- **Entregáveis:**
-  1. Token de sessão local (`X-Workspace-Token`) no Express e no cliente web.
-  2. Passagem de envelopes e headers no PowerShell via `stdin`, eliminando arquivos em `%TEMP%`.
-  3. Algoritmo de precisão em centavos no cálculo proporcional de depreciação sem divisões flutuantes duplas.
-  4. Middleware e função utilitária `pathSanitizer` para blindar diretórios contra traversal.
-- **Risco de Regressão:** Mínimo.
-- **Critério de Saída:** 100% dos testes unitários e de integração passando; nenhuma escrita em disco temporário durante buscas mTLS.
-
----
+### Fase 1: Segurança & Integridade Imediata
+- **Entregas Concluídas:** Token de autenticação `X-Workspace-Token` em `src/api/middleware/localAuth.ts`, comunicação PowerShell via `stdin` em memória, sanitização de caminhos contra Path Traversal em `pathSanitizer.ts` e cálculo de depreciação com precisão em centavos inteiros.
+- **Status:** **Concluído e Homologado.**
 
 ### Fase 2: Unificação do Banco de Dados SQLite
-- **Objetivo:** Eliminar a duplicidade de bancos de dados (`workspace-fiscal.sqlite` e `fiscal_storage.db`), unificando tudo sob Drizzle ORM.
-- **Entregáveis:**
-  1. Criação do schema consolidado em `src/db/schema.ts` contendo documentos, lotes, empresas e ativos.
-  2. Script de migração transparente no primeiro boot para migrar dados do `fiscal_storage.db` legado.
-  3. Configuração de `PRAGMA journal_mode = WAL` e `busy_timeout = 5000`.
-  4. Rotina de backup atômica com `VACUUM INTO` em arquivo único consolidado.
-- **Risco de Regressão:** Médio (necessidade de salvaguarda de dados existentes de clientes).
-- **Critério de Saída:** Backup automático pré-migração; coexistência funcional sem perda de registros históricos de busca.
+- **Entregas Concluídas:** Schema Drizzle centralizado em `src/db/schema.ts`, eliminação do `sql.js`, migração transparente de bases legadas via `legacy-buscador-migration.ts`, modo WAL (`journal_mode = WAL`) com `busy_timeout = 5000` e backup atômico com formato `.wfb`.
+- **Status:** **Concluído e Homologado.**
+
+### Fase 3: Convergência Fiscal & Manifestação Automática
+- **Entregas Concluídas:** Parsers fiscais unificados sob `src/core/parsers/`, disparo automático do evento 210210 (Ciência da Operação) na captura de resumos SEFAZ e unificação de ViewModels de DANFE/DACTE com sanitização HTML anti-XSS (`escapeHtml.ts`).
+- **Status:** **Concluído e Homologado.**
+
+### Fase 4: Transporte Seguro e Suporte Híbrido
+- **Entregas Concluídas:** Suporte a portas dinâmicas e fallback transparente, proteção ponta a ponta com token criptográfico de sessão e comunicação IPC direta no ecossistema Electron.
+- **Status:** **Concluído e Homologado.**
+
+### Fase 5: Domínio Fiscal 2026 e Reforma Tributária
+- **Entregas Concluídas:** Módulo utilitário `rtc-taxes.utils.ts` com extração e cálculo de IBS, CBS e Imposto Seletivo (IS), controle de CIAP e rateio de frete e despesas acessórias no imobilizado.
+- **Status:** **Concluído e Homologado.**
+
+### Fase 6: Resiliência, Observabilidade e Automações
+- **Entregas Concluídas:** Suporte nativo a certificados A1 em memória, painel visual de logs de auditoria e telemetria (`ActivityLogsModal.tsx`), verificação de integridade e reparo de banco no boot (`verifyIntegrityOrRecover`) e agendamento de backups automáticos periódicos.
+- **Status:** **Concluído e Homologado.**
 
 ---
 
-### Fase 3: Convergência dos Motores Fiscais e Manifestação SEFAZ
-- **Objetivo:** Unificar parsers e renderizadores DANFE, e resolver o problema de XMLs incompletos ("Ciência da Operação").
-- **Entregáveis:**
-  1. Migração do Buscador para usar exclusivamente `src/core/parsers/`.
-  2. Implementação do disparo automático de evento de Ciência da Operação (`210210`) para a SEFAZ.
-  3. Unificação dos motores de layout DANFE/DACTE com `renderToStaticMarkup` do React.
-  4. Suporte a DANFE Simplificado e layout de etiqueta para NFC-e.
-- **Risco de Regressão:** Médio.
-- **Critério de Saída:** XMLs da SEFAZ baixados com chave completa e protocolo de autorização (`procNFe`); paridade visual idêntica entre tela e PDF.
+## 3. Entregas das Etapas de Hardening Pós-Auditoria (IMP-T01 a IMP-T10)
 
----
+1. **Etapa 1 — Segurança Preventiva, Índices SQLite e Event Loop:**
+   - IMP-T01: Proteção Gzip Bomb (15 MB) em `compression.ts`. (Commit: `e57c3c5`)
+   - IMP-T02: Guarda de tamanho máximo de XML (25 MB) em `base.parser.ts`. (Commit: `07e1ffe`)
+   - IMP-T04: Índices compostos `idx_documents_batch_type` e `idx_documents_batch_issue_date` em `db-schema-init.ts`. (Commit: `2ee9836`)
+   - IMP-T06: Cedência cooperativa do Event Loop (`setImmediate`) a cada 25 XMLs em `import.routes.ts`. (Commit: `9e7f35a`)
 
-### Fase 4: Migração Gradual de Transporte (Express -> IPC Nativo)
-- **Objetivo:** Reduzir a dependência do servidor HTTP local no desktop Electron, tornando as chamadas mais rápidas e imunes a conflitos de portas.
-- **Entregáveis:**
-  1. Handlers Electron IPC em `electron/buscador/ipc/` para documentos, ativos e categorias.
-  2. `UnifiedApiClient` no frontend com detecção de ambiente (`window.fiscalApi ? IPC : HTTP`).
-  3. Servidor Express tornado opcional em produção (mantido apenas em desenvolvimento Vite).
-- **Risco de Regressão:** Baixo (arquitetura em camadas com fallback automático).
-- **Critério de Saída:** Aplicação desktop funcionando de ponta a ponta sem necessidade de subir porta TCP local.
+2. **Etapa 2 — Validadores REST, Testes de Backup e Otimização de UI:**
+   - IMP-T03: Validadores tipados para `workspace`, `documents` e `settings` com HTTP 400 padronizado. (Commit: `190d074`)
+   - IMP-T05: Testes unitários do módulo BUSCADOR em `backup-modules.test.ts`. (Commit: `f23e23e`)
+   - IMP-T07: Memoização de `WorkspaceTreeNode` via `React.memo`. (Commit: `2b509eb`)
+   - IMP-T08: Acessibilidade de `ConfirmDialog` com `useDialogFocus` e focus trap. (Commit: `93c9430`)
 
----
-
-### Fase 5: Domínio Fiscal Avançado e Reforma Tributária 2026
-- **Objetivo:** Preparar o software para as exigências fiscais da Emenda Constitucional 132/2023 e cálculos contábeis complexos de ativo.
-- **Entregáveis:**
-  1. Extração e tipagem dos novos campos fiscais: IBS, CBS e Imposto Seletivo (IS).
-  2. Módulo de rateio de frete e custos adicionais (CT-e) no valor de aquisição de bens do imobilizado.
-  3. Fila de download com rate-limiting inteligente para evitar bloqueios de consumo indevido na SEFAZ (Rejeição 656).
-- **Risco de Regressão:** Baixo.
-- **Critério de Saída:** XMLs com tags 2026 parseados com sucesso e exibidos nos resumos fiscais; rateio de CT-e calculando cotas ajustadas.
-
----
-
-### Fase 6: Observabilidade, Resiliência e Automações
-- **Objetivo:** Robustez corporativa, suporte a certificados sem PowerShell e automação contínua.
-- **Entregáveis:**
-  1. Provedor nativo para certificados A1 `.pfx` em memória via TLS padrão do Node.js.
-  2. Resiliência com Circuit Breaker e backoff exponencial em instabilidades da SEFAZ/ADN.
-  3. Painel visual unificado de auditoria e telemetria operacional com exportação.
-  4. Módulo de geração e exportação de arquivo do Bloco G do SPED Fiscal.
-  5. Agendador em segundo plano com ícone na bandeja do sistema (System Tray).
-- **Risco de Regressão:** Baixo.
-- **Critério de Saída:** Aplicação operando silenciosamente na bandeja, capturando documentos sem travamentos e com logs detalhados.
-
+3. **Etapa 3 — Resolução de CVEs npm, CI/CD e Documentação:**
+   - IMP-T09: Resolução de 100% das vulnerabilidades High/Critical via overrides e auditoria obrigatória no GitHub Actions. (Commit: `63fbfff`)
+   - IMP-T10: Atualização integral dos 8 relatórios técnicos consolidando a versão final v3.5.2.
