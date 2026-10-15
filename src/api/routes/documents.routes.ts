@@ -50,7 +50,7 @@ router.post('/bulk-move', async (req, res) => {
       return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
     const { ids, folderId } = validation.data;
-    await documentsRepository.moveManyToFolder(ids, folderId);
+    await documentsRepository.moveManyToFolder(ids, folderId ?? null);
     res.json({ success: true, count: ids.length });
   } catch (error) {
     console.error('[DocumentsRoute] Error bulk moving documents:', error);

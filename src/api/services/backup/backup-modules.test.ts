@@ -118,7 +118,7 @@ describe('Backup Submodules Isolated Tests (IMP-T05)', () => {
       expect(result.manifest.format).toBe('workspace-fiscal-backup');
       expect(result.manifest.modules).toEqual(['BUSCADOR']);
       expect(result.manifest.checksums).toBeDefined();
-      expect(result.manifest.checksums['data/buscador.json']).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.manifest.checksums!['data/buscador.json']).toMatch(/^sha256:[a-f0-9]{64}$/);
 
       // Verify physical entries inside zip
       const zip = new AdmZip(createdBackupPath);

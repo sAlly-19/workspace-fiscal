@@ -48,7 +48,7 @@ export interface BackupInspectionResult {
   appVersion?: string;
   createdAt?: string;
   filePath?: string;
-  modules?: BackupModule[] | ['FULL_DATABASE'];
+  modules?: (BackupModule | 'FULL_DATABASE')[];
   stats?: BackupManifest['stats'];
 }
 
