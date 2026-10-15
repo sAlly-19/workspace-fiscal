@@ -595,11 +595,16 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
       const isSearchInput = activeElement === searchInputRef.current;
 
-      // 1. Ctrl + F / Cmd + F / / -> Focar campo de busca
-      if (
-        ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'k' || e.key === 'K')) ||
-        (e.key === '/' && !isInputActive)
-      ) {
+      // 1. Atalhos de busca:
+      // Se um documento estiver aberto, Ctrl + F é reservado para a busca interna na nota (DocumentPreview).
+      // Ctrl + K e / focam na busca global de notas fiscais.
+      // Se nenhum documento estiver aberto, Ctrl + F também aciona a busca global como fallback.
+      const isGlobalSearchShortcut =
+        ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) ||
+        (!selectedDocumentId && !docDetails && (e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) ||
+        (e.key === '/' && !isInputActive);
+
+      if (isGlobalSearchShortcut) {
         e.preventDefault();
         searchInputRef.current?.focus();
         searchInputRef.current?.select();

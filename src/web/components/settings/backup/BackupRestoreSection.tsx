@@ -106,7 +106,17 @@ export function BackupRestoreSection({
                 <span className={`text-[11px] font-semibold ${isLight ? 'text-[#475569]' : 'text-[#a1a1aa]'}`}>
                   Escolha os módulos a restaurar deste backup:
                 </span>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                <div
+                  className={`grid gap-2 mt-2 ${
+                    (inspection.modules?.length || 0) <= 1
+                      ? 'grid-cols-1'
+                      : (inspection.modules?.length || 0) === 2
+                      ? 'grid-cols-1 sm:grid-cols-2'
+                      : (inspection.modules?.length || 0) === 3
+                      ? 'grid-cols-1 sm:grid-cols-3'
+                      : 'grid-cols-2 md:grid-cols-4'
+                  }`}
+                >
                   {inspection.modules?.map((mod) => (
                     <label
                       key={mod}
@@ -143,6 +153,11 @@ export function BackupRestoreSection({
                     </label>
                   ))}
                 </div>
+                {!inspection.modules?.includes('BUSCADOR' as any) && (
+                  <p className={`text-[10px] mt-1.5 italic ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                    Nota: Este arquivo de backup foi gerado antes da inclusão do módulo Buscador NF.
+                  </p>
+                )}
               </div>
             ) : (
               <p className={`text-[11px] italic ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>

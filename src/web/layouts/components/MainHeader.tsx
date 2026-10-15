@@ -87,12 +87,12 @@ export function MainHeader({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-9 border border-[var(--border-default)] bg-[var(--surface-input)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] rounded-lg py-1.5 pl-9 pr-16 text-xs focus:outline-none focus:border-blue-500 transition-colors"
-              placeholder="Buscar notas fiscais... (Ctrl + F ou /)"
+              placeholder="Buscar notas fiscais... (Ctrl+K ou /)"
             />
             {!searchQuery && (
               <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none gap-1">
                 <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
-                  Ctrl+F
+                  Ctrl+K
                 </kbd>
                 <kbd className="text-[9px] px-1 py-0.5 rounded border border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-muted)] font-mono">
                   /
