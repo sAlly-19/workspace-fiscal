@@ -25,20 +25,45 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const titleId = 'confirmation-dialog-title';
+  const descriptionId = 'confirmation-dialog-description';
 
   return (
-    <DialogShell isOpen={isOpen} titleId={titleId} onClose={onCancel} initialFocusRef={cancelRef} size="sm">
+    <DialogShell
+      isOpen={isOpen}
+      titleId={titleId}
+      descriptionId={descriptionId}
+      onClose={onCancel}
+      closeOnBackdrop={!isBusy}
+      closeOnEscape={!isBusy}
+      initialFocusRef={cancelRef}
+      size="sm"
+    >
       <div className="p-5">
         <div className="flex items-start gap-3">
           <TriangleAlert className={`mt-0.5 h-5 w-5 ${variant === 'danger' ? 'text-rose-500' : 'text-amber-500'}`} />
           <div>
             <h2 id={titleId} className="text-sm font-semibold">{title}</h2>
-            <p className="mt-2 text-sm text-[var(--text-secondary,#475569)]">{description}</p>
+            <p id={descriptionId} className="mt-2 text-sm text-[var(--text-secondary,#475569)]">{description}</p>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button ref={cancelRef} type="button" onClick={onCancel} disabled={isBusy} className="rounded-lg border px-4 py-2 text-xs font-semibold disabled:opacity-50">Cancelar</button>
-          <button type="button" onClick={onConfirm} disabled={isBusy} className={`rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 cursor-pointer ${variant === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
+          <button
+            ref={cancelRef}
+            type="button"
+            onClick={onCancel}
+            disabled={isBusy}
+            className="rounded-lg border px-4 py-2 text-xs font-semibold disabled:opacity-50 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isBusy}
+            className={`rounded-lg px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 cursor-pointer ${
+              variant === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-purple-600 hover:bg-purple-500'
+            }`}
+          >
             {isBusy ? 'Aguarde...' : confirmLabel}
           </button>
         </div>

@@ -5,6 +5,7 @@ import { useDialogFocus } from '../../hooks/useDialogFocus';
 export interface DialogShellProps {
   isOpen: boolean;
   titleId: string;
+  descriptionId?: string;
   children: React.ReactNode;
   onClose: () => void;
   closeOnBackdrop?: boolean;
@@ -23,6 +24,7 @@ const sizeClasses = {
 export const DialogShell: React.FC<DialogShellProps> = ({
   isOpen,
   titleId,
+  descriptionId,
   children,
   onClose,
   closeOnBackdrop = true,
@@ -53,6 +55,7 @@ export const DialogShell: React.FC<DialogShellProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
+            aria-describedby={descriptionId}
             tabIndex={-1}
             className={`w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden rounded-xl border border-[var(--border-default,#334155)] bg-[var(--surface-panel,#fff)] text-[var(--text-primary,#0f172a)] shadow-2xl`}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
