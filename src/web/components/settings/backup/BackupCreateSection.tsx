@@ -34,7 +34,7 @@ export function BackupCreateSection({
           Selecione quais módulos do Workspace Fiscal você deseja incluir no arquivo de backup portátil:
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           {/* NF View Card */}
           <label
             onClick={() => toggleCreateModule('NF_VIEW')}

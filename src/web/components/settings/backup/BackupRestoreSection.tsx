@@ -107,14 +107,12 @@ export function BackupRestoreSection({
                   Escolha os módulos a restaurar deste backup:
                 </span>
                 <div
-                  className={`grid gap-2 mt-2 ${
+                  className={`grid gap-2.5 mt-2 ${
                     (inspection.modules?.length || 0) <= 1
                       ? 'grid-cols-1'
-                      : (inspection.modules?.length || 0) === 2
-                      ? 'grid-cols-1 sm:grid-cols-2'
                       : (inspection.modules?.length || 0) === 3
                       ? 'grid-cols-1 sm:grid-cols-3'
-                      : 'grid-cols-2 md:grid-cols-4'
+                      : 'grid-cols-1 sm:grid-cols-2'
                   }`}
                 >
                   {inspection.modules?.map((mod) => (
