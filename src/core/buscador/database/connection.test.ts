@@ -77,5 +77,47 @@ describe('DatabaseManager native libsql', () => {
 
     db.close();
   });
+
+  it('opens a unified database with Drizzle documents table without failing with no such column company_id', async () => {
+    // Simulate Drizzle pre-creating workspace-fiscal.sqlite tables
+    const Database = require('libsql');
+    const rawDb = new Database(dbPath);
+    rawDb.exec(`
+      CREATE TABLE documents (
+        id TEXT PRIMARY KEY NOT NULL,
+        type TEXT NOT NULL,
+        access_key TEXT,
+        number TEXT,
+        series TEXT,
+        issue_date INTEGER,
+        status TEXT NOT NULL,
+        issuer_name TEXT,
+        issuer_document TEXT,
+        recipient_name TEXT,
+        recipient_document TEXT,
+        total_amount REAL,
+        billing TEXT,
+        raw_xml_path TEXT NOT NULL,
+        batch_id TEXT,
+        import_job_id TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL
+      );
+      CREATE TABLE companies (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        document TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL
+      );
+    `);
+    rawDb.close();
+
+    // DatabaseManager.create(dbPath) should succeed without throwing "no such column: company_id"
+    const db = await DatabaseManager.create(dbPath);
+    expect(db.hasTable('buscador_documents')).toBe(true);
+    expect(db.hasTable('documents')).toBe(true);
+    db.close();
+  });
 });
 

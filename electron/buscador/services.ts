@@ -75,13 +75,8 @@ export async function initializeServices(userDataPath: string): Promise<Applicat
   try {
     db = await getDatabase(dbPath);
   } catch (dbErr) {
-    console.error('Falha crítica ao abrir banco do Buscador, tentando recuperação com fallback:', dbErr);
-    if (fs.existsSync(dbPath)) {
-      try {
-        fs.renameSync(dbPath, `${dbPath}.corrupted-${Date.now()}.bak`);
-      } catch {}
-    }
-    db = await getDatabase(dbPath);
+    console.error('Falha crítica ao abrir banco do Buscador:', dbErr);
+    throw dbErr;
   }
   const companyRepo = new CompanyRepository(db);
   const certRepo = new CertificateRepository(db);

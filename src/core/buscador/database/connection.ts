@@ -71,6 +71,54 @@ export class DatabaseManager {
     }
   }
 
+  public getBuscadorDocTable(): string {
+    if (this.hasTable('buscador_documents')) {
+      return 'buscador_documents';
+    }
+    if (this.hasTable('documents')) {
+      if (this.hasColumn('documents', 'company_id')) {
+        return 'documents';
+      }
+      return 'buscador_documents';
+    }
+    return 'documents';
+  }
+
+  private ensureBuscadorDocTable(): void {
+    const docTable = this.getBuscadorDocTable();
+    if (docTable === 'buscador_documents' && !this.hasTable('buscador_documents')) {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS buscador_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        document_type TEXT NOT NULL CHECK(document_type IN ('NFE', 'CTE', 'NFSE')),
+        environment TEXT NOT NULL DEFAULT 'homologation' CHECK(environment IN ('homologation', 'production')),
+        origin TEXT NOT NULL DEFAULT 'SEFAZ_DISTRIBUTION' CHECK(origin IN ('SEFAZ_DISTRIBUTION', 'NFSE_ADN_DISTRIBUTION', 'NFSE_SEFIN_DIRECT')),
+        nsu TEXT NOT NULL,
+        schema_type TEXT NOT NULL,
+        access_key TEXT NOT NULL,
+        content_hash TEXT,
+        document_number TEXT,
+        series TEXT,
+        issue_date TEXT,
+        received_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        issuer_cnpj TEXT,
+        issuer_name TEXT,
+        recipient_cnpj TEXT,
+        recipient_name TEXT,
+        total_value REAL DEFAULT 0,
+        xml_path TEXT,
+        pdf_path TEXT,
+        xml_status TEXT NOT NULL DEFAULT 'XML_DISPONIVEL' CHECK(xml_status IN ('XML_DISPONIVEL', 'XML_INDISPONIVEL')),
+        pdf_status TEXT NOT NULL DEFAULT 'PDF_INDISPONIVEL' CHECK(pdf_status IN ('PDF_DISPONIVEL', 'PDF_INDISPONIVEL')),
+        situacao_fiscal TEXT DEFAULT 'AUTORIZADA' CHECK(situacao_fiscal IN ('AUTORIZADA', 'CANCELADA', 'DENEGADA')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        UNIQUE(company_id, document_type, environment, access_key),
+        FOREIGN KEY (company_id) REFERENCES companies(numeric_id) ON DELETE CASCADE
+      );`);
+    }
+  }
+
   private cleanupOrRecoverMigrationTables(): void {
     const handlePair = (targetTable: string, tempTable: string) => {
       const hasTarget = this.hasTable(targetTable);
@@ -91,8 +139,20 @@ export class DatabaseManager {
       }
     };
 
-    handlePair('documents', 'documents_v3');
-    handlePair('documents', 'documents_v2');
+    const docTable = this.getBuscadorDocTable();
+    if (docTable === 'buscador_documents') {
+      handlePair('buscador_documents', 'buscador_documents_v3');
+      handlePair('buscador_documents', 'buscador_documents_v2');
+      if (this.hasTable('documents_v3')) {
+        this.db.exec('DROP TABLE IF EXISTS documents_v3;');
+      }
+      if (this.hasTable('documents_v2')) {
+        this.db.exec('DROP TABLE IF EXISTS documents_v2;');
+      }
+    } else {
+      handlePair('documents', 'documents_v3');
+      handlePair('documents', 'documents_v2');
+    }
     handlePair('distribution_state', 'distribution_state_v3');
     handlePair('distribution_state', 'distribution_state_v2');
   }
@@ -100,12 +160,16 @@ export class DatabaseManager {
   private initSchema(): void {
     this.cleanupOrRecoverMigrationTables();
     this.db.exec(INITIAL_SCHEMA_SQL);
+    this.ensureBuscadorDocTable();
     this.runMigrations();
     try {
-      this.execute(`UPDATE documents
-        SET document_number = CAST(CAST(substr(access_key, 26, 9) AS INTEGER) AS TEXT),
-            series = CAST(CAST(substr(access_key, 23, 3) AS INTEGER) AS TEXT)
-        WHERE (document_number IS NULL OR document_number = '') AND LENGTH(access_key) = 44;`);
+      const docTable = this.getBuscadorDocTable();
+      if (this.hasTable(docTable) && this.hasColumn(docTable, 'access_key') && this.hasColumn(docTable, 'document_number')) {
+        this.execute(`UPDATE ${docTable}
+          SET document_number = CAST(CAST(substr(access_key, 26, 9) AS INTEGER) AS TEXT),
+              series = CAST(CAST(substr(access_key, 23, 3) AS INTEGER) AS TEXT)
+          WHERE (document_number IS NULL OR document_number = '') AND LENGTH(access_key) = 44;`);
+      }
     } catch {}
   }
 
@@ -159,10 +223,28 @@ export class DatabaseManager {
       }
       if (!this.hasColumn('distribution_state', 'environment')) this.migrateDistributionState();
 
-      const documentSql = this.queryOne<{ sql: string }>(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'documents';"
-      )?.sql || '';
-      if (/access_key\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(documentSql)) this.migrateDocuments();
+      const docTable = this.getBuscadorDocTable();
+      if (docTable === 'documents' && this.hasTable('documents') && this.hasColumn('documents', 'company_id')) {
+        const documentSql = this.queryOne<{ sql: string }>(
+          "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'documents';"
+        )?.sql || '';
+        if (/access_key\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(documentSql)) this.migrateDocuments();
+
+        const needsDocumentsV3 = !this.hasColumn('documents', 'environment')
+          || !this.hasColumn('documents', 'origin')
+          || !this.hasColumn('documents', 'content_hash');
+        if (needsDocumentsV3) this.migrateDocumentsV3();
+      } else if (docTable === 'buscador_documents' && this.hasTable('buscador_documents')) {
+        if (!this.hasColumn('buscador_documents', 'environment')) {
+          this.execute("ALTER TABLE buscador_documents ADD COLUMN environment TEXT NOT NULL DEFAULT 'homologation';");
+        }
+        if (!this.hasColumn('buscador_documents', 'origin')) {
+          this.execute("ALTER TABLE buscador_documents ADD COLUMN origin TEXT NOT NULL DEFAULT 'SEFAZ_DISTRIBUTION';");
+        }
+        if (!this.hasColumn('buscador_documents', 'content_hash')) {
+          this.execute("ALTER TABLE buscador_documents ADD COLUMN content_hash TEXT;");
+        }
+      }
 
       if (!this.hasColumn('query_history', 'environment')) {
         this.execute("ALTER TABLE query_history ADD COLUMN environment TEXT NOT NULL DEFAULT 'homologation';");
@@ -171,11 +253,6 @@ export class DatabaseManager {
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'distribution_state';"
       )?.sql || '';
       if (!/['\"]NFSE['\"]/.test(distributionSql)) this.migrateDistributionStateV3();
-
-      const needsDocumentsV3 = !this.hasColumn('documents', 'environment')
-        || !this.hasColumn('documents', 'origin')
-        || !this.hasColumn('documents', 'content_hash');
-      if (needsDocumentsV3) this.migrateDocumentsV3();
 
       this.createNfseEventsTable();
       this.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('nfse_environment', 'homologation');");
@@ -212,6 +289,7 @@ export class DatabaseManager {
   }
 
   private migrateDocuments(): void {
+    if (!this.hasTable('documents') || !this.hasColumn('documents', 'company_id')) return;
     this.db.exec('DROP TABLE IF EXISTS documents_v2;');
     this.db.exec(`CREATE TABLE documents_v2 (
       id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL,
@@ -255,6 +333,7 @@ export class DatabaseManager {
   }
 
   private migrateDocumentsV3(): void {
+    if (!this.hasTable('documents') || !this.hasColumn('documents', 'company_id')) return;
     const legacyEnvironment = this.queryOne<{ value: string }>(
       "SELECT value FROM app_settings WHERE key = 'sefaz_environment';"
     )?.value === 'production' ? 'production' : 'homologation';
@@ -291,6 +370,10 @@ export class DatabaseManager {
   }
 
   private createNfseEventsTable(): void {
+    const docTable = this.getBuscadorDocTable();
+    const fkTarget = this.hasTable(docTable) && this.hasColumn(docTable, 'company_id')
+      ? docTable
+      : 'buscador_documents';
     this.db.exec(`CREATE TABLE IF NOT EXISTS nfse_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       company_id INTEGER NOT NULL,
@@ -308,7 +391,7 @@ export class DatabaseManager {
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
-      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE SET NULL
+      FOREIGN KEY (document_id) REFERENCES ${fkTarget}(id) ON DELETE SET NULL
     );`);
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_nfse_events_document ON nfse_events(document_id);');
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_nfse_events_key ON nfse_events(company_id, environment, access_key);');
@@ -319,19 +402,28 @@ export class DatabaseManager {
   }
 
   private createDocumentIndexes(): void {
+    const docTable = this.getBuscadorDocTable();
+    if (!this.hasTable(docTable) || !this.hasColumn(docTable, 'company_id')) {
+      return;
+    }
     const statements = [
       'DROP INDEX IF EXISTS idx_docs_company_access_key;',
-      'CREATE INDEX IF NOT EXISTS idx_docs_company_id ON documents(company_id);',
-      'CREATE INDEX IF NOT EXISTS idx_docs_access_key ON documents(access_key);',
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_identity
-        ON documents(company_id, document_type, environment, access_key);`,
-      'CREATE INDEX IF NOT EXISTS idx_docs_nsu ON documents(nsu);',
-      'CREATE INDEX IF NOT EXISTS idx_docs_issue_date ON documents(issue_date);',
-      'CREATE INDEX IF NOT EXISTS idx_docs_issuer_cnpj ON documents(issuer_cnpj);',
-      'CREATE INDEX IF NOT EXISTS idx_docs_recipient_cnpj ON documents(recipient_cnpj);',
-      'CREATE INDEX IF NOT EXISTS idx_docs_document_type ON documents(document_type);',
+      `DROP INDEX IF EXISTS idx_${docTable}_company_access_key;`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_company_id ON ${docTable}(company_id);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_access_key ON ${docTable}(access_key);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_${docTable}_identity
+        ON ${docTable}(company_id, document_type, environment, access_key);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_nsu ON ${docTable}(nsu);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_issue_date ON ${docTable}(issue_date);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_issuer_cnpj ON ${docTable}(issuer_cnpj);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_recipient_cnpj ON ${docTable}(recipient_cnpj);`,
+      `CREATE INDEX IF NOT EXISTS idx_${docTable}_document_type ON ${docTable}(document_type);`,
     ];
-    for (const statement of statements) this.db.exec(statement);
+    for (const statement of statements) {
+      try {
+        this.db.exec(statement);
+      } catch {}
+    }
   }
 
   public queryAll<T = unknown>(sql: string, params: unknown[] = []): T[] {
