@@ -415,5 +415,11 @@ describe('Fiscal Detectors and Parsers', () => {
     expect(doc.number).toBe('123');
     expect(doc.items[0].description).toBe('Correcao de dados adicionais da nota fiscal');
   });
+
+  it('throws an error when XML content exceeds 25 MB maximum size guard (IMP-T02)', () => {
+    const parser = new NFeParser();
+    const hugeXml = '<nfeProc>' + ' '.repeat(26 * 1024 * 1024) + '</nfeProc>';
+    expect(() => parser.parse(hugeXml, 'huge.xml')).toThrow(/25MB|tamanho máximo|excede o limite/i);
+  });
 });
 
