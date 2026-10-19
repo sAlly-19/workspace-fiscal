@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { folders, batches, documents, documentItems, documentTaxes, importJobs } from '../../db/schema';
+import { folders, batches, documents, documentItems, documentTaxes, importJobs, folderWatchFiles } from '../../db/schema';
 import { eq, inArray, or } from 'drizzle-orm';
 
 export interface FolderNode {
@@ -98,6 +98,68 @@ export class WorkspaceRepository {
     return getDescendants(folderId);
   }
 
+  // Monitored Folder File Tracking (Persistence across restarts)
+  async getWatchFiles(folderId: string): Promise<Array<{ filePath: string; status: 'imported' | 'ignored' }>> {
+    try {
+      const rows = await db.query.folderWatchFiles.findMany({
+        where: eq(folderWatchFiles.folderId, folderId),
+      });
+      return rows.map((r) => ({
+        filePath: r.filePath,
+        status: r.status as 'imported' | 'ignored',
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async recordWatchFile(folderId: string, filePath: string, status: 'imported' | 'ignored' = 'imported'): Promise<void> {
+    try {
+      await db.insert(folderWatchFiles)
+        .values({
+          folderId,
+          filePath,
+          status,
+        })
+        .onConflictDoUpdate({
+          target: [folderWatchFiles.folderId, folderWatchFiles.filePath],
+          set: { status },
+        });
+    } catch {
+      // Ignore conflict / transient errors
+    }
+  }
+
+  async recordWatchFilesBatch(
+    folderId: string,
+    files: Array<{ filePath: string; status: 'imported' | 'ignored' }>
+  ): Promise<void> {
+    if (files.length === 0) return;
+    try {
+      for (const f of files) {
+        await this.recordWatchFile(folderId, f.filePath, f.status);
+      }
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  async getExistingAccessKeysForFolder(folderId: string): Promise<Set<string>> {
+    try {
+      const docs = await db.query.documents.findMany({
+        where: eq(documents.batchId, folderId),
+        columns: { accessKey: true },
+      });
+      const keys = new Set<string>();
+      for (const d of docs) {
+        if (d.accessKey) keys.add(d.accessKey);
+      }
+      return keys;
+    } catch {
+      return new Set();
+    }
+  }
+
   // Delete a folder and recursively its subfolders & unassign or delete documents
   async deleteFolder(id: string) {
     // 1. Find all folders
@@ -121,6 +183,7 @@ export class WorkspaceRepository {
       for (const fId of targetFolderIds) {
         await db.update(documents).set({ batchId: null }).where(eq(documents.batchId, fId));
         await db.delete(batches).where(eq(batches.folderId, fId));
+        await db.delete(folderWatchFiles).where(eq(folderWatchFiles.folderId, fId));
       }
 
       // Delete folders in reverse order (leaf folders first)
@@ -199,6 +262,7 @@ export class WorkspaceRepository {
     await db.delete(documentTaxes);
     await db.delete(documents);
     await db.delete(batches);
+    await db.delete(folderWatchFiles);
     await db.delete(folders);
     await db.delete(importJobs);
 

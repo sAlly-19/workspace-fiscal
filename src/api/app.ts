@@ -111,7 +111,8 @@ export function createApp(): express.Express {
   app.use('/api/events', sseEventsRoutes);
 
   // Inicializa monitoramento contínuo de pastas locais em background
-  folderWatcherService.init().catch((err) => {
+  // Com delay no scan inicial para liberar total prioridade ao boot da janela e render da UI
+  folderWatcherService.init({ delayScanMs: 3500 }).catch((err) => {
     logger.warn({ err: err?.message }, 'folder_watcher_init_background_note');
   });
 

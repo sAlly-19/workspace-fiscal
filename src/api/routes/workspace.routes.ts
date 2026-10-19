@@ -105,7 +105,7 @@ router.post('/folders/:id/watch/confirm', async (req, res) => {
 // Watch folder action: dismiss pending import
 router.post('/folders/:id/watch/dismiss', async (req, res) => {
   try {
-    folderWatcherService.dismissPendingImport(req.params.id);
+    await folderWatcherService.dismissPendingImport(req.params.id);
     res.json({ success: true });
   } catch (error) {
     console.error('[WorkspaceRoute] Error dismissing watch import:', error);

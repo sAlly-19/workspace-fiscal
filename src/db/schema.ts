@@ -85,6 +85,22 @@ export const batches = sqliteTable('batches', {
   };
 });
 
+export const folderWatchFiles = sqliteTable(
+  'folder_watch_files',
+  {
+    folderId: text('folder_id').notNull().references(() => folders.id, { onDelete: 'cascade' }),
+    filePath: text('file_path').notNull(),
+    status: text('status').$type<'imported' | 'ignored'>().notNull().default('imported'),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .default(sql`(strftime('%s', 'now'))`)
+      .notNull(),
+  },
+  (table) => ({
+    folderIdx: index('idx_watch_files_folder').on(table.folderId),
+    filePathIdx: index('idx_watch_files_path').on(table.filePath),
+  })
+);
+
 export const importJobs = sqliteTable('import_jobs', {
   id: text('id').primaryKey(), // UUID
   status: text('status').notNull(), // 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'

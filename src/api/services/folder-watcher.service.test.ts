@@ -29,6 +29,10 @@ describe('FolderWatcherService', () => {
     mockWorkspaceRepo = {
       getFolderById: vi.fn(),
       getActiveWatchedFolders: vi.fn().mockResolvedValue([]),
+      getWatchFiles: vi.fn().mockResolvedValue([]),
+      getExistingAccessKeysForFolder: vi.fn().mockResolvedValue(new Set()),
+      recordWatchFile: vi.fn().mockResolvedValue(undefined),
+      recordWatchFilesBatch: vi.fn().mockResolvedValue(undefined),
     };
 
     service = new FolderWatcherService({
@@ -173,6 +177,58 @@ describe('FolderWatcherService', () => {
 
     service.stopWatcher('folder-4');
     expect(service.isWatching('folder-4')).toBe(false);
+  });
+
+  it('skips already imported files loaded from repository persistence on catch-up scan', async () => {
+    const xmlFile = path.join(tempDir, 'nfe_persisted.xml');
+    fs.writeFileSync(xmlFile, '<NFe><infNFe>persisted</infNFe></NFe>', 'utf-8');
+
+    // Repository already knows this file was imported in a past session
+    mockWorkspaceRepo.getWatchFiles.mockResolvedValue([
+      { filePath: xmlFile, status: 'imported' },
+    ]);
+
+    await service.startWatcher({
+      id: 'folder-persisted',
+      name: 'Pasta Persistida',
+      watchPath: tempDir,
+      watchRecursive: false,
+      watchMode: 'auto',
+    });
+
+    await new Promise((r) => setTimeout(r, 120));
+
+    // Should NOT call processFile because the file was recognized as already imported
+    expect(mockImportService.createImportJob).not.toHaveBeenCalled();
+    expect(mockImportService.processFile).not.toHaveBeenCalled();
+  });
+
+  it('defers catch-up scan when delayScanMs is set without blocking startWatcher', async () => {
+    const xmlFile = path.join(tempDir, 'nfe_deferred.xml');
+    fs.writeFileSync(xmlFile, '<NFe><infNFe>deferred</infNFe></NFe>', 'utf-8');
+
+    const started = await service.startWatcher(
+      {
+        id: 'folder-delay',
+        name: 'Pasta Delay',
+        watchPath: tempDir,
+        watchRecursive: false,
+        watchMode: 'auto',
+      },
+      { delayScanMs: 200 }
+    );
+
+    // startWatcher returns true immediately, watcher is active
+    expect(started).toBe(true);
+    expect(service.isWatching('folder-delay')).toBe(true);
+
+    // After only 50ms, the catch-up scan has not run yet
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockImportService.createImportJob).not.toHaveBeenCalled();
+
+    // After delay passes (e.g. 250ms), the scan completes
+    await new Promise((r) => setTimeout(r, 220));
+    expect(mockImportService.createImportJob).toHaveBeenCalled();
   });
 });
 

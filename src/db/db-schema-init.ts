@@ -106,6 +106,18 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
   `);
 
   await rawClient.execute(`
+    CREATE TABLE IF NOT EXISTS "folder_watch_files" (
+      "folder_id" TEXT NOT NULL,
+      "file_path" TEXT NOT NULL,
+      "status" TEXT DEFAULT 'imported' NOT NULL,
+      "created_at" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL,
+      PRIMARY KEY ("folder_id", "file_path")
+    );
+  `);
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_watch_files_folder" ON "folder_watch_files"("folder_id");');
+  await rawClient.execute('CREATE INDEX IF NOT EXISTS "idx_watch_files_path" ON "folder_watch_files"("file_path");');
+
+  await rawClient.execute(`
     CREATE TABLE IF NOT EXISTS "import_jobs" (
       "id" TEXT PRIMARY KEY NOT NULL,
       "status" TEXT NOT NULL,

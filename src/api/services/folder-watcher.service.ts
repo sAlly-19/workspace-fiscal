@@ -44,20 +44,25 @@ export class FolderWatcherService extends EventEmitter {
 
   /**
    * Inicializa o serviço carregando e monitorando todas as pastas ativas do banco.
+   * delayScanMs: permite adiar a varredura pesada de disco no boot para dar total prioridade à UI.
    */
-  async init(): Promise<void> {
+  async init(options: { delayScanMs?: number } = {}): Promise<void> {
+    const delayScanMs = options.delayScanMs ?? 3500;
     try {
       const watched = await this.workspaceRepository.getActiveWatchedFolders();
-      logger.info({ count: watched.length }, 'folder_watcher_init_starting');
+      logger.info({ count: watched.length, delayScanMs }, 'folder_watcher_init_starting');
       for (const folder of watched) {
         if (folder.watchPath && (folder.watchMode === 'auto' || folder.watchMode === 'prompt')) {
-          await this.startWatcher({
-            id: folder.id,
-            name: folder.name,
-            watchPath: folder.watchPath,
-            watchRecursive: Boolean(folder.watchRecursive),
-            watchMode: folder.watchMode as 'auto' | 'prompt',
-          });
+          await this.startWatcher(
+            {
+              id: folder.id,
+              name: folder.name,
+              watchPath: folder.watchPath,
+              watchRecursive: Boolean(folder.watchRecursive),
+              watchMode: folder.watchMode as 'auto' | 'prompt',
+            },
+            { delayScanMs }
+          );
         }
       }
     } catch (err: any) {
@@ -68,7 +73,7 @@ export class FolderWatcherService extends EventEmitter {
   /**
    * Sincroniza os watchers com o estado atual do banco de dados SQLite.
    */
-  async syncWatchers(): Promise<void> {
+  async syncWatchers(options: { delayScanMs?: number } = {}): Promise<void> {
     try {
       const activeFolders = await this.workspaceRepository.getActiveWatchedFolders();
       const activeIds = new Set(activeFolders.map((f) => f.id));
@@ -91,13 +96,16 @@ export class FolderWatcherService extends EventEmitter {
 
         if (needsRestart && f.watchPath) {
           this.stopWatcher(f.id);
-          await this.startWatcher({
-            id: f.id,
-            name: f.name,
-            watchPath: f.watchPath,
-            watchRecursive: Boolean(f.watchRecursive),
-            watchMode: f.watchMode as 'auto' | 'prompt',
-          });
+          await this.startWatcher(
+            {
+              id: f.id,
+              name: f.name,
+              watchPath: f.watchPath,
+              watchRecursive: Boolean(f.watchRecursive),
+              watchMode: f.watchMode as 'auto' | 'prompt',
+            },
+            { delayScanMs: options.delayScanMs ?? 0 }
+          );
         }
       }
     } catch (err: any) {
@@ -106,9 +114,36 @@ export class FolderWatcherService extends EventEmitter {
   }
 
   /**
+   * Carrega os arquivos já persistidos no banco SQLite para memória.
+   */
+  private async loadPersistedWatchFiles(folderId: string): Promise<void> {
+    try {
+      const persisted = await this.workspaceRepository.getWatchFiles(folderId);
+      const processed = this.processedFiles.get(folderId) || new Set<string>();
+      const ignored = this.ignoredFiles.get(folderId) || new Set<string>();
+
+      for (const p of persisted) {
+        if (p.status === 'ignored') {
+          ignored.add(p.filePath);
+        } else {
+          processed.add(p.filePath);
+        }
+      }
+
+      this.processedFiles.set(folderId, processed);
+      this.ignoredFiles.set(folderId, ignored);
+    } catch (e: any) {
+      logger.warn({ folderId, err: e?.message }, 'folder_watcher_load_persisted_failed');
+    }
+  }
+
+  /**
    * Inicia o monitoramento de uma pasta específica.
    */
-  async startWatcher(folder: WatchedFolder): Promise<boolean> {
+  async startWatcher(
+    folder: WatchedFolder,
+    options: { delayScanMs?: number } = {}
+  ): Promise<boolean> {
     if (!folder.watchPath || !fs.existsSync(folder.watchPath)) {
       logger.warn({ folderId: folder.id, path: folder.watchPath }, 'folder_watcher_path_not_found');
       return false;
@@ -128,17 +163,11 @@ export class FolderWatcherService extends EventEmitter {
       this.pendingFiles.set(folder.id, new Set());
     }
 
-    try {
-      // 1. Realiza a varredura inicial (Catch-up Scan)
-      await this.scanDirectory(
-        folder.id,
-        folder.name,
-        folder.watchPath,
-        Boolean(folder.watchRecursive),
-        folder.watchMode
-      );
+    // 1. Carrega os arquivos já conhecidos do banco SQLite para memória
+    await this.loadPersistedWatchFiles(folder.id);
 
-      // 2. Registra o fs.watch nativo
+    try {
+      // 2. Registra o fs.watch nativo IMEDIATAMENTE (nunca perde eventos de arquivos novos)
       const watcher = fs.watch(
         folder.watchPath,
         { recursive: Boolean(folder.watchRecursive) },
@@ -163,6 +192,36 @@ export class FolderWatcherService extends EventEmitter {
         { folderId: folder.id, path: folder.watchPath, mode: folder.watchMode },
         'folder_watcher_started'
       );
+
+      // 3. Executa a varredura inicial (Catch-up Scan) em SEGUNDO PLANO sem travar o boot da aplicação
+      const delay = options.delayScanMs ?? 0;
+      if (delay > 0) {
+        setTimeout(() => {
+          this.scanDirectory(
+            folder.id,
+            folder.name,
+            folder.watchPath,
+            Boolean(folder.watchRecursive),
+            folder.watchMode
+          ).catch((scanErr) => {
+            logger.warn({ folderId: folder.id, err: scanErr?.message }, 'folder_watcher_deferred_scan_error');
+          });
+        }, delay);
+      } else {
+        // Inicia assincronamente sem bloquear a chamada atual
+        setImmediate(() => {
+          this.scanDirectory(
+            folder.id,
+            folder.name,
+            folder.watchPath,
+            Boolean(folder.watchRecursive),
+            folder.watchMode
+          ).catch((scanErr) => {
+            logger.warn({ folderId: folder.id, err: scanErr?.message }, 'folder_watcher_immediate_scan_error');
+          });
+        });
+      }
+
       return true;
     } catch (err: any) {
       logger.error({ folderId: folder.id, err: err?.message }, 'folder_watcher_start_failed');
@@ -242,6 +301,12 @@ export class FolderWatcherService extends EventEmitter {
 
     const foundXmls: string[] = [];
 
+    // Pre-carrega chaves de acesso já existentes no banco para essa pasta
+    const existingKeys = await this.workspaceRepository.getExistingAccessKeysForFolder(folderId);
+    const processedSet = this.processedFiles.get(folderId) || new Set();
+    const ignoredSet = this.ignoredFiles.get(folderId) || new Set();
+    const newlyIdentifiedAsImported: Array<{ filePath: string; status: 'imported' }> = [];
+
     const walk = async (currentDir: string) => {
       let entries: fs.Dirent[];
       try {
@@ -260,16 +325,31 @@ export class FolderWatcherService extends EventEmitter {
         }
 
         if (entry.isFile() && this.isXmlFile(full)) {
-          const processed = this.processedFiles.get(folderId)?.has(full);
-          const ignored = this.ignoredFiles.get(folderId)?.has(full);
-          if (!processed && !ignored) {
-            foundXmls.push(full);
+          // 1. Checagem em memória ultra-rápida (O(1))
+          if (processedSet.has(full) || ignoredSet.has(full)) {
+            continue;
           }
+
+          // 2. Se o nome do arquivo contém a chave de acesso de 44 dígitos já existente no banco para esta pasta
+          const keyMatch = entry.name.match(/(?:NFe|CTe|NFCe)?(\d{44})/i);
+          if (keyMatch && existingKeys.has(keyMatch[1])) {
+            processedSet.add(full);
+            newlyIdentifiedAsImported.push({ filePath: full, status: 'imported' });
+            continue;
+          }
+
+          foundXmls.push(full);
         }
       }
     };
 
     await walk(dirPath);
+
+    // Salva em lote arquivos identificados como já pertencentes ao banco nesta varredura
+    if (newlyIdentifiedAsImported.length > 0) {
+      this.processedFiles.set(folderId, processedSet);
+      await this.workspaceRepository.recordWatchFilesBatch(folderId, newlyIdentifiedAsImported);
+    }
 
     if (foundXmls.length === 0) {
       this.emitSse('WATCH_SYNC_PROGRESS', {
@@ -412,6 +492,7 @@ export class FolderWatcherService extends EventEmitter {
     try {
       const job = await this.importService.createImportJob(total);
       const processedSet = this.processedFiles.get(folderId) || new Set();
+      const filesToPersist: Array<{ filePath: string; status: 'imported' }> = [];
 
       const BATCH_SIZE = 5;
       for (let i = 0; i < filePaths.length; i++) {
@@ -431,6 +512,7 @@ export class FolderWatcherService extends EventEmitter {
           );
 
           processedSet.add(fp);
+          filesToPersist.push({ filePath: fp, status: 'imported' });
           if (result && result.duplicate) {
             skippedCount++;
           } else {
@@ -443,6 +525,11 @@ export class FolderWatcherService extends EventEmitter {
 
         // Emite atualização de progresso em tempo real e cede cooperativamente ao Event Loop
         if ((i + 1) % BATCH_SIZE === 0 || i === filePaths.length - 1) {
+          if (filesToPersist.length > 0) {
+            await this.workspaceRepository.recordWatchFilesBatch(folderId, filesToPersist);
+            filesToPersist.length = 0;
+          }
+
           this.emitSse('WATCH_SYNC_PROGRESS', {
             folderId,
             folderName,
@@ -452,8 +539,14 @@ export class FolderWatcherService extends EventEmitter {
             isSyncing: true,
             phase: 'importing',
           });
-          await new Promise((resolve) => setImmediate(resolve));
+
+          // Cede a vez ao Event Loop para que requisições HTTP, consultas de UI e cliques respondam instantaneamente
+          await new Promise((resolve) => setTimeout(resolve, 30));
         }
+      }
+
+      if (filesToPersist.length > 0) {
+        await this.workspaceRepository.recordWatchFilesBatch(folderId, filesToPersist);
       }
 
       this.processedFiles.set(folderId, processedSet);
@@ -527,17 +620,23 @@ export class FolderWatcherService extends EventEmitter {
   }
 
   /**
-   * Descarta os arquivos pendentes do modo prompt, marcando-os como ignorados.
+   * Descarta os arquivos pendentes do modo prompt, marcando-os como ignorados e persistindo.
    */
-  dismissPendingImport(folderId: string): void {
+  async dismissPendingImport(folderId: string): Promise<void> {
     const pending = this.pendingFiles.get(folderId);
     if (pending && pending.size > 0) {
       const ignored = this.ignoredFiles.get(folderId) || new Set();
+      const filesToPersist: Array<{ filePath: string; status: 'ignored' }> = [];
       for (const f of pending) {
         ignored.add(f);
+        filesToPersist.push({ filePath: f, status: 'ignored' });
       }
       this.ignoredFiles.set(folderId, ignored);
       this.pendingFiles.set(folderId, new Set());
+
+      await this.workspaceRepository.recordWatchFilesBatch(folderId, filesToPersist);
+      this.emitSse('WATCH_PROMPT_DISMISSED', { folderId });
+      logger.info({ folderId, count: pending.size }, 'folder_watcher_pending_dismissed');
     }
   }
 
