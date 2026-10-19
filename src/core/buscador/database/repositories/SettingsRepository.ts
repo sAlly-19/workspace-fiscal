@@ -18,8 +18,8 @@ export class SettingsRepository {
     const parsedPageSize = Number(map.get('items_per_page'));
     return {
       default_storage_path: map.get('default_storage_path') || '',
-      sefaz_environment: environment === 'production' ? 'production' : 'homologation',
-      nfse_environment: nfseEnvironment === 'production' ? 'production' : 'homologation',
+      sefaz_environment: environment === 'homologation' ? 'homologation' : 'production',
+      nfse_environment: nfseEnvironment === 'homologation' ? 'homologation' : 'production',
       items_per_page: normalizePageSize(parsedPageSize),
       log_level: logLevel === 'warn' || logLevel === 'error' || logLevel === 'debug' ? logLevel : 'info',
     };

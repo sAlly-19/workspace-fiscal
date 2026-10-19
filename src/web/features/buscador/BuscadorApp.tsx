@@ -187,8 +187,8 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     }
 
     const currentEnv = currentMode === 'NFSE'
-      ? (settings?.nfse_environment || 'homologation')
-      : (settings?.sefaz_environment || 'homologation');
+      ? (settings?.nfse_environment || 'production')
+      : (settings?.sefaz_environment || 'production');
 
     try {
       const result = await window.fiscalApi?.documents.search({
@@ -368,7 +368,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
         <AppHeader
           activeCompany={activeCompany}
           certHealth={certHealth}
-          environment={workspaceMode === 'NFSE' ? (settings?.nfse_environment || 'homologation') : (settings?.sefaz_environment || 'homologation')}
+          environment={workspaceMode === 'NFSE' ? (settings?.nfse_environment || 'production') : (settings?.sefaz_environment || 'production')}
           workspaceMode={workspaceMode}
           onWorkspaceModeChange={handleWorkspaceModeChange}
           theme={theme}
@@ -438,7 +438,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       content={workspaceMode === 'NFSE' ? (
         <NfseWorkspace
           company={activeCompany}
-          environment={(settings?.nfse_environment || 'homologation')}
+          environment={(settings?.nfse_environment || 'production')}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onDownloadXml={handleDownloadXml}
           onOpenFileFolder={handleOpenFolder}

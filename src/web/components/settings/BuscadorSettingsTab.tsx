@@ -110,8 +110,8 @@ export function BuscadorSettingsTab({ isLight }: BuscadorSettingsTabProps) {
     }
   };
 
-  const env = settings?.sefaz_environment || 'homologation';
-  const nfseEnv = settings?.nfse_environment || 'homologation';
+  const env = settings?.sefaz_environment || 'production';
+  const nfseEnv = settings?.nfse_environment || 'production';
   const defaultFolder = settings?.default_storage_path || '';
 
   return (

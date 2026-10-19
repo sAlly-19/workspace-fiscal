@@ -154,11 +154,11 @@ describe('NFS-e repositories', () => {
   it('stores the NFS-e environment independently from SEFAZ', () => {
     const settings = new SettingsRepository(db);
 
-    settings.updateSettings({ nfse_environment: 'production' });
+    settings.updateSettings({ nfse_environment: 'homologation' });
 
     expect(settings.getSettings()).toMatchObject({
-      sefaz_environment: 'homologation',
-      nfse_environment: 'production',
+      sefaz_environment: 'production',
+      nfse_environment: 'homologation',
     });
   });
 });

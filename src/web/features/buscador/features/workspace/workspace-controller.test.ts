@@ -14,7 +14,7 @@ describe('workspace-controller', () => {
     expect(state.mode).toBe('SEFAZ');
     expect(state.activeCompanyId).toBeNull();
     expect(state.filters.docTypes).toEqual({ nfe: true, cte: true });
-    expect(getActiveEnvironment(state)).toBe('homologation');
+    expect(getActiveEnvironment(state)).toBe('production');
   });
 
   it('preserva empresa selecionada e limpa filtros especificos de SEFAZ ao alternar para NFSE', () => {

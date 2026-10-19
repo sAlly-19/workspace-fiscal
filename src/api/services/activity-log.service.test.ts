@@ -74,6 +74,7 @@ describe('ActivityLogService', () => {
   });
 
   it('calcula estatísticas consolidadas de auditoria', async () => {
+    await db.delete(activityLogs);
     await service.record({ level: 'SUCCESS', module: 'BACKUP', action: 'BACKUP_CREATE', message: 'Backup gerado' });
     await service.record({ level: 'SUCCESS', module: 'NFVIEW', action: 'XML_IMPORT', message: 'XMLs importados' });
     await service.record({ level: 'ERROR', module: 'BUSCADOR', action: 'SYNC_ERROR', message: 'Erro de conexão' });

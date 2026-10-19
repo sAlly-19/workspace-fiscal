@@ -66,7 +66,7 @@ export class NfseViewModel {
   constructor(
     private readonly api: NfseViewModelApi,
     initialCompanyId: number | null = null,
-    initialEnvironment: NfseEnvironment = 'homologation'
+    initialEnvironment: NfseEnvironment = 'production'
   ) {
     this.state = {
       companyId: initialCompanyId,

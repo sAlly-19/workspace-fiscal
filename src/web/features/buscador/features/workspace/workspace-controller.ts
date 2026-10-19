@@ -20,8 +20,8 @@ export function createInitialWorkspaceState(initial?: Partial<WorkspaceState>): 
   return {
     mode: initial?.mode ?? 'SEFAZ',
     activeCompanyId: initial?.activeCompanyId ?? null,
-    sefazEnvironment: initial?.sefazEnvironment ?? 'homologation',
-    nfseEnvironment: initial?.nfseEnvironment ?? 'homologation',
+    sefazEnvironment: initial?.sefazEnvironment ?? 'production',
+    nfseEnvironment: initial?.nfseEnvironment ?? 'production',
     filters: initial?.filters ?? {
       docTypes: { nfe: true, cte: true },
     },

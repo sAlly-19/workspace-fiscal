@@ -19,14 +19,14 @@ describe('Buscador Settings Tab Cards', () => {
 
   it('renders SefazEnvironmentCard element with correct structure', () => {
     const el = React.createElement(SefazEnvironmentCard, {
-      env: 'homologation',
+      env: 'production',
       saving: false,
       onUpdateEnv: () => {},
       isLight: true,
     });
     expect(el).toBeDefined();
     expect(el.type).toBe(SefazEnvironmentCard);
-    expect(el.props.env).toBe('homologation');
+    expect(el.props.env).toBe('production');
   });
 
   it('renders NfseEnvironmentCard element with correct structure', () => {

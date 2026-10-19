@@ -169,8 +169,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
 -- Inserção de configurações padrões se não existirem
 INSERT OR IGNORE INTO app_settings (key, value) VALUES 
 ('default_storage_path', ''),
-('sefaz_environment', 'homologation'),
-('nfse_environment', 'homologation'),
+('sefaz_environment', 'production'),
+('nfse_environment', 'production'),
 ('items_per_page', '50'),
 ('log_level', 'info');
 `;

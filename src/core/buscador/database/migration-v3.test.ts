@@ -138,7 +138,7 @@ describe('database migration v2 to v3', () => {
     )?.name).toBe('nfse_events');
     expect(db.queryOne<{ value: string }>(
       "SELECT value FROM app_settings WHERE key = 'nfse_environment';"
-    )?.value).toBe('homologation');
+    )?.value).toBe('production');
 
     expect(() => db.execute(
       `INSERT INTO distribution_state (company_id, document_type, environment, last_nsu, max_nsu, status)

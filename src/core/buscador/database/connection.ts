@@ -282,7 +282,7 @@ export class DatabaseManager {
     this.db.exec(`INSERT INTO distribution_state_v2 (
       id, company_id, document_type, environment, last_nsu, max_nsu, last_query_at, status, last_error, created_at, updated_at
     ) SELECT id, company_id, document_type,
-      COALESCE((SELECT value FROM app_settings WHERE key = 'sefaz_environment'), 'homologation'),
+      COALESCE((SELECT value FROM app_settings WHERE key = 'sefaz_environment'), 'production'),
       last_nsu, max_nsu, last_query_at, status, last_error, created_at, updated_at FROM distribution_state;`);
     this.db.exec('DROP TABLE distribution_state;');
     this.db.exec('ALTER TABLE distribution_state_v2 RENAME TO distribution_state;');

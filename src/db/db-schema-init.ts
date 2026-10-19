@@ -504,10 +504,15 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
   await rawClient.execute(`
     INSERT OR IGNORE INTO "app_settings" ("key", "value") VALUES 
     ('default_storage_path', ''),
-    ('sefaz_environment', 'homologation'),
-    ('nfse_environment', 'homologation'),
+    ('sefaz_environment', 'production'),
+    ('nfse_environment', 'production'),
     ('items_per_page', '50'),
     ('log_level', 'info');
+  `);
+
+  // Garante que o ambiente de produção oficial seja o padrão absoluto para todos os usuários
+  await rawClient.execute(`
+    UPDATE "app_settings" SET "value" = 'production' WHERE "key" IN ('sefaz_environment', 'nfse_environment') AND "value" = 'homologation';
   `);
 }
 
