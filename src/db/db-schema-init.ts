@@ -91,6 +91,8 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
       await rawClient.execute('ALTER TABLE "folders" ADD COLUMN "watch_mode" TEXT DEFAULT \'off\';');
       logger.info({ table: 'folders', column: 'watch_mode' }, 'database_column_migrated');
     }
+    // Migra pastas antigas configuradas como 'auto' para 'prompt' (modo com confirmação)
+    await rawClient.execute("UPDATE \"folders\" SET \"watch_mode\" = 'prompt' WHERE \"watch_mode\" = 'auto';");
   } catch (migErr) {
     logger.warn({ err: (migErr as Error).message }, 'database_folders_migration_note');
   }

@@ -13,7 +13,7 @@ export interface FolderWatchModalProps {
     config: {
       watchPath: string | null;
       watchRecursive: boolean;
-      watchMode: 'off' | 'auto' | 'prompt';
+      watchMode: 'off' | 'prompt';
     }
   ) => Promise<void>;
 }
@@ -27,7 +27,7 @@ export function FolderWatchModal({
 }: FolderWatchModalProps) {
   const isLight = currentTheme === 'light';
 
-  const [watchMode, setWatchMode] = useState<'off' | 'auto' | 'prompt'>('off');
+  const [watchMode, setWatchMode] = useState<'off' | 'prompt'>('off');
   const [watchPath, setWatchPath] = useState('');
   const [watchRecursive, setWatchRecursive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +38,7 @@ export function FolderWatchModal({
 
   useEffect(() => {
     if (folder) {
-      setWatchMode(folder.watchMode || 'off');
+      setWatchMode(folder.watchMode === 'prompt' ? 'prompt' : 'off');
       setWatchPath(folder.watchPath || '');
       setWatchRecursive(Boolean(folder.watchRecursive));
       setErrorMessage(null);
@@ -195,7 +195,7 @@ export function FolderWatchModal({
           {/* Mode Selection */}
           <div>
             <label className="block font-semibold mb-1.5 text-xs">Modo de Operação:</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setWatchMode('off')}
@@ -218,26 +218,6 @@ export function FolderWatchModal({
 
               <button
                 type="button"
-                onClick={() => setWatchMode('auto')}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  watchMode === 'auto'
-                    ? 'border-emerald-500 bg-emerald-500/10 font-semibold'
-                    : isLight
-                    ? 'border-slate-200 hover:bg-slate-50'
-                    : 'border-zinc-800 hover:bg-zinc-800/50'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-xs text-emerald-400">Automático</span>
-                  {watchMode === 'auto' && <Check className="w-3.5 h-3.5 text-emerald-500" />}
-                </div>
-                <p className={`text-[11px] leading-relaxed ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                  Importa novos XMLs silenciosamente em segundo plano.
-                </p>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setWatchMode('prompt')}
                 className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                   watchMode === 'prompt'
@@ -252,7 +232,7 @@ export function FolderWatchModal({
                   {watchMode === 'prompt' && <Check className="w-3.5 h-3.5 text-amber-500" />}
                 </div>
                 <p className={`text-[11px] leading-relaxed ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                  Avisa quando detectar novos XMLs e aguarda autorização.
+                  Avisa quando detectar novos XMLs e aguarda autorização antes de importar.
                 </p>
               </button>
             </div>

@@ -15,7 +15,7 @@ describe('Folder Watch UI Components', () => {
       children: [],
       watchPath: 'C:\\test\\xmls',
       watchRecursive: true,
-      watchMode: 'auto',
+      watchMode: 'prompt',
     };
 
     const defaultProps: FolderWatchModalProps = {
@@ -31,7 +31,7 @@ describe('Folder Watch UI Components', () => {
       expect(element).toBeDefined();
       expect(element.props.isOpen).toBe(true);
       expect(element.props.folder?.name).toBe('Notas Recebidas');
-      expect(element.props.folder?.watchMode).toBe('auto');
+      expect(element.props.folder?.watchMode).toBe('prompt');
     });
 
     it('creates element with isOpen false when closed', () => {

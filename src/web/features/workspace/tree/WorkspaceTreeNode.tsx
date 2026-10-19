@@ -181,12 +181,8 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
               {node.watchMode && node.watchMode !== 'off' && !isSyncing ? (
                 <span
                   data-testid={`watch-indicator-${node.id}`}
-                  title={`Monitoramento ativo (${node.watchMode === 'auto' ? 'Automático' : 'Solicitar confirmação'})${node.watchPath ? `: ${node.watchPath}` : ''}`}
-                  className={`inline-flex items-center justify-center p-0.5 rounded shrink-0 ${
-                    node.watchMode === 'auto'
-                      ? 'text-emerald-400'
-                      : 'text-amber-400'
-                  }`}
+                  title={`Monitoramento ativo (Solicitar confirmação)${node.watchPath ? `: ${node.watchPath}` : ''}`}
+                  className="inline-flex items-center justify-center p-0.5 rounded shrink-0 text-amber-400"
                 >
                   <FolderSync className="w-3.5 h-3.5 animate-pulse" />
                 </span>

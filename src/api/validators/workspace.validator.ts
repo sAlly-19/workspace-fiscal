@@ -5,14 +5,14 @@ export interface CreateFolderInput {
   parentId?: string | null;
   watchPath?: string | null;
   watchRecursive?: boolean;
-  watchMode?: 'off' | 'auto' | 'prompt';
+  watchMode?: 'off' | 'prompt';
 }
 
 export interface UpdateFolderInput {
   name?: string;
   watchPath?: string | null;
   watchRecursive?: boolean;
-  watchMode?: 'off' | 'auto' | 'prompt';
+  watchMode?: 'off' | 'prompt';
 }
 
 export function validateCreateFolder(body: unknown): ValidationResult<CreateFolderInput> {
@@ -42,8 +42,15 @@ export function validateCreateFolder(body: unknown): ValidationResult<CreateFold
     errors.push('watchRecursive deve ser um booleano.');
   }
 
-  if (b.watchMode !== undefined && !['off', 'auto', 'prompt'].includes(b.watchMode)) {
-    errors.push('watchMode deve ser "off", "auto" ou "prompt".');
+  let normalizedWatchMode: 'off' | 'prompt' = 'off';
+  if (b.watchMode !== undefined) {
+    if (b.watchMode === 'auto' || b.watchMode === 'prompt') {
+      normalizedWatchMode = 'prompt';
+    } else if (b.watchMode === 'off') {
+      normalizedWatchMode = 'off';
+    } else {
+      errors.push('watchMode deve ser "off" ou "prompt".');
+    }
   }
 
   if (errors.length > 0) {
@@ -57,7 +64,7 @@ export function validateCreateFolder(body: unknown): ValidationResult<CreateFold
       parentId: b.parentId || null,
       watchPath: typeof b.watchPath === 'string' ? b.watchPath.trim() : (b.watchPath === null ? null : undefined),
       watchRecursive: typeof b.watchRecursive === 'boolean' ? b.watchRecursive : false,
-      watchMode: (b.watchMode as 'off' | 'auto' | 'prompt') || 'off',
+      watchMode: normalizedWatchMode,
     },
   };
 }
@@ -96,8 +103,15 @@ export function validateUpdateFolder(body: unknown): ValidationResult<UpdateFold
     errors.push('watchRecursive deve ser um booleano.');
   }
 
-  if (hasWatchMode && !['off', 'auto', 'prompt'].includes(b.watchMode)) {
-    errors.push('watchMode deve ser "off", "auto" ou "prompt".');
+  let normalizedWatchMode: 'off' | 'prompt' | undefined = undefined;
+  if (hasWatchMode) {
+    if (b.watchMode === 'auto' || b.watchMode === 'prompt') {
+      normalizedWatchMode = 'prompt';
+    } else if (b.watchMode === 'off') {
+      normalizedWatchMode = 'off';
+    } else {
+      errors.push('watchMode deve ser "off" ou "prompt".');
+    }
   }
 
   if (errors.length > 0) {
@@ -108,7 +122,7 @@ export function validateUpdateFolder(body: unknown): ValidationResult<UpdateFold
   if (hasName && typeof b.name === 'string') resultData.name = b.name.trim();
   if (hasWatchPath) resultData.watchPath = typeof b.watchPath === 'string' ? b.watchPath.trim() : null;
   if (hasWatchRecursive) resultData.watchRecursive = Boolean(b.watchRecursive);
-  if (hasWatchMode) resultData.watchMode = b.watchMode as 'off' | 'auto' | 'prompt';
+  if (hasWatchMode && normalizedWatchMode) resultData.watchMode = normalizedWatchMode;
 
   return {
     success: true,

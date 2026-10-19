@@ -54,7 +54,7 @@ describe('FolderWatcherService', () => {
     } catch {}
   });
 
-  it('filters non-xml files and processes valid xml in auto mode', async () => {
+  it('filters non-xml files and processes valid xml when prompt is confirmed', async () => {
     // Create an XML and a non-XML file in tempDir
     const xmlFile = path.join(tempDir, 'nfe_test_01.xml');
     const txtFile = path.join(tempDir, 'ignored.txt');
@@ -66,7 +66,7 @@ describe('FolderWatcherService', () => {
       name: 'Entradas 2026',
       watchPath: tempDir,
       watchRecursive: false,
-      watchMode: 'auto',
+      watchMode: 'prompt',
     });
 
     await service.startWatcher({
@@ -74,12 +74,22 @@ describe('FolderWatcherService', () => {
       name: 'Entradas 2026',
       watchPath: tempDir,
       watchRecursive: false,
-      watchMode: 'auto',
+      watchMode: 'prompt',
     });
 
-    // Wait for catch-up processing
+    // Wait for catch-up scanning
     await new Promise((r) => setTimeout(r, 120));
 
+    // Initially queues for confirmation
+    expect(mockImportService.createImportJob).not.toHaveBeenCalled();
+    const promptEvent = emittedEvents.find((e) => e.event === 'WATCH_PROMPT_IMPORT');
+    expect(promptEvent).toBeDefined();
+    expect(promptEvent?.data.folderId).toBe('folder-1');
+    expect(promptEvent?.data.pendingCount).toBe(1);
+
+    // Confirm import
+    const result = await service.confirmPendingImport('folder-1');
+    expect(result.importedCount).toBe(1);
     expect(mockImportService.createImportJob).toHaveBeenCalled();
     expect(mockImportService.processFile).toHaveBeenCalledTimes(1);
     expect(mockImportService.markJobCompleted).toHaveBeenCalledWith('mock-job-id');
@@ -160,7 +170,7 @@ describe('FolderWatcherService', () => {
     expect(service.getPendingFiles('folder-3').length).toBe(0);
 
     // Trigger watcher again by checking known files or rescanning
-    await service.scanDirectory('folder-3', 'Pasta Teste', tempDir, false, 'prompt');
+    await service.scanDirectory('folder-3', 'Pasta Teste', tempDir, false);
     expect(service.getPendingFiles('folder-3').length).toBe(0);
   });
 
@@ -170,7 +180,7 @@ describe('FolderWatcherService', () => {
       name: 'Pasta Stop',
       watchPath: tempDir,
       watchRecursive: false,
-      watchMode: 'auto',
+      watchMode: 'prompt',
     });
 
     expect(service.isWatching('folder-4')).toBe(true);
@@ -193,12 +203,13 @@ describe('FolderWatcherService', () => {
       name: 'Pasta Persistida',
       watchPath: tempDir,
       watchRecursive: false,
-      watchMode: 'auto',
+      watchMode: 'prompt',
     });
 
     await new Promise((r) => setTimeout(r, 120));
 
-    // Should NOT call processFile because the file was recognized as already imported
+    // Should NOT queue or call processFile because the file was recognized as already imported
+    expect(service.getPendingFiles('folder-persisted').length).toBe(0);
     expect(mockImportService.createImportJob).not.toHaveBeenCalled();
     expect(mockImportService.processFile).not.toHaveBeenCalled();
   });
@@ -213,7 +224,7 @@ describe('FolderWatcherService', () => {
         name: 'Pasta Delay',
         watchPath: tempDir,
         watchRecursive: false,
-        watchMode: 'auto',
+        watchMode: 'prompt',
       },
       { delayScanMs: 200 }
     );
@@ -224,11 +235,11 @@ describe('FolderWatcherService', () => {
 
     // After only 50ms, the catch-up scan has not run yet
     await new Promise((r) => setTimeout(r, 50));
-    expect(mockImportService.createImportJob).not.toHaveBeenCalled();
+    expect(service.getPendingFiles('folder-delay').length).toBe(0);
 
-    // After delay passes (e.g. 250ms), the scan completes
+    // After delay passes (e.g. 250ms), the scan completes and queues pending file
     await new Promise((r) => setTimeout(r, 220));
-    expect(mockImportService.createImportJob).toHaveBeenCalled();
+    expect(service.getPendingFiles('folder-delay').length).toBe(1);
   });
 });
 

@@ -12,7 +12,7 @@ export interface FolderNode {
   documentCount?: number;
   watchPath?: string | null;
   watchRecursive?: boolean;
-  watchMode?: 'off' | 'auto' | 'prompt';
+  watchMode?: 'off' | 'prompt';
 }
 
 export class WorkspaceRepository {
@@ -24,7 +24,7 @@ export class WorkspaceRepository {
     watchConfig?: {
       watchPath?: string | null;
       watchRecursive?: boolean;
-      watchMode?: 'off' | 'auto' | 'prompt';
+      watchMode?: 'off' | 'prompt';
     }
   ) {
     return db.insert(folders).values({
@@ -33,7 +33,7 @@ export class WorkspaceRepository {
       parentId: parentId || null,
       watchPath: watchConfig?.watchPath || null,
       watchRecursive: Boolean(watchConfig?.watchRecursive),
-      watchMode: watchConfig?.watchMode || 'off',
+      watchMode: watchConfig?.watchMode === 'prompt' ? 'prompt' : 'off',
     }).returning();
   }
 
@@ -44,7 +44,7 @@ export class WorkspaceRepository {
       name?: string;
       watchPath?: string | null;
       watchRecursive?: boolean;
-      watchMode?: 'off' | 'auto' | 'prompt';
+      watchMode?: 'off' | 'prompt';
     } | string
   ) {
     const updatePayload: Record<string, any> = {
@@ -69,12 +69,12 @@ export class WorkspaceRepository {
     });
   }
 
-  // Get all folders with active watch mode ('auto' or 'prompt')
+  // Get all folders with active watch mode ('prompt')
   async getActiveWatchedFolders() {
     const list = await db.query.folders.findMany();
     return list.filter(
       (f) =>
-        (f.watchMode === 'auto' || f.watchMode === 'prompt') &&
+        (f.watchMode === 'prompt' || (f.watchMode as any) === 'auto') &&
         Boolean(f.watchPath && f.watchPath.trim())
     );
   }
@@ -226,7 +226,7 @@ export class WorkspaceRepository {
         documentCount: docCounts[f.id] || 0,
         watchPath: f.watchPath ?? null,
         watchRecursive: Boolean(f.watchRecursive),
-        watchMode: (f.watchMode as 'off' | 'auto' | 'prompt') || 'off',
+        watchMode: f.watchMode === 'prompt' || (f.watchMode as any) === 'auto' ? 'prompt' : 'off',
       });
     });
 

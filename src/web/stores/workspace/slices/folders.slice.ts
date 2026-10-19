@@ -13,7 +13,7 @@ export interface FoldersSlice {
     watchConfig?: {
       watchPath?: string | null;
       watchRecursive?: boolean;
-      watchMode?: 'off' | 'auto' | 'prompt';
+      watchMode?: 'off' | 'prompt';
     }
   ) => Promise<FolderNode | null>;
   updateFolder: (
@@ -24,7 +24,7 @@ export interface FoldersSlice {
           name?: string;
           watchPath?: string | null;
           watchRecursive?: boolean;
-          watchMode?: 'off' | 'auto' | 'prompt';
+          watchMode?: 'off' | 'prompt';
         }
   ) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
@@ -87,7 +87,7 @@ export const createFoldersSlice: StateCreator<
     watchConfig?: {
       watchPath?: string | null;
       watchRecursive?: boolean;
-      watchMode?: 'off' | 'auto' | 'prompt';
+      watchMode?: 'off' | 'prompt';
     }
   ) => {
     try {
@@ -129,7 +129,7 @@ export const createFoldersSlice: StateCreator<
           name?: string;
           watchPath?: string | null;
           watchRecursive?: boolean;
-          watchMode?: 'off' | 'auto' | 'prompt';
+          watchMode?: 'off' | 'prompt';
         }
   ) => {
     try {

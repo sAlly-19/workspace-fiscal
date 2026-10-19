@@ -85,7 +85,7 @@ describe('Workspace Watch Routes & SSE Integration', () => {
       headers: headers(),
       body: JSON.stringify({
         watchPath: 'C:\\test\\novo-caminho',
-        watchMode: 'auto',
+        watchMode: 'prompt',
         watchRecursive: false,
       }),
     });
@@ -93,7 +93,7 @@ describe('Workspace Watch Routes & SSE Integration', () => {
     expect(patchRes.status).toBe(200);
     const updated = await patchRes.json();
     expect(updated.watchPath).toBe('C:\\test\\novo-caminho');
-    expect(updated.watchMode).toBe('auto');
+    expect(updated.watchMode).toBe('prompt');
   });
 
   it('handles watch confirm and dismiss endpoints without errors', async () => {

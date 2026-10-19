@@ -157,7 +157,7 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
     config: {
       watchPath: string | null;
       watchRecursive: boolean;
-      watchMode: 'off' | 'auto' | 'prompt';
+      watchMode: 'off' | 'prompt';
     }
   ) => {
     await updateFolder(folderId, config);

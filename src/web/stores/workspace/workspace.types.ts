@@ -8,7 +8,7 @@ export interface FolderNode {
   documentCount?: number;
   watchPath?: string | null;
   watchRecursive?: boolean;
-  watchMode?: 'off' | 'auto' | 'prompt';
+  watchMode?: 'off' | 'prompt';
 }
 
 export interface DocumentItem {
@@ -79,7 +79,7 @@ export interface WorkspaceState {
     watchConfig?: {
       watchPath?: string | null;
       watchRecursive?: boolean;
-      watchMode?: 'off' | 'auto' | 'prompt';
+      watchMode?: 'off' | 'prompt';
     }
   ) => Promise<FolderNode | null>;
   updateFolder: (
@@ -90,7 +90,7 @@ export interface WorkspaceState {
           name?: string;
           watchPath?: string | null;
           watchRecursive?: boolean;
-          watchMode?: 'off' | 'auto' | 'prompt';
+          watchMode?: 'off' | 'prompt';
         }
   ) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;

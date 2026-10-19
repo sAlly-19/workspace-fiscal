@@ -48,7 +48,7 @@ export interface WorkspaceModalsProps {
       config: {
         watchPath: string | null;
         watchRecursive: boolean;
-        watchMode: 'off' | 'auto' | 'prompt';
+        watchMode: 'off' | 'prompt';
       }
     ) => Promise<void>;
   };

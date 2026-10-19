@@ -183,7 +183,7 @@ describe('WorkspaceTree Submodules', () => {
       expect(element.props.node.children).toHaveLength(2);
     });
 
-    it('supports watchMode auto and prompt with onConfigureWatch callback', () => {
+    it('supports watchMode prompt with onConfigureWatch callback', () => {
       const onConfigureWatch = vi.fn();
       const watchedNode: FolderNode = {
         id: 'node-watch',
@@ -194,7 +194,7 @@ describe('WorkspaceTree Submodules', () => {
         children: [],
         watchPath: 'C:\\test\\watch',
         watchRecursive: true,
-        watchMode: 'auto',
+        watchMode: 'prompt',
       };
 
       const element = React.createElement(WorkspaceTreeNode, {
@@ -229,7 +229,7 @@ describe('WorkspaceTree Submodules', () => {
         onConfigureWatch,
       });
 
-      expect(element.props.node.watchMode).toBe('auto');
+      expect(element.props.node.watchMode).toBe('prompt');
       expect(element.props.node.watchPath).toBe('C:\\test\\watch');
       expect(element.props.node.watchRecursive).toBe(true);
       expect(element.props.onConfigureWatch).toBe(onConfigureWatch);
@@ -244,7 +244,7 @@ describe('WorkspaceTree Submodules', () => {
         updatedAt: '2026-01-01T00:00:00Z',
         children: [],
         documentCount: 10,
-        watchMode: 'auto',
+        watchMode: 'prompt',
         watchPath: 'C:\\XMLs',
       };
 

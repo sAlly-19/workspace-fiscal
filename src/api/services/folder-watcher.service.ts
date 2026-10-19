@@ -11,7 +11,7 @@ export interface WatchedFolder {
   name: string;
   watchPath: string;
   watchRecursive?: boolean;
-  watchMode: 'auto' | 'prompt';
+  watchMode: 'prompt';
 }
 
 export interface FolderWatcherServiceOptions {
@@ -52,14 +52,14 @@ export class FolderWatcherService extends EventEmitter {
       const watched = await this.workspaceRepository.getActiveWatchedFolders();
       logger.info({ count: watched.length, delayScanMs }, 'folder_watcher_init_starting');
       for (const folder of watched) {
-        if (folder.watchPath && (folder.watchMode === 'auto' || folder.watchMode === 'prompt')) {
+        if (folder.watchPath && (folder.watchMode === 'prompt' || (folder.watchMode as any) === 'auto')) {
           await this.startWatcher(
             {
               id: folder.id,
               name: folder.name,
               watchPath: folder.watchPath,
               watchRecursive: Boolean(folder.watchRecursive),
-              watchMode: folder.watchMode as 'auto' | 'prompt',
+              watchMode: 'prompt',
             },
             { delayScanMs }
           );
@@ -102,7 +102,7 @@ export class FolderWatcherService extends EventEmitter {
               name: f.name,
               watchPath: f.watchPath,
               watchRecursive: Boolean(f.watchRecursive),
-              watchMode: f.watchMode as 'auto' | 'prompt',
+              watchMode: 'prompt',
             },
             { delayScanMs: options.delayScanMs ?? 0 }
           );
@@ -138,7 +138,7 @@ export class FolderWatcherService extends EventEmitter {
   }
 
   /**
-   * Inicia o monitoramento de uma pasta específica.
+   * Inicia o monitoramento de uma pasta específica (modo com confirmação).
    */
   async startWatcher(
     folder: WatchedFolder,
@@ -201,8 +201,7 @@ export class FolderWatcherService extends EventEmitter {
             folder.id,
             folder.name,
             folder.watchPath,
-            Boolean(folder.watchRecursive),
-            folder.watchMode
+            Boolean(folder.watchRecursive)
           ).catch((scanErr) => {
             logger.warn({ folderId: folder.id, err: scanErr?.message }, 'folder_watcher_deferred_scan_error');
           });
@@ -214,8 +213,7 @@ export class FolderWatcherService extends EventEmitter {
             folder.id,
             folder.name,
             folder.watchPath,
-            Boolean(folder.watchRecursive),
-            folder.watchMode
+            Boolean(folder.watchRecursive)
           ).catch((scanErr) => {
             logger.warn({ folderId: folder.id, err: scanErr?.message }, 'folder_watcher_immediate_scan_error');
           });
@@ -286,8 +284,7 @@ export class FolderWatcherService extends EventEmitter {
     folderId: string,
     folderName: string,
     dirPath: string,
-    recursive: boolean,
-    mode: 'auto' | 'prompt'
+    recursive: boolean
   ): Promise<string[]> {
     this.emitSse('WATCH_SYNC_PROGRESS', {
       folderId,
@@ -364,28 +361,24 @@ export class FolderWatcherService extends EventEmitter {
       return [];
     }
 
-    if (mode === 'auto') {
-      await this.importFiles(folderId, folderName, foundXmls);
-    } else {
-      const set = this.pendingFiles.get(folderId) || new Set();
-      foundXmls.forEach((f) => set.add(f));
-      this.pendingFiles.set(folderId, set);
-      this.emitSse('WATCH_SYNC_PROGRESS', {
-        folderId,
-        folderName,
-        importedCount: 0,
-        skippedCount: 0,
-        total: set.size,
-        isSyncing: false,
-        phase: 'completed',
-      });
-      this.emitSse('WATCH_PROMPT_IMPORT', {
-        folderId,
-        folderName,
-        pendingCount: set.size,
-        files: Array.from(set),
-      });
-    }
+    const set = this.pendingFiles.get(folderId) || new Set();
+    foundXmls.forEach((f) => set.add(f));
+    this.pendingFiles.set(folderId, set);
+    this.emitSse('WATCH_SYNC_PROGRESS', {
+      folderId,
+      folderName,
+      importedCount: 0,
+      skippedCount: 0,
+      total: set.size,
+      isSyncing: false,
+      phase: 'completed',
+    });
+    this.emitSse('WATCH_PROMPT_IMPORT', {
+      folderId,
+      folderName,
+      pendingCount: set.size,
+      files: Array.from(set),
+    });
 
     return foundXmls;
   }
@@ -411,19 +404,15 @@ export class FolderWatcherService extends EventEmitter {
       const stillProcessed = this.processedFiles.get(folder.id)?.has(filePath);
       if (stillIgnored || stillProcessed) return;
 
-      if (folder.watchMode === 'auto') {
-        await this.importFiles(folder.id, folder.name, [filePath]);
-      } else {
-        const set = this.pendingFiles.get(folder.id) || new Set();
-        set.add(filePath);
-        this.pendingFiles.set(folder.id, set);
-        this.emitSse('WATCH_PROMPT_IMPORT', {
-          folderId: folder.id,
-          folderName: folder.name,
-          pendingCount: set.size,
-          files: Array.from(set),
-        });
-      }
+      const set = this.pendingFiles.get(folder.id) || new Set();
+      set.add(filePath);
+      this.pendingFiles.set(folder.id, set);
+      this.emitSse('WATCH_PROMPT_IMPORT', {
+        folderId: folder.id,
+        folderName: folder.name,
+        pendingCount: set.size,
+        files: Array.from(set),
+      });
     }, this.debounceMs);
 
     this.debounceTimers.set(filePath, timer);
