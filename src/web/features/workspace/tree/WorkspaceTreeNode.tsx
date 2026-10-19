@@ -131,8 +131,18 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
             )}
           </button>
 
-          {/* Folder Icon */}
-          {isExpanded ? (
+          {/* Folder Icon / Sync Spinner */}
+          {isSyncing ? (
+            <span
+              title={`Sincronizando arquivos... (${(node.documentCount || 0) + (syncProgress?.importedCount || 0)} importados)`}
+              className="inline-flex shrink-0 items-center justify-center"
+            >
+              <Loader2
+                data-testid={`sync-spinner-${node.id}`}
+                className={`w-3.5 h-3.5 shrink-0 animate-spin ${isSelected ? 'text-white' : 'text-blue-500'}`}
+              />
+            </span>
+          ) : isExpanded ? (
             <FolderOpen className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-blue-500'}`} />
           ) : (
             <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-amber-500'}`} />
@@ -168,15 +178,7 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
               <span className="truncate flex-1 tracking-tight" title={node.name}>
                 {node.name}
               </span>
-              {isSyncing ? (
-                <span
-                  data-testid={`sync-spinner-${node.id}`}
-                  title={`Sincronizando arquivos... (${syncProgress?.importedCount || 0}${syncProgress?.total ? ` de ${syncProgress.total}` : ''} já importados)`}
-                  className="inline-flex items-center justify-center p-0.5 rounded shrink-0 text-blue-400"
-                >
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                </span>
-              ) : node.watchMode && node.watchMode !== 'off' ? (
+              {node.watchMode && node.watchMode !== 'off' && !isSyncing ? (
                 <span
                   data-testid={`watch-indicator-${node.id}`}
                   title={`Monitoramento ativo (${node.watchMode === 'auto' ? 'Automático' : 'Solicitar confirmação'})${node.watchPath ? `: ${node.watchPath}` : ''}`}
@@ -200,15 +202,16 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
             {isSyncing ? (
               <span
                 data-testid={`sync-badge-${node.id}`}
-                title={`Sincronizando: ${syncProgress?.importedCount || 0}${syncProgress?.total ? ` de ${syncProgress.total}` : ''} arquivos importados`}
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold flex items-center gap-1 transition-all ${
+                title={`Sincronizando: ${(node.documentCount || 0) + (syncProgress?.importedCount || 0)} arquivos importados`}
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold transition-all ${
                   isSelected
                     ? 'bg-blue-700 text-white'
-                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse'
+                    : currentTheme === 'light'
+                    ? 'bg-[#e2e8f0] text-blue-600 font-bold border border-blue-300'
+                    : 'bg-[#27272a] text-blue-400 font-bold border border-blue-500/40'
                 }`}
               >
-                <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
-                <span>{(node.documentCount || 0) + (syncProgress?.importedCount || 0)}</span>
+                {(node.documentCount || 0) + (syncProgress?.importedCount || 0)}
               </span>
             ) : node.documentCount !== undefined && node.documentCount > 0 ? (
               <span
