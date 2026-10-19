@@ -12,8 +12,10 @@ import exportsRoutes from './routes/exports.routes';
 import backupRoutes from './routes/backup.routes';
 import settingsRoutes from './routes/settings.routes';
 import eventsRoutes from './routes/events.routes';
+import sseEventsRoutes from './routes/sse-events.routes';
 import assetImportRoutes from './routes/asset-import.routes';
 import updatesRoutes from './routes/updates.routes';
+import { folderWatcherService } from './services/folder-watcher.service';
 import { mutationRateLimiter, readRateLimiter, requestLogger } from './middleware/rateLimit';
 import { errorHandler } from './middleware/errorHandler';
 import { localAuthMiddleware } from './middleware/localAuth';
@@ -106,6 +108,12 @@ export function createApp(): express.Express {
   app.use('/api/backup', mutationRateLimiter, backupRoutes);
   app.use('/api/settings', mutationRateLimiter, settingsRoutes);
   app.use('/api/updates', updatesRoutes);
+  app.use('/api/events', sseEventsRoutes);
+
+  // Inicializa monitoramento contínuo de pastas locais em background
+  folderWatcherService.init().catch((err) => {
+    logger.warn({ err: err?.message }, 'folder_watcher_init_background_note');
+  });
 
   // 404 JSON para rotas /api não encontradas
   app.all('/api/*', (req, res) => {

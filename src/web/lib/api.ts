@@ -30,6 +30,7 @@ export interface DesktopElectronAPI {
     totalFound: number;
     skipped: number;
   }>;
+  selectDirectory?: (options?: { title?: string }) => Promise<string | null>;
   openImportDialog: () => Promise<{
     canceled: boolean;
     results: Array<{ filePath: string; fileName: string; content: string; size: number }>;

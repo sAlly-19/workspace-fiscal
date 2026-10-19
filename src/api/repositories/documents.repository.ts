@@ -118,13 +118,34 @@ export class DocumentsRepository {
     }).where(inArray(documents.id, documentIds)).returning();
   }
 
+  async findRawXmlPathsByIds(ids: string[]) {
+    if (!ids || ids.length === 0) return [];
+    const CHUNK = 400;
+    const paths: string[] = [];
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      const rows = await db
+        .select({ rawXmlPath: documents.rawXmlPath })
+        .from(documents)
+        .where(inArray(documents.id, slice));
+      for (const r of rows) {
+        if (r.rawXmlPath) paths.push(r.rawXmlPath);
+      }
+    }
+    return paths;
+  }
+
   async delete(id: string) {
     return db.delete(documents).where(eq(documents.id, id));
   }
 
   async deleteMany(ids: string[]) {
     if (!ids || ids.length === 0) return;
-    return db.delete(documents).where(inArray(documents.id, ids));
+    const CHUNK = 400;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      await db.delete(documents).where(inArray(documents.id, slice));
+    }
   }
 
   async deleteAll() {

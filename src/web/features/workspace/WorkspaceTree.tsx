@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useWorkspaceStore, type FolderNode } from '../../stores/workspace.store';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { FolderWatchModal } from '../../components/FolderWatchModal';
 import {
   WorkspaceTreeHeader,
   WorkspaceTreeNode,
@@ -35,9 +36,9 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
-  // Folder deletion modal state
   const [folderToDelete, setFolderToDelete] = useState<FolderNode | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [folderToConfigureWatch, setFolderToConfigureWatch] = useState<FolderNode | null>(null);
 
   const breadcrumb = useMemo(() => {
     const path: FolderNode[] = [];
@@ -151,6 +152,17 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
     }
   };
 
+  const handleSaveWatchConfig = async (
+    folderId: string,
+    config: {
+      watchPath: string | null;
+      watchRecursive: boolean;
+      watchMode: 'off' | 'auto' | 'prompt';
+    }
+  ) => {
+    await updateFolder(folderId, config);
+  };
+
   return (
     <div
       className={`flex flex-col h-full ${
@@ -169,6 +181,15 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setFolderToDelete(null)}
+      />
+
+      {/* Folder Watch Configuration Modal */}
+      <FolderWatchModal
+        isOpen={!!folderToConfigureWatch}
+        folder={folderToConfigureWatch}
+        currentTheme={currentTheme}
+        onClose={() => setFolderToConfigureWatch(null)}
+        onSave={handleSaveWatchConfig}
       />
 
       {/* Header and Breadcrumbs */}
@@ -233,6 +254,7 @@ export function WorkspaceTree({ onImportToFolder, onSelectFolder }: WorkspaceTre
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onImportToFolder={onImportToFolder}
+            onConfigureWatch={(folder) => setFolderToConfigureWatch(folder)}
           />
         ))}
       </div>

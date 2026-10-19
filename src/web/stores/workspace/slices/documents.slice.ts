@@ -109,13 +109,31 @@ export const createDocumentsSlice: StateCreator<
     }
   },
 
-  bulkDeleteDocuments: async (ids: string[]) => {
+  bulkDeleteDocuments: async (
+    ids: string[],
+    onProgress?: (processed: number, total: number) => void
+  ) => {
+    if (!ids || ids.length === 0) return;
     try {
-      await apiFetch('/api/documents/bulk-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids }),
-      });
+      const CHUNK_SIZE = 150;
+      const total = ids.length;
+      let processed = 0;
+
+      onProgress?.(0, total);
+
+      for (let i = 0; i < total; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        await apiFetch('/api/documents/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: chunk }),
+        });
+        processed += chunk.length;
+        onProgress?.(processed, total);
+        // Pequena pausa cooperativa para animação fluida da barra no frontend
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
       const idSet = new Set(ids);
       const nextDocs = get().documents.filter((d) => !idSet.has(d.id));
       const currentSelected = get().selectedDocumentId;

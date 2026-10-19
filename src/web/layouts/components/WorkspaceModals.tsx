@@ -5,6 +5,8 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { ImportProgressModal } from '../../components/ImportProgressModal';
 import { SettingsModal } from '../../components/SettingsModal';
 import { SplashScreen } from '../../components/SplashScreen';
+import { FolderWatchModal } from '../../components/FolderWatchModal';
+import { DeleteProgressModal } from '../../components/DeleteProgressModal';
 
 export interface WorkspaceModalsProps {
   showSplash: boolean;
@@ -22,6 +24,10 @@ export interface WorkspaceModalsProps {
   uploadProgress: { total: number; processed: number; percent: number } | null;
   selectedFolderName: string;
   onCloseImportProgress: () => void;
+  isDeleting?: boolean;
+  deleteProgress?: { total: number; processed: number; percent: number } | null;
+  deleteError?: string | null;
+  onCloseDeleteProgress?: () => void;
   isDraggingOver: boolean;
   selectedFolderId: string | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -33,6 +39,19 @@ export interface WorkspaceModalsProps {
   folders: FolderNode[];
   onMoveToFolder: (folderId: string | null) => Promise<void>;
   onCloseFolderPicker: () => void;
+  watchFolderConfig?: {
+    isOpen: boolean;
+    folder: FolderNode | null;
+    onClose: () => void;
+    onSave: (
+      folderId: string,
+      config: {
+        watchPath: string | null;
+        watchRecursive: boolean;
+        watchMode: 'off' | 'auto' | 'prompt';
+      }
+    ) => Promise<void>;
+  };
 }
 
 export function WorkspaceModals({
@@ -45,6 +64,10 @@ export function WorkspaceModals({
   uploadProgress,
   selectedFolderName,
   onCloseImportProgress,
+  isDeleting,
+  deleteProgress,
+  deleteError,
+  onCloseDeleteProgress,
   isDraggingOver,
   selectedFolderId,
   fileInputRef,
@@ -56,6 +79,7 @@ export function WorkspaceModals({
   folders,
   onMoveToFolder,
   onCloseFolderPicker,
+  watchFolderConfig,
 }: WorkspaceModalsProps) {
   // Flatten folders tree for quick folder move picker
   const getFlatFolders = (nodes: FolderNode[], depth = 0): { id: string; name: string; depth: number }[] => {
@@ -89,6 +113,17 @@ export function WorkspaceModals({
         onCancel={onCancelConfirm}
       />
 
+      {/* Watch Folder Modal */}
+      {watchFolderConfig && (
+        <FolderWatchModal
+          isOpen={watchFolderConfig.isOpen}
+          folder={watchFolderConfig.folder}
+          currentTheme={currentTheme}
+          onClose={watchFolderConfig.onClose}
+          onSave={watchFolderConfig.onSave}
+        />
+      )}
+
       {/* Import Progress Modal (with Minimizable Bubble) */}
       <ImportProgressModal
         isOpen={isUploading}
@@ -97,6 +132,17 @@ export function WorkspaceModals({
         percent={uploadProgress?.percent || 0}
         targetFolderName={selectedFolderName}
         onClose={onCloseImportProgress}
+      />
+
+      {/* Delete Progress Modal (with Minimizable Bubble) */}
+      <DeleteProgressModal
+        isOpen={Boolean(isDeleting)}
+        total={deleteProgress?.total || 0}
+        processed={deleteProgress?.processed || 0}
+        percent={deleteProgress?.percent || 0}
+        isComplete={deleteProgress ? deleteProgress.processed >= deleteProgress.total && deleteProgress.total > 0 : false}
+        error={deleteError}
+        onClose={onCloseDeleteProgress || (() => {})}
       />
 
       {/* Full-screen Drag & Drop Overlay */}

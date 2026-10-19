@@ -11,9 +11,11 @@ import { highlightMatches, clearHighlights, setActiveMatch } from './preview/doc
 export function DocumentPreview({
   docDetails,
   onBackToList,
+  onDepreciate,
 }: {
   docDetails: any;
   onBackToList?: () => void;
+  onDepreciate?: (docId: string) => void;
 }) {
   const { settings } = useWorkspaceStore();
   const currentTheme = settings.theme || 'dark';
@@ -303,6 +305,7 @@ export function DocumentPreview({
         handleCopyXml={handleCopyXml}
         handleDownloadXml={handleDownloadXml}
         handlePrint={handlePrint}
+        onDepreciate={onDepreciate ? () => onDepreciate(docDetails.id) : undefined}
         protocolStatus={docDetails.protocolStatus}
         hasAuthorizationProtocol={docDetails.hasAuthorizationProtocol}
         documentStatus={docDetails.status}

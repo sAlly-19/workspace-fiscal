@@ -43,6 +43,8 @@ const api = {
     ipcRenderer.invoke('dialog:openXml', options || {}),
   openDirectory: (options?: { recursive?: boolean; maxFiles?: number }): Promise<OpenDirectoryResult> =>
     ipcRenderer.invoke('dialog:openDirectory', options || {}),
+  selectDirectory: (options?: { title?: string }): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectDirectory', options || {}),
   openImportDialog: (): Promise<ImportResult> =>
     ipcRenderer.invoke('dialog:openImport'),
   openBackupDialog: (): Promise<{ canceled: boolean; filePath: string | null }> =>
@@ -182,6 +184,8 @@ const fiscalApi = {
     exportJson: (filter?: any) => ipcRenderer.invoke('logs:exportJson', filter),
     record: (input: any) => ipcRenderer.invoke('logs:record', input),
   },
+  selectDirectory: (options?: { title?: string }): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:selectDirectory', options || {}),
 };
 
 contextBridge.exposeInMainWorld('api', api);

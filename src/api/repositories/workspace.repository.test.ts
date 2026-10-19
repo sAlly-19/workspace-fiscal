@@ -8,6 +8,7 @@ describe('WorkspaceRepository & Recursive Subfolders (TDD)', () => {
   beforeEach(async () => {
     await initDatabase();
     await rawClient.execute('DELETE FROM "documents";');
+    await rawClient.execute('DELETE FROM "batches";');
     await rawClient.execute('DELETE FROM "folders";');
   });
 

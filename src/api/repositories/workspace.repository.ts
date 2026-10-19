@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { folders, batches, documents, documentItems, documentTaxes, importJobs } from '../../db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 
 export interface FolderNode {
   id: string;
@@ -10,24 +10,73 @@ export interface FolderNode {
   updatedAt: Date;
   children: FolderNode[];
   documentCount?: number;
+  watchPath?: string | null;
+  watchRecursive?: boolean;
+  watchMode?: 'off' | 'auto' | 'prompt';
 }
 
 export class WorkspaceRepository {
   // Create a new folder at root (parentId = null) or as a subfolder
-  async createFolder(id: string, name: string, parentId?: string | null) {
+  async createFolder(
+    id: string,
+    name: string,
+    parentId?: string | null,
+    watchConfig?: {
+      watchPath?: string | null;
+      watchRecursive?: boolean;
+      watchMode?: 'off' | 'auto' | 'prompt';
+    }
+  ) {
     return db.insert(folders).values({
       id,
       name,
       parentId: parentId || null,
+      watchPath: watchConfig?.watchPath || null,
+      watchRecursive: Boolean(watchConfig?.watchRecursive),
+      watchMode: watchConfig?.watchMode || 'off',
     }).returning();
   }
 
-  // Rename a folder
-  async updateFolder(id: string, name: string) {
-    return db.update(folders).set({
-      name,
+  // Rename a folder or update its watch configuration
+  async updateFolder(
+    id: string,
+    data: {
+      name?: string;
+      watchPath?: string | null;
+      watchRecursive?: boolean;
+      watchMode?: 'off' | 'auto' | 'prompt';
+    } | string
+  ) {
+    const updatePayload: Record<string, any> = {
       updatedAt: new Date(),
-    }).where(eq(folders.id, id)).returning();
+    };
+    if (typeof data === 'string') {
+      updatePayload.name = data;
+    } else {
+      if (data.name !== undefined) updatePayload.name = data.name;
+      if (data.watchPath !== undefined) updatePayload.watchPath = data.watchPath;
+      if (data.watchRecursive !== undefined) updatePayload.watchRecursive = data.watchRecursive;
+      if (data.watchMode !== undefined) updatePayload.watchMode = data.watchMode;
+    }
+
+    return db.update(folders).set(updatePayload).where(eq(folders.id, id)).returning();
+  }
+
+  // Get a single folder by ID
+  async getFolderById(id: string) {
+    return db.query.folders.findFirst({
+      where: eq(folders.id, id),
+    });
+  }
+
+  // Get all folders with active watch mode ('auto' or 'prompt')
+  async getActiveWatchedFolders() {
+    const list = await db.query.folders.findMany();
+    return list.filter(
+      (f) =>
+        (f.watchMode === 'auto' || f.watchMode === 'prompt') &&
+        Boolean(f.watchPath && f.watchPath.trim())
+    );
   }
 
   // Gather all descendant folder IDs recursively for a given folder
@@ -112,6 +161,9 @@ export class WorkspaceRepository {
         updatedAt: f.updatedAt,
         children: [],
         documentCount: docCounts[f.id] || 0,
+        watchPath: f.watchPath ?? null,
+        watchRecursive: Boolean(f.watchRecursive),
+        watchMode: (f.watchMode as 'off' | 'auto' | 'prompt') || 'off',
       });
     });
 

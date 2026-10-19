@@ -6,6 +6,9 @@ export interface FolderNode {
   updatedAt: string;
   children: FolderNode[];
   documentCount?: number;
+  watchPath?: string | null;
+  watchRecursive?: boolean;
+  watchMode?: 'off' | 'auto' | 'prompt';
 }
 
 export interface DocumentItem {
@@ -38,6 +41,16 @@ export interface AppSettings {
   theme: 'dark' | 'light';
 }
 
+export interface FolderSyncProgress {
+  folderId: string;
+  folderName?: string;
+  isSyncing: boolean;
+  importedCount: number;
+  skippedCount?: number;
+  total?: number;
+  phase?: 'scanning' | 'importing' | 'completed';
+}
+
 export interface WorkspaceState {
   folders: FolderNode[];
   selectedFolderId: string | null;
@@ -48,6 +61,10 @@ export interface WorkspaceState {
   searchQuery: string;
   expandedFolderIds: Record<string, boolean>;
 
+  // Folder real-time watch sync tracking
+  folderSyncProgress: Record<string, FolderSyncProgress>;
+  setFolderSyncProgress: (folderId: string, progress: FolderSyncProgress | null) => void;
+
   // Progress & Settings
   isImporting: boolean;
   importProgress: ImportProgress | null;
@@ -56,8 +73,26 @@ export interface WorkspaceState {
 
   // Actions
   fetchWorkspace: () => Promise<void>;
-  createFolder: (name: string, parentId?: string | null) => Promise<FolderNode | null>;
-  updateFolder: (id: string, name: string) => Promise<void>;
+  createFolder: (
+    name: string,
+    parentId?: string | null,
+    watchConfig?: {
+      watchPath?: string | null;
+      watchRecursive?: boolean;
+      watchMode?: 'off' | 'auto' | 'prompt';
+    }
+  ) => Promise<FolderNode | null>;
+  updateFolder: (
+    id: string,
+    data:
+      | string
+      | {
+          name?: string;
+          watchPath?: string | null;
+          watchRecursive?: boolean;
+          watchMode?: 'off' | 'auto' | 'prompt';
+        }
+  ) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
   toggleFolderExpand: (folderId: string) => void;
   selectFolder: (folderId: string | null, folderName?: string) => void;
@@ -65,7 +100,10 @@ export interface WorkspaceState {
   fetchDocuments: (folderId?: string | null) => Promise<void>;
   moveDocument: (documentId: string, folderId: string | null) => Promise<void>;
   deleteDocument: (documentId: string) => Promise<void>;
-  bulkDeleteDocuments: (ids: string[]) => Promise<void>;
+  bulkDeleteDocuments: (
+    ids: string[],
+    onProgress?: (processed: number, total: number) => void
+  ) => Promise<void>;
   bulkMoveDocuments: (ids: string[], folderId: string | null) => Promise<void>;
   clearAllDocuments: () => Promise<void>;
   resetWorkspaceDatabase: () => Promise<void>;

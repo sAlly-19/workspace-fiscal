@@ -8,6 +8,7 @@ import {
   Trash2,
   X,
   UploadCloud,
+  PackagePlus,
 } from 'lucide-react';
 import { EmptyState } from '../../../components/EmptyState';
 import { DocumentCardSkeleton } from '../../../components/Skeleton';
@@ -32,6 +33,8 @@ export interface DocumentListPaneProps {
   onSetMovingDocId: (id: string) => void;
   onTriggerSingleDelete: (id: string, docLabel: string) => void;
   onTriggerUploadXml: () => void;
+  onDepreciateDoc?: (docId: string) => void;
+  immobilizedDocNumbers?: Set<string>;
 }
 
 export const INITIAL_BATCH_SIZE = 50;
@@ -46,6 +49,8 @@ interface DocumentCardItemProps {
   onToggleDocSelection: (id: string) => void;
   onSetMovingDocId: (id: string) => void;
   onTriggerSingleDelete: (id: string, docLabel: string) => void;
+  onDepreciateDoc?: (docId: string) => void;
+  isImmobilized?: boolean;
 }
 
 const DocumentCardItem = React.memo(function DocumentCardItem({
@@ -57,6 +62,8 @@ const DocumentCardItem = React.memo(function DocumentCardItem({
   onToggleDocSelection,
   onSetMovingDocId,
   onTriggerSingleDelete,
+  onDepreciateDoc,
+  isImmobilized,
 }: DocumentCardItemProps) {
   return (
     <div
@@ -168,6 +175,26 @@ const DocumentCardItem = React.memo(function DocumentCardItem({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              onDepreciateDoc?.(doc.id);
+            }}
+            className={`p-1 rounded transition-all cursor-pointer ${
+              isImmobilized
+                ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-600 hover:text-white ring-1 ring-emerald-500/30'
+                : currentTheme === 'light'
+                ? 'hover:bg-blue-600 hover:text-white text-[#64748b]'
+                : 'hover:bg-blue-600 hover:text-white text-[#71717a]'
+            }`}
+            title={
+              isImmobilized
+                ? 'Nota já possui item imobilizado (clique para adicionar outro)'
+                : 'Depreciar Nota (Imobilizado)'
+            }
+          >
+            <PackagePlus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               onSetMovingDocId(doc.id);
             }}
             className={`p-1 rounded transition-all cursor-pointer ${
@@ -230,6 +257,8 @@ export function DocumentListPane({
   onSetMovingDocId,
   onTriggerSingleDelete,
   onTriggerUploadXml,
+  onDepreciateDoc,
+  immobilizedDocNumbers,
 }: DocumentListPaneProps) {
   const [renderedCount, setRenderedCount] = React.useState(INITIAL_BATCH_SIZE);
 
@@ -407,6 +436,8 @@ export function DocumentListPane({
               onToggleDocSelection={onToggleDocSelection}
               onSetMovingDocId={onSetMovingDocId}
               onTriggerSingleDelete={onTriggerSingleDelete}
+              onDepreciateDoc={onDepreciateDoc}
+              isImmobilized={Boolean(doc.number && immobilizedDocNumbers?.has(doc.number.trim()))}
             />
           ))
         )}

@@ -1,12 +1,32 @@
 import { StateCreator } from 'zustand';
 import { apiFetch } from '../../../lib/api';
-import { FolderNode, WorkspaceState } from '../workspace.types';
+import { FolderNode, FolderSyncProgress, WorkspaceState } from '../workspace.types';
 import { safeFetchJson, writeUrlParams } from '../workspace.utils';
 
 export interface FoldersSlice {
+  folderSyncProgress: Record<string, FolderSyncProgress>;
+  setFolderSyncProgress: (folderId: string, progress: FolderSyncProgress | null) => void;
   fetchWorkspace: () => Promise<void>;
-  createFolder: (name: string, parentId?: string | null) => Promise<FolderNode | null>;
-  updateFolder: (id: string, name: string) => Promise<void>;
+  createFolder: (
+    name: string,
+    parentId?: string | null,
+    watchConfig?: {
+      watchPath?: string | null;
+      watchRecursive?: boolean;
+      watchMode?: 'off' | 'auto' | 'prompt';
+    }
+  ) => Promise<FolderNode | null>;
+  updateFolder: (
+    id: string,
+    data:
+      | string
+      | {
+          name?: string;
+          watchPath?: string | null;
+          watchRecursive?: boolean;
+          watchMode?: 'off' | 'auto' | 'prompt';
+        }
+  ) => Promise<void>;
   deleteFolder: (id: string) => Promise<void>;
   toggleFolderExpand: (folderId: string) => void;
   selectFolder: (folderId: string | null, folderName?: string) => void;
@@ -18,6 +38,24 @@ export const createFoldersSlice: StateCreator<
   [],
   FoldersSlice
 > = (set, get) => ({
+  folderSyncProgress: {},
+
+  setFolderSyncProgress: (folderId, progress) => {
+    set((state) => {
+      if (!progress) {
+        const next = { ...state.folderSyncProgress };
+        delete next[folderId];
+        return { folderSyncProgress: next };
+      }
+      return {
+        folderSyncProgress: {
+          ...state.folderSyncProgress,
+          [folderId]: progress,
+        },
+      };
+    });
+  },
+
   fetchWorkspace: async () => {
     try {
       const folders = await safeFetchJson<FolderNode[]>('/api/workspace');
@@ -43,12 +81,27 @@ export const createFoldersSlice: StateCreator<
     }
   },
 
-  createFolder: async (name: string, parentId?: string | null) => {
+  createFolder: async (
+    name: string,
+    parentId?: string | null,
+    watchConfig?: {
+      watchPath?: string | null;
+      watchRecursive?: boolean;
+      watchMode?: 'off' | 'auto' | 'prompt';
+    }
+  ) => {
     try {
+      const payload: Record<string, any> = { name, parentId: parentId || null };
+      if (watchConfig) {
+        if (watchConfig.watchPath !== undefined) payload.watchPath = watchConfig.watchPath;
+        if (watchConfig.watchRecursive !== undefined) payload.watchRecursive = watchConfig.watchRecursive;
+        if (watchConfig.watchMode !== undefined) payload.watchMode = watchConfig.watchMode;
+      }
+
       const res = await apiFetch('/api/workspace/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, parentId: parentId || null }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Failed to create folder');
       const contentType = res.headers.get('content-type') || '';
@@ -68,17 +121,28 @@ export const createFoldersSlice: StateCreator<
     }
   },
 
-  updateFolder: async (id: string, name: string) => {
+  updateFolder: async (
+    id: string,
+    data:
+      | string
+      | {
+          name?: string;
+          watchPath?: string | null;
+          watchRecursive?: boolean;
+          watchMode?: 'off' | 'auto' | 'prompt';
+        }
+  ) => {
     try {
+      const payload = typeof data === 'string' ? { name: data } : data;
       const res = await apiFetch(`/api/workspace/folders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await get().fetchWorkspace();
-      if (get().selectedFolderId === id) {
-        set({ selectedFolderName: name });
+      if (payload.name && get().selectedFolderId === id) {
+        set({ selectedFolderName: payload.name });
       }
     } catch (error) {
       console.error('Failed to update folder:', error);

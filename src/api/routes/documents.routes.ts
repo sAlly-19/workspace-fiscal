@@ -30,11 +30,11 @@ router.post('/bulk-delete', async (req, res) => {
       return res.status(400).json({ error: validation.errors[0], details: validation.errors });
     }
     const { ids } = validation.data;
-    // Coleta paths antes de deletar para limpar storage
-    const docs = await documentsRepository.findByIds(ids);
+    // Coleta paths antes de deletar para limpar storage com baixo consumo de memória
+    const paths = await documentsRepository.findRawXmlPathsByIds(ids);
     await documentsRepository.deleteMany(ids);
-    for (const d of docs) {
-      if ((d as any).rawXmlPath) await storageService.deleteXml((d as any).rawXmlPath).catch(() => {});
+    for (const p of paths) {
+      await storageService.deleteXml(p).catch(() => {});
     }
     res.json({ success: true, count: ids.length });
   } catch (error) {

@@ -14,6 +14,7 @@ import {
   ChevronUp,
   ChevronDown,
   X,
+  PackagePlus,
 } from 'lucide-react';
 import React from 'react';
 import { motion } from 'motion/react';
@@ -53,6 +54,7 @@ export interface PreviewToolbarProps {
   handleCopyXml: () => void;
   handleDownloadXml: () => void;
   handlePrint: () => void;
+  onDepreciate?: () => void;
   // Status Fiscal (IMP-019)
   protocolStatus?: string;
   hasAuthorizationProtocol?: boolean;
@@ -85,6 +87,7 @@ export function PreviewToolbar({
   handleCopyXml,
   handleDownloadXml,
   handlePrint,
+  onDepreciate,
   protocolStatus,
   hasAuthorizationProtocol,
   documentStatus,
@@ -368,6 +371,21 @@ export function PreviewToolbar({
           <Download className="w-3.5 h-3.5" />
           <span className="hidden md:inline">Baixar XML</span>
         </button>
+
+        {onDepreciate && (
+          <button
+            onClick={onDepreciate}
+            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 border rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              currentTheme === 'light'
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
+                : 'bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 border-emerald-500/40'
+            }`}
+            title="Depreciar Nota Fiscal (Imobilizado)"
+          >
+            <PackagePlus className="w-3.5 h-3.5" />
+            <span>Depreciar</span>
+          </button>
+        )}
 
         <button
           onClick={handlePrint}

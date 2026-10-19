@@ -12,6 +12,7 @@ import { MainFooter } from './components/MainFooter';
 import { WorkspaceModals } from './components/WorkspaceModals';
 import { DocumentListPane } from '../features/documents/workspace/DocumentListPane';
 import { DocumentPreviewEmptyState } from '../features/documents/workspace/DocumentPreviewEmptyState';
+import { DepreciateDocumentModal } from '../features/documents/modals/DepreciateDocumentModal';
 
 export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   const {
@@ -47,6 +48,14 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     null
   );
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Deletion Progress state
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{ total: number; processed: number; percent: number } | null>(
+    null
+  );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isDocsLoading, setIsDocsLoading] = useState(false);
 
@@ -56,6 +65,22 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   // Dialog states
   const [movingDocId, setMovingDocId] = useState<string | null>(null);
   const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
+  const [depreciatingDocId, setDepreciatingDocId] = useState<string | null>(null);
+  const [immobilizedDocNumbers, setImmobilizedDocNumbers] = useState<Set<string>>(new Set());
+
+  const fetchImmobilizedIdentifiers = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/assets/immobilized-identifiers');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.documentNumbers) {
+          setImmobilizedDocNumbers(new Set(data.documentNumbers));
+        }
+      }
+    } catch (e) {
+      console.warn('[MainLayout] Failed to fetch immobilized identifiers', e);
+    }
+  }, []);
 
   // Confirm Modal state
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -87,6 +112,10 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     fetchWorkspace();
     fetchDocuments();
   }, [fetchWorkspace, fetchDocuments]);
+
+  useEffect(() => {
+    fetchImmobilizedIdentifiers();
+  }, [fetchImmobilizedIdentifiers, documents]);
 
   // UX4: Skeleton — escuta sinal de loading do store
   useEffect(() => {
@@ -553,24 +582,46 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     });
   };
 
-  // Trigger bulk deletion with confirm modal
+  // Trigger bulk deletion with confirm modal + real-time progress bar modal
   const handleTriggerBulkDelete = () => {
     if (selectedDocIds.length === 0) return;
+    const totalToDelete = selectedDocIds.length;
+    const idsToDelete = [...selectedDocIds];
+
     setConfirmConfig({
       isOpen: true,
-      title: `Excluir ${selectedDocIds.length} Documentos`,
-      description: `Tem certeza que deseja excluir os ${selectedDocIds.length} documentos fiscais selecionados permanentemente?`,
-      confirmLabel: `Excluir (${selectedDocIds.length})`,
+      title: `Excluir ${totalToDelete} Documentos`,
+      description: `Tem certeza que deseja excluir os ${totalToDelete} documentos fiscais selecionados permanentemente?`,
+      confirmLabel: `Excluir (${totalToDelete})`,
       onConfirm: async () => {
-        setIsConfirmLoading(true);
+        // Fecha o modal de confirmação imediatamente para abrir a barra de progresso de exclusão
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        setIsDeleting(true);
+        setDeleteError(null);
+        setDeleteProgress({ total: totalToDelete, processed: 0, percent: 0 });
+
         try {
-          await bulkDeleteDocuments(selectedDocIds);
-          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
-          toast.success(`${selectedDocIds.length} documento(s) excluído(s)`, 'Remoção em lote concluída.');
+          await bulkDeleteDocuments(idsToDelete, (processed, total) => {
+            const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            setDeleteProgress({
+              total,
+              processed,
+              percent: pct,
+            });
+          });
+
+          setDeleteProgress({ total: totalToDelete, processed: totalToDelete, percent: 100 });
+          toast.success(`${totalToDelete} documento(s) excluído(s)`, 'Remoção em lote concluída com sucesso.');
+
+          // Fecha suavemente após 1.8s se não minimizado pelo usuário
+          setTimeout(() => {
+            setIsDeleting(false);
+            setDeleteProgress(null);
+          }, 1800);
         } catch (err: any) {
+          console.error('[BulkDelete] Erro ao excluir documentos:', err);
+          setDeleteError(err?.message || 'Falha ao processar exclusão de documentos.');
           toast.error('Erro ao excluir em lote', err?.message || 'Tente novamente.');
-        } finally {
-          setIsConfirmLoading(false);
         }
       },
     });
@@ -715,6 +766,14 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
           setIsUploading(false);
           setUploadProgress(null);
         }}
+        isDeleting={isDeleting}
+        deleteProgress={deleteProgress}
+        deleteError={deleteError}
+        onCloseDeleteProgress={() => {
+          setIsDeleting(false);
+          setDeleteProgress(null);
+          setDeleteError(null);
+        }}
         isDraggingOver={isDraggingOver}
         selectedFolderId={selectedFolderId}
         fileInputRef={fileInputRef}
@@ -728,6 +787,17 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         onCloseFolderPicker={() => {
           setMovingDocId(null);
           setIsBulkMoveOpen(false);
+        }}
+      />
+
+      {/* Modal Unificado de Depreciação (NF View -> Imobilizado) */}
+      <DepreciateDocumentModal
+        isOpen={Boolean(depreciatingDocId)}
+        documentId={depreciatingDocId || ''}
+        isLight={currentTheme === 'light'}
+        onClose={() => setDepreciatingDocId(null)}
+        onAssetCreated={() => {
+          fetchImmobilizedIdentifiers();
         }}
       />
 
@@ -814,6 +884,8 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
             setTargetUploadFolderId(selectedFolderId);
             fileInputRef.current?.click();
           }}
+          onDepreciateDoc={(docId) => setDepreciatingDocId(docId)}
+          immobilizedDocNumbers={immobilizedDocNumbers}
         />
 
         {/* Document List Resizer Handle */}
@@ -832,7 +904,10 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
           }`}
         >
           {docDetails ? (
-            <DocumentPreview docDetails={docDetails} />
+            <DocumentPreview
+              docDetails={docDetails}
+              onDepreciate={(docId) => setDepreciatingDocId(docId)}
+            />
           ) : (
             <DocumentPreviewEmptyState currentTheme={currentTheme} />
           )}

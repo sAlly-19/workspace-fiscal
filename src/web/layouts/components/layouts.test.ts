@@ -159,6 +159,48 @@ describe('Layout Components Contracts & Props', () => {
       expect(element.props.selectedDocIds).toHaveLength(2);
       expect(element.props.uploadProgress?.percent).toBe(50);
     });
+
+    it('handles delete progress modal configuration', () => {
+      const onCloseDelete = vi.fn();
+      const props = {
+        showSplash: false,
+        onFinishSplash: () => {},
+        confirmConfig: {
+          isOpen: false,
+          title: '',
+          description: '',
+          onConfirm: vi.fn().mockResolvedValue(undefined),
+        },
+        isConfirmLoading: false,
+        onCancelConfirm: () => {},
+        isUploading: false,
+        uploadProgress: null,
+        selectedFolderName: 'Geral',
+        onCloseImportProgress: () => {},
+        isDeleting: true,
+        deleteProgress: { total: 9905, processed: 1250, percent: 13 },
+        deleteError: null,
+        onCloseDeleteProgress: onCloseDelete,
+        isDraggingOver: false,
+        selectedFolderId: null,
+        fileInputRef: { current: null },
+        onFileUpload: () => {},
+        movingDocId: null,
+        isBulkMoveOpen: false,
+        selectedDocIds: [],
+        currentTheme: 'dark',
+        folders: [],
+        onMoveToFolder: vi.fn().mockResolvedValue(undefined),
+        onCloseFolderPicker: () => {},
+      };
+      const element = React.createElement(WorkspaceModals, props);
+
+      expect(element).toBeDefined();
+      expect(element.props.isDeleting).toBe(true);
+      expect(element.props.deleteProgress?.total).toBe(9905);
+      expect(element.props.deleteProgress?.processed).toBe(1250);
+      expect(element.props.deleteProgress?.percent).toBe(13);
+    });
   });
 });
 

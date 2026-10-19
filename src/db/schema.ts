@@ -62,6 +62,9 @@ export const folders = sqliteTable('folders', {
   id: text('id').primaryKey(), // UUID
   name: text('name').notNull(),
   parentId: text('parent_id'), // Self-referencing UUID for hierarchy
+  watchPath: text('watch_path'),
+  watchRecursive: integer('watch_recursive', { mode: 'boolean' }).default(false),
+  watchMode: text('watch_mode').$type<'off' | 'auto' | 'prompt'>().default('off'),
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`).notNull(),
 }, (table) => {

@@ -67,10 +67,33 @@ export async function initSchemaAndMigrations(rawClient: Client): Promise<void> 
       "id" TEXT PRIMARY KEY NOT NULL,
       "name" TEXT NOT NULL,
       "parent_id" TEXT,
+      "watch_path" TEXT,
+      "watch_recursive" INTEGER DEFAULT 0,
+      "watch_mode" TEXT DEFAULT 'off',
       "created_at" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL,
       "updated_at" INTEGER DEFAULT (strftime('%s', 'now')) NOT NULL
     );
   `);
+
+  // Dynamic Column Migrations for folders (watch folder support)
+  try {
+    const foldersInfo = await rawClient.execute('PRAGMA table_info(folders);');
+    const folderCols = foldersInfo.rows.map((row: any) => row.name || row[1]);
+    if (!folderCols.includes('watch_path')) {
+      await rawClient.execute('ALTER TABLE "folders" ADD COLUMN "watch_path" TEXT;');
+      logger.info({ table: 'folders', column: 'watch_path' }, 'database_column_migrated');
+    }
+    if (!folderCols.includes('watch_recursive')) {
+      await rawClient.execute('ALTER TABLE "folders" ADD COLUMN "watch_recursive" INTEGER DEFAULT 0;');
+      logger.info({ table: 'folders', column: 'watch_recursive' }, 'database_column_migrated');
+    }
+    if (!folderCols.includes('watch_mode')) {
+      await rawClient.execute('ALTER TABLE "folders" ADD COLUMN "watch_mode" TEXT DEFAULT \'off\';');
+      logger.info({ table: 'folders', column: 'watch_mode' }, 'database_column_migrated');
+    }
+  } catch (migErr) {
+    logger.warn({ err: (migErr as Error).message }, 'database_folders_migration_note');
+  }
 
   await rawClient.execute(`
     CREATE TABLE IF NOT EXISTS "batches" (

@@ -86,6 +86,7 @@ export interface FiscalDesktopAPI {
     exportJson: (filter?: any) => Promise<string>;
     record: (input: any) => Promise<any>;
   };
+  selectDirectory?: (options?: { title?: string }) => Promise<string | null>;
 }
 
 import type { DesktopElectronAPI } from '../web/lib/api';

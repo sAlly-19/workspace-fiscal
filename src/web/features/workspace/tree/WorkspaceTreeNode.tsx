@@ -11,8 +11,10 @@ import {
   Upload,
   Check,
   X,
+  FolderSync,
+  Loader2,
 } from 'lucide-react';
-import type { FolderNode } from '../../../stores/workspace.store';
+import { useWorkspaceStore, type FolderNode } from '../../../stores/workspace.store';
 
 export interface WorkspaceTreeNodeProps {
   node: FolderNode;
@@ -44,6 +46,7 @@ export interface WorkspaceTreeNodeProps {
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, folderId: string | null) => void;
   onImportToFolder?: (folderId: string | null) => void;
+  onConfigureWatch?: (folder: FolderNode) => void;
 }
 
 export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
@@ -76,7 +79,11 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
   onDragLeave,
   onDrop,
   onImportToFolder,
+  onConfigureWatch,
 }: WorkspaceTreeNodeProps) {
+  const syncProgress = useWorkspaceStore((s) => s.folderSyncProgress[node.id]);
+  const isSyncing = Boolean(syncProgress?.isSyncing);
+
   const isExpanded = !!expandedFolderIds[node.id];
   const isSelected = selectedFolderId === node.id;
   const hasChildren = node.children && node.children.length > 0;
@@ -157,17 +164,53 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
               </button>
             </div>
           ) : (
-            <span className="truncate flex-1 tracking-tight" title={node.name}>
-              {node.name}
-            </span>
+            <>
+              <span className="truncate flex-1 tracking-tight" title={node.name}>
+                {node.name}
+              </span>
+              {isSyncing ? (
+                <span
+                  data-testid={`sync-spinner-${node.id}`}
+                  title={`Sincronizando arquivos... (${syncProgress?.importedCount || 0}${syncProgress?.total ? ` de ${syncProgress.total}` : ''} já importados)`}
+                  className="inline-flex items-center justify-center p-0.5 rounded shrink-0 text-blue-400"
+                >
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                </span>
+              ) : node.watchMode && node.watchMode !== 'off' ? (
+                <span
+                  data-testid={`watch-indicator-${node.id}`}
+                  title={`Monitoramento ativo (${node.watchMode === 'auto' ? 'Automático' : 'Solicitar confirmação'})${node.watchPath ? `: ${node.watchPath}` : ''}`}
+                  className={`inline-flex items-center justify-center p-0.5 rounded shrink-0 ${
+                    node.watchMode === 'auto'
+                      ? 'text-emerald-400'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  <FolderSync className="w-3.5 h-3.5 animate-pulse" />
+                </span>
+              ) : null}
+            </>
           )}
         </div>
 
         {/* Right: Badge / Action Controls */}
         {!isEditing && (
           <div className="flex items-center gap-1 shrink-0">
-            {/* Document count badge */}
-            {node.documentCount !== undefined && node.documentCount > 0 && (
+            {/* Live Sync Progress Badge or Static Document Count Badge */}
+            {isSyncing ? (
+              <span
+                data-testid={`sync-badge-${node.id}`}
+                title={`Sincronizando: ${syncProgress?.importedCount || 0}${syncProgress?.total ? ` de ${syncProgress.total}` : ''} arquivos importados`}
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold flex items-center gap-1 transition-all ${
+                  isSelected
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse'
+                }`}
+              >
+                <Loader2 className="w-2.5 h-2.5 animate-spin shrink-0" />
+                <span>{(node.documentCount || 0) + (syncProgress?.importedCount || 0)}</span>
+              </span>
+            ) : node.documentCount !== undefined && node.documentCount > 0 ? (
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
                   isSelected 
@@ -179,7 +222,7 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
               >
                 {node.documentCount}
               </span>
-            )}
+            ) : null}
 
             {/* Action Menu Trigger */}
             <div className="relative">
@@ -206,7 +249,7 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
                       onCloseMenu();
                     }}
                   />
-                  <div className={`absolute right-0 top-6 z-40 w-44 rounded-xl shadow-2xl py-1 text-xs border ${
+                  <div className={`absolute right-0 top-6 z-40 w-48 rounded-xl shadow-2xl py-1 text-xs border ${
                     currentTheme === 'light'
                       ? 'bg-white border-[#cbd5e1] text-[#0f172a]'
                       : 'bg-[#18181b] border-[#3f3f46] text-[#fafafa]'
@@ -247,6 +290,21 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
                     >
                       <Edit2 className="w-3.5 h-3.5 text-amber-400" />
                       Renomear
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseMenu();
+                        onConfigureWatch?.(node);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors cursor-pointer ${
+                        currentTheme === 'light'
+                          ? 'hover:bg-blue-600 hover:text-white text-[#334155]'
+                          : 'hover:bg-blue-600 hover:text-white'
+                      }`}
+                    >
+                      <FolderSync className="w-3.5 h-3.5 text-indigo-400" />
+                      Configurar Monitoramento...
                     </button>
                     <div className={`border-t my-1 ${currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]'}`} />
                     <button
@@ -340,6 +398,7 @@ export const WorkspaceTreeNode = React.memo(function WorkspaceTreeNode({
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onImportToFolder={onImportToFolder}
+              onConfigureWatch={onConfigureWatch}
             />
           ))}
         </div>

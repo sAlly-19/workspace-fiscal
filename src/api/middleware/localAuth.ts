@@ -42,8 +42,11 @@ export function localAuthMiddleware(req: Request, res: Response, next: NextFunct
     return;
   }
 
-  // 6. Validação do cabeçalho X-Workspace-Token
-  const providedToken = req.headers['x-workspace-token'];
+  // 6. Validação do cabeçalho X-Workspace-Token ou query parameter (para EventSource/SSE)
+  const headerToken = req.headers['x-workspace-token'];
+  const queryToken = typeof req.query?.token === 'string' ? req.query.token : undefined;
+  const providedToken = (headerToken as string) || queryToken;
+
   if (!providedToken || typeof providedToken !== 'string') {
     res.status(401).json({ error: 'Unauthorized local session' });
     return;

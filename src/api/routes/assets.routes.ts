@@ -9,7 +9,128 @@ import { generateSchedule } from '../../core/depreciation/calculate';
 import { validateCreateAsset, validateUpdateAsset, validateDisposeAsset } from '../validators';
 import crypto from 'crypto';
 
+import fs from 'fs';
+import { documents } from '../../db/schema';
+import { detectFiscalDocument } from '../../core/detector';
+import { parseFiscalDocument } from '../../core/parsers';
+import { sanitizeCNPJ } from '../../core/buscador/domain/cnpj';
+import { logger } from '../utils/logger';
+
 const router = Router();
+
+router.get('/immobilized-identifiers', async (_req, res) => {
+  try {
+    const allAssets = await db.query.assets.findMany({
+      columns: {
+        documentNumber: true,
+        supplier: true,
+      },
+    });
+
+    const docNums = new Set<string>();
+    const pairs: Array<{ documentNumber: string; supplier: string }> = [];
+
+    for (const a of allAssets) {
+      if (a.documentNumber) {
+        docNums.add(a.documentNumber.trim());
+        pairs.push({
+          documentNumber: a.documentNumber.trim(),
+          supplier: a.supplier ? a.supplier.trim() : '',
+        });
+      }
+    }
+
+    res.json({
+      documentNumbers: Array.from(docNums),
+      pairs,
+    });
+  } catch (e) {
+    logger.error({ err: (e as Error).message }, 'error_getting_immobilized_identifiers');
+    res.status(500).json({ error: 'Erro ao buscar identificadores de notas imobilizadas' });
+  }
+});
+
+router.post('/parse-from-document/:documentId', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const doc = await db.query.documents.findFirst({
+      where: eq(documents.id, documentId),
+    });
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Documento não encontrado' });
+    }
+
+    if (!doc.rawXmlPath || !fs.existsSync(doc.rawXmlPath)) {
+      return res.status(400).json({ error: 'Arquivo XML original não encontrado no disco' });
+    }
+
+    const xml = await fs.promises.readFile(doc.rawXmlPath, 'utf8');
+    const docType = detectFiscalDocument(xml);
+    const parsed = parseFiscalDocument(xml, docType, doc.rawXmlPath, doc.batchId || undefined);
+
+    const destCleanDoc = parsed.recipient?.document ? sanitizeCNPJ(parsed.recipient.document) : '';
+    const emitCleanDoc = parsed.issuer?.document ? sanitizeCNPJ(parsed.issuer.document) : '';
+
+    const primarySuggestion = destCleanDoc && destCleanDoc.length === 14 ? 'DESTINATARIO' : 'EMITENTE';
+
+    const items = (parsed.items && parsed.items.length > 0)
+      ? parsed.items.map((it, idx) => ({
+          itemIndex: idx + 1,
+          code: it.code || null,
+          description: it.description,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalPrice,
+          totalPriceCents: Math.round(it.totalPrice * 100),
+          ncm: it.ncm || null,
+        }))
+      : [{
+          itemIndex: 1,
+          code: null,
+          description: parsed.serviceDescription || (parsed.type === 'CTE' ? 'Serviço de Transporte de Carga' : 'Serviço Prestado / Aquisição'),
+          quantity: 1,
+          unitPrice: parsed.totals?.total ?? 0,
+          totalPrice: parsed.totals?.total ?? 0,
+          totalPriceCents: Math.round((parsed.totals?.total ?? 0) * 100),
+          ncm: null,
+        }];
+
+    const suggestion = {
+      companySuggestion: {
+        primary: primarySuggestion,
+        destinatario: {
+          name: parsed.recipient?.name || doc.recipientName || '',
+          document: parsed.recipient?.document || doc.recipientDocument || '',
+          cleanDocument: destCleanDoc,
+          state: parsed.recipient?.address?.state || '',
+          city: parsed.recipient?.address?.city || '',
+        },
+        emitente: {
+          name: parsed.issuer?.name || doc.issuerName || '',
+          document: parsed.issuer?.document || doc.issuerDocument || '',
+          cleanDocument: emitCleanDoc,
+          state: parsed.issuer?.address?.state || '',
+          city: parsed.issuer?.address?.city || '',
+        },
+      },
+      items,
+      invoice: {
+        number: parsed.number || doc.number || null,
+        series: parsed.series || doc.series || null,
+        issueDate: parsed.issueDate ? new Date(parsed.issueDate).toISOString() : (doc.issueDate ? new Date(doc.issueDate).toISOString() : null),
+        accessKey: parsed.accessKey || doc.accessKey || null,
+        totalAmount: Math.round((parsed.totals?.total ?? doc.totalAmount ?? 0) * 100),
+        supplier: parsed.issuer?.name || doc.issuerName || '',
+      },
+    };
+
+    res.json(suggestion);
+  } catch (e) {
+    logger.error({ err: (e as Error).message }, 'error_parsing_asset_from_document');
+    res.status(500).json({ error: 'Erro ao extrair dados do documento para ativo' });
+  }
+});
 
 router.get('/', async (req, res) => {
   try {

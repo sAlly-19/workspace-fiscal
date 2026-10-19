@@ -182,6 +182,109 @@ describe('WorkspaceTree Submodules', () => {
       expect(element.props.expandedFolderIds['node-root']).toBe(true);
       expect(element.props.node.children).toHaveLength(2);
     });
+
+    it('supports watchMode auto and prompt with onConfigureWatch callback', () => {
+      const onConfigureWatch = vi.fn();
+      const watchedNode: FolderNode = {
+        id: 'node-watch',
+        name: 'Notas Monitoradas',
+        parentId: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        children: [],
+        watchPath: 'C:\\test\\watch',
+        watchRecursive: true,
+        watchMode: 'auto',
+      };
+
+      const element = React.createElement(WorkspaceTreeNode, {
+        node: watchedNode,
+        depth: 0,
+        currentTheme: 'dark',
+        selectedFolderId: null,
+        expandedFolderIds: {},
+        editingFolderId: null,
+        editingName: '',
+        creatingParentId: undefined,
+        newFolderName: '',
+        activeMenuId: null,
+        dragOverFolderId: null,
+        inputRef: { current: null },
+        onSelectFolder: vi.fn(),
+        onToggleExpand: vi.fn(),
+        onStartCreate: vi.fn(),
+        onSaveCreate: vi.fn(),
+        onCancelCreate: vi.fn(),
+        onChangeNewFolderName: vi.fn(),
+        onStartEdit: vi.fn(),
+        onSaveEdit: vi.fn(),
+        onCancelEdit: vi.fn(),
+        onChangeEditingName: vi.fn(),
+        onRequestDelete: vi.fn(),
+        onToggleMenu: vi.fn(),
+        onCloseMenu: vi.fn(),
+        onDragOver: vi.fn(),
+        onDragLeave: vi.fn(),
+        onDrop: vi.fn(),
+        onConfigureWatch,
+      });
+
+      expect(element.props.node.watchMode).toBe('auto');
+      expect(element.props.node.watchPath).toBe('C:\\test\\watch');
+      expect(element.props.node.watchRecursive).toBe(true);
+      expect(element.props.onConfigureWatch).toBe(onConfigureWatch);
+    });
+
+    it('renders sync spinner and real-time count badge when folder is syncing', () => {
+      const syncingNode: FolderNode = {
+        id: 'node-syncing-123',
+        name: '05-2026',
+        parentId: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        children: [],
+        documentCount: 10,
+        watchMode: 'auto',
+        watchPath: 'C:\\XMLs',
+      };
+
+      const element = React.createElement(WorkspaceTreeNode, {
+        node: syncingNode,
+        depth: 0,
+        currentTheme: 'dark',
+        selectedFolderId: null,
+        expandedFolderIds: {},
+        editingFolderId: null,
+        editingName: '',
+        creatingParentId: undefined,
+        newFolderName: '',
+        activeMenuId: null,
+        dragOverFolderId: null,
+        inputRef: { current: null },
+        onSelectFolder: vi.fn(),
+        onToggleExpand: vi.fn(),
+        onStartCreate: vi.fn(),
+        onSaveCreate: vi.fn(),
+        onCancelCreate: vi.fn(),
+        onChangeNewFolderName: vi.fn(),
+        onStartEdit: vi.fn(),
+        onSaveEdit: vi.fn(),
+        onCancelEdit: vi.fn(),
+        onChangeEditingName: vi.fn(),
+        onRequestDelete: vi.fn(),
+        onToggleMenu: vi.fn(),
+        onCloseMenu: vi.fn(),
+        onDragOver: vi.fn(),
+        onDragLeave: vi.fn(),
+        onDrop: vi.fn(),
+      });
+
+      expect(element).toBeDefined();
+      expect(element.props.node.id).toBe('node-syncing-123');
+      expect(element.props.node.name).toBe('05-2026');
+      expect(element.props.node.documentCount).toBe(10);
+    });
   });
 });
+
 

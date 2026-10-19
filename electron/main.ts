@@ -270,6 +270,24 @@ function registerIpcHandlers(apiBaseUrl: string) {
   });
 
   registerVerifiedHandler(
+    'dialog:selectDirectory',
+    async (_e, options?: { title?: string }) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return null;
+      }
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: options?.title || 'Selecionar pasta para monitoramento',
+        properties: ['openDirectory', 'createDirectory'],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+      trackReadFile(result.filePaths[0]);
+      return result.filePaths[0];
+    }
+  );
+
+  registerVerifiedHandler(
     'dialog:saveFile',
     async (_e, options: { defaultPath?: string; filters?: { name: string; extensions: string[] }[] }) => {
       const result = await dialog.showSaveDialog(mainWindow!, {

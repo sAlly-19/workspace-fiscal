@@ -13,9 +13,12 @@ import { ServerUnreachableOverlay, useServerUnreachable } from './components/Ser
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { UpdatePromptModal } from './components/UpdatePromptModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ToastHost } from './components/Toast';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useWorkspaceStore } from './stores/workspace.store';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
+import { useFolderWatcherEvents } from './hooks/useFolderWatcherEvents';
+import { FolderWatchPromptCard } from './components/FolderWatchPromptCard';
 
 type View = 'home' | 'nfview' | 'depreciation' | 'buscador';
 
@@ -24,6 +27,9 @@ export default function App() {
   const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
   const serverUnreachable = useServerUnreachable();
   const setIsSettingsOpen = useWorkspaceStore((s) => s.setIsSettingsOpen);
+  const { prompts, confirmImport, dismissImport, viewFolder } = useFolderWatcherEvents({
+    onNavigateNfView: () => setView('nfview'),
+  });
   const {
     isOpen: isUpdateModalOpen,
     updaterState,
@@ -114,6 +120,16 @@ export default function App() {
         onCancel={cancelDownload}
         onInstall={installAndRestart}
         onCheckAgain={() => checkNow(true)}
+      />
+      <ToastHost />
+      <FolderWatchPromptCard
+        prompts={prompts}
+        onConfirm={confirmImport}
+        onDismiss={dismissImport}
+        onViewFolder={(folderId, folderName) => {
+          viewFolder(folderId, folderName);
+          setView('nfview');
+        }}
       />
     </>
   );

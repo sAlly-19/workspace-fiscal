@@ -102,6 +102,39 @@ describe('Document Workspace Components Contracts & Props', () => {
       expect(element.props.isDocsLoading).toBe(true);
       expect(element.props.searchQuery).toBe('filtro sem resultados');
     });
+
+    it('renders "Depreciar Nota" button with normal and "Já Imobilizado" visual states', () => {
+      const onDepreciateDoc = vi.fn();
+      const immobilizedDocNumbers = new Set(['1001']);
+
+      const element = React.createElement(DocumentListPane, {
+        listWidth: 400,
+        currentTheme: 'dark',
+        filteredDocuments: mockDocs,
+        selectedDocumentId: null,
+        selectedDocIds: [],
+        selectedFolderName: 'Notas de Outubro',
+        allFilteredSelected: false,
+        isDocsLoading: false,
+        searchQuery: '',
+        onSelectAllDocs: vi.fn(),
+        onSelectDocument: vi.fn(),
+        onToggleDocSelection: vi.fn(),
+        onBatchPrint: vi.fn(),
+        onOpenBulkMove: vi.fn(),
+        onTriggerBulkDelete: vi.fn(),
+        onClearDocSelection: vi.fn(),
+        onSetMovingDocId: vi.fn(),
+        onTriggerSingleDelete: vi.fn(),
+        onTriggerUploadXml: vi.fn(),
+        onDepreciateDoc,
+        immobilizedDocNumbers,
+      });
+
+      expect(element.props.onDepreciateDoc).toBe(onDepreciateDoc);
+      expect(element.props.immobilizedDocNumbers?.has('1001')).toBe(true);
+      expect(element.props.immobilizedDocNumbers?.has('1002')).toBe(false);
+    });
   });
 });
 
