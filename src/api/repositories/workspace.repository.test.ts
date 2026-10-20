@@ -107,5 +107,65 @@ describe('WorkspaceRepository & Recursive Subfolders (TDD)', () => {
     const ids = docs.map((d) => d.id).sort();
     expect(ids).toEqual(['doc-1', 'doc-2'].sort());
   });
+
+  it('getExistingDocumentIdentifiers retorna chaves, numeros por emitente e nomes de arquivos de todo o workspace', async () => {
+    await workspaceRepository.createFolder('f-a', 'Pasta A', null);
+    await workspaceRepository.createFolder('f-b', 'Pasta B', null);
+
+    await documentsRepository.create({
+      id: 'doc-nfe-1',
+      type: 'NFE',
+      accessKey: '35260100000000000000550010000000011000000010',
+      number: '1',
+      issuerDocument: '12345678000199',
+      rawXmlPath: 'C:\\xmls\\35260100000000000000550010000000011000000010-nfe.xml',
+      batchId: 'f-a',
+      status: 'VALID',
+    });
+
+    await documentsRepository.create({
+      id: 'doc-nfse-1',
+      type: 'NFSE',
+      accessKey: null,
+      number: '9988',
+      issuerDocument: '98765432000188',
+      rawXmlPath: 'C:\\xmls\\NFSe_9988.xml',
+      batchId: 'f-b',
+      status: 'VALID',
+    });
+
+    await documentsRepository.create({
+      id: 'doc-sem-pasta',
+      type: 'CTE',
+      accessKey: '35260100000000000000570010000000021000000020',
+      number: '2',
+      issuerDocument: '11223344000155',
+      rawXmlPath: 'C:\\xmls\\cte_02.xml',
+      batchId: null,
+      status: 'VALID',
+    });
+
+    const ids = await workspaceRepository.getExistingDocumentIdentifiers();
+    expect(ids.accessKeys.has('35260100000000000000550010000000011000000010')).toBe(true);
+    expect(ids.accessKeys.has('35260100000000000000570010000000021000000020')).toBe(true);
+    expect(ids.numbersByIssuer.has('98765432000188:9988')).toBe(true);
+    expect(ids.rawXmlFileNames.has('35260100000000000000550010000000011000000010-nfe.xml')).toBe(true);
+    expect(ids.rawXmlFileNames.has('NFSe_9988.xml')).toBe(true);
+    expect(ids.rawXmlFileNames.has('cte_02.xml')).toBe(true);
+  });
+
+  it('recordWatchFilesBatch realiza insercao em chunks de 500 sem estourar limites do SQLite', async () => {
+    await workspaceRepository.createFolder('f-chunk', 'Pasta Chunks', null);
+
+    const testFiles = Array.from({ length: 650 }, (_, i) => ({
+      filePath: `C:\\notas\\nota_${i}.xml`,
+      status: 'imported' as const,
+    }));
+
+    await workspaceRepository.recordWatchFilesBatch('f-chunk', testFiles);
+
+    const persisted = await workspaceRepository.getWatchFiles('f-chunk');
+    expect(persisted.length).toBe(650);
+  });
 });
 

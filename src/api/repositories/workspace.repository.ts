@@ -1,6 +1,13 @@
+import path from 'path';
 import { db } from '../../db';
 import { folders, batches, documents, documentItems, documentTaxes, importJobs, folderWatchFiles } from '../../db/schema';
 import { eq, inArray, or } from 'drizzle-orm';
+
+export interface ExistingDocumentIdentifiers {
+  accessKeys: Set<string>;
+  numbersByIssuer: Set<string>; // formato: `${issuerDocument}:${number}`
+  rawXmlFileNames: Set<string>;
+}
 
 export interface FolderNode {
   id: string;
@@ -135,12 +142,57 @@ export class WorkspaceRepository {
     files: Array<{ filePath: string; status: 'imported' | 'ignored' }>
   ): Promise<void> {
     if (files.length === 0) return;
+    const CHUNK_SIZE = 500;
     try {
-      for (const f of files) {
-        await this.recordWatchFile(folderId, f.filePath, f.status);
+      for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+        const chunk = files.slice(i, i + CHUNK_SIZE);
+        await db.transaction(async (tx) => {
+          for (const f of chunk) {
+            await tx
+              .insert(folderWatchFiles)
+              .values({
+                folderId,
+                filePath: f.filePath,
+                status: f.status,
+              })
+              .onConflictDoUpdate({
+                target: [folderWatchFiles.folderId, folderWatchFiles.filePath],
+                set: { status: f.status },
+              });
+          }
+        });
       }
     } catch {
-      // Ignore errors
+      // Ignore conflict / transient errors
+    }
+  }
+
+  async getExistingDocumentIdentifiers(): Promise<ExistingDocumentIdentifiers> {
+    try {
+      const docs = await db.query.documents.findMany({
+        columns: {
+          accessKey: true,
+          number: true,
+          issuerDocument: true,
+          rawXmlPath: true,
+        },
+      });
+      const accessKeys = new Set<string>();
+      const numbersByIssuer = new Set<string>();
+      const rawXmlFileNames = new Set<string>();
+
+      for (const d of docs) {
+        if (d.accessKey) accessKeys.add(d.accessKey.trim());
+        if (d.number && d.issuerDocument) {
+          numbersByIssuer.add(`${d.issuerDocument.trim()}:${d.number.trim()}`);
+        }
+        if (d.rawXmlPath) {
+          rawXmlFileNames.add(path.basename(d.rawXmlPath));
+        }
+      }
+      return { accessKeys, numbersByIssuer, rawXmlFileNames };
+    } catch {
+      return { accessKeys: new Set(), numbersByIssuer: new Set(), rawXmlFileNames: new Set() };
     }
   }
 
