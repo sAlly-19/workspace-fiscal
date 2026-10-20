@@ -93,6 +93,7 @@ export async function getApiToken(): Promise<string | null> {
 
 export function clearApiTokenCache(): void {
   _cachedApiToken = null;
+  _cachedApiBaseUrl = null;
 }
 
 export async function getApiBaseUrl(): Promise<string> {
@@ -127,6 +128,34 @@ export function apiUrl(path: string): string {
 /** Versão síncrona que usa cache; para chamadas que precisam de await use apiFetch */
 export function apiUrlSync(path: string): string {
   return apiUrl(path);
+}
+
+/**
+ * Retorna uma URL completa autenticada incluindo o token de sessão local no query param `token`.
+ * Essencial para URLs abertas diretamente no navegador do sistema (ex: window.open / batch-print / downloads).
+ */
+export async function getAuthenticatedApiUrl(
+  path: string,
+  queryParams?: Record<string, string | number | boolean | undefined | null>
+): Promise<string> {
+  const base =
+    (await getApiBaseUrl()) ||
+    (typeof window !== 'undefined' && window.location?.origin && window.location.origin.startsWith('http')
+      ? window.location.origin
+      : 'http://127.0.0.1');
+  const token = await getApiToken();
+  const url = new URL(base.replace(/\/+$/, '') + (path.startsWith('/') ? path : '/' + path));
+  if (queryParams) {
+    for (const [key, val] of Object.entries(queryParams)) {
+      if (val !== undefined && val !== null) {
+        url.searchParams.set(key, String(val));
+      }
+    }
+  }
+  if (token) {
+    url.searchParams.set('token', token);
+  }
+  return url.toString();
 }
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {

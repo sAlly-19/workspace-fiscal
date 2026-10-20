@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, getAuthenticatedApiUrl } from '../../lib/api';
 import { useWorkspaceStore } from '../../stores/workspace.store';
 import { PreviewToolbar, type PreviewMode } from './preview/PreviewToolbar';
 import { XmlPreviewPane } from './preview/XmlPreviewPane';
@@ -271,9 +271,9 @@ export function DocumentPreview({
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (e) {
       console.warn('[DocumentPreview] download failed', e);
-      // Fallback relativo
+      // Fallback autenticado
       const link = document.createElement('a');
-      link.href = `/api/documents/${docDetails.id}/xml`;
+      link.href = await getAuthenticatedApiUrl(`/api/documents/${docDetails.id}/xml`);
       link.download = `${docDetails.accessKey || docDetails.number || 'documento'}.xml`;
       document.body.appendChild(link);
       link.click();

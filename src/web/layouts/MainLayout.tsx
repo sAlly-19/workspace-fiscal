@@ -241,16 +241,42 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
 
   // Batch Print handler
   const handleBatchPrint = async (docIdsToPrint?: string[]) => {
-    const ids = docIdsToPrint && docIdsToPrint.length > 0 ? docIdsToPrint : selectedDocIds;
-    // Em Electron usa base URL dinâmica
-    const { getApiBaseUrl } = await import('../lib/api');
+    const rawIds = docIdsToPrint && docIdsToPrint.length > 0 ? docIdsToPrint : selectedDocIds;
+    const targetIds =
+      rawIds && rawIds.length > 0
+        ? rawIds
+        : filteredDocuments.length > 0
+        ? filteredDocuments.map((d) => d.id)
+        : null;
+
+    // Em Electron usa base URL e token dinâmicos
+    const { getApiBaseUrl, getApiToken, apiFetch } = await import('../lib/api');
     const base = await getApiBaseUrl();
-    const buildUrl = (qs: string) => `${base}/api/documents/batch-print?${qs}`;
-    if (ids && ids.length > 0) {
-      window.open(buildUrl(`ids=${ids.join(',')}&autoprint=true`), '_blank');
-    } else if (filteredDocuments.length > 0) {
-      const allFilteredIds = filteredDocuments.map((d) => d.id);
-      window.open(buildUrl(`ids=${allFilteredIds.join(',')}&autoprint=true`), '_blank');
+    const token = await getApiToken();
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+
+    // Se temos mais de 15 documentos específicos, cria ticket de sessão para URL curta e limpa no navegador
+    if (targetIds && targetIds.length > 15) {
+      try {
+        const sessionRes = await apiFetch('/api/documents/batch-print-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: targetIds }),
+        });
+        if (sessionRes.ok) {
+          const { ticket } = await sessionRes.json();
+          window.open(`${base}/api/documents/batch-print?ticket=${ticket}&autoprint=true${tokenParam}`, '_blank');
+          return;
+        }
+      } catch (err) {
+        console.warn('[handleBatchPrint] Erro ao criar ticket de impressão, usando fallback direto', err);
+      }
+    }
+
+    const buildUrl = (qs: string) => `${base}/api/documents/batch-print?${qs}${tokenParam}`;
+
+    if (targetIds && targetIds.length > 0) {
+      window.open(buildUrl(`ids=${targetIds.join(',')}&autoprint=true`), '_blank');
     } else {
       window.open(buildUrl(`batchId=${selectedFolderId || 'all'}&autoprint=true`), '_blank');
     }

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { documentsRepository } from '../repositories/documents.repository';
 import { storageService } from '../services/storage.service';
 import { enrichDocumentFromXml } from '../services/document-enricher.service';
@@ -58,16 +59,50 @@ router.post('/bulk-move', async (req, res) => {
   }
 });
 
+interface PrintSession {
+  ids?: string[];
+  batchId?: string;
+  createdAt: number;
+}
+
+const printSessions = new Map<string, PrintSession>();
+
+// Limpeza de sessões expiradas (TTL: 30 minutos)
+const cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [ticket, session] of printSessions.entries()) {
+    if (now - session.createdAt > 30 * 60 * 1000) {
+      printSessions.delete(ticket);
+    }
+  }
+}, 5 * 60 * 1000);
+if (cleanupInterval.unref) {
+  cleanupInterval.unref();
+}
+
+export function clearPrintSessions(): void {
+  printSessions.clear();
+}
+
 async function fetchDocsForPrint(query: any, body: any) {
   let ids: string[] | null = null;
   let batchId: string | null = null;
-  if (query?.ids && typeof query.ids === 'string') {
+
+  if (query?.ticket && typeof query.ticket === 'string') {
+    const session = printSessions.get(query.ticket);
+    if (session) {
+      if (session.ids && session.ids.length > 0) ids = session.ids;
+      if (session.batchId) batchId = session.batchId;
+    }
+  }
+
+  if (!ids && query?.ids && typeof query.ids === 'string') {
     ids = query.ids.split(',').filter(Boolean);
-  } else if (body?.ids && Array.isArray(body.ids)) {
+  } else if (!ids && body?.ids && Array.isArray(body.ids)) {
     ids = body.ids.filter(Boolean);
   }
-  if (query?.batchId && typeof query.batchId === 'string') batchId = query.batchId;
-  else if (body?.batchId) batchId = String(body.batchId);
+  if (!batchId && query?.batchId && typeof query.batchId === 'string') batchId = query.batchId;
+  else if (!batchId && body?.batchId) batchId = String(body.batchId);
   // Limite de segurança: evita URL gigante / payload enorme
   if (ids && ids.length > 500) ids = ids.slice(0, 500);
 
@@ -75,6 +110,22 @@ async function fetchDocsForPrint(query: any, body: any) {
   if (batchId) return documentsRepository.findAll(batchId);
   return documentsRepository.findAll();
 }
+
+router.post('/batch-print-session', (req, res) => {
+  try {
+    const { ids, batchId } = req.body || {};
+    const ticket = crypto.randomUUID();
+    printSessions.set(ticket, {
+      ids: Array.isArray(ids) ? ids.filter((id) => typeof id === 'string' && id.trim().length > 0) : undefined,
+      batchId: typeof batchId === 'string' ? batchId : undefined,
+      createdAt: Date.now(),
+    });
+    res.json({ ticket });
+  } catch (error) {
+    console.error('[DocumentsRoute] Error creating batch print session:', error);
+    res.status(500).json({ error: 'Erro ao criar sessão de impressão em lote.' });
+  }
+});
 
 router.get('/batch-print', async (req, res) => {
   try {

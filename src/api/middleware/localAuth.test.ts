@@ -112,6 +112,30 @@ describe('localAuthMiddleware', () => {
     expect(body.docs).toEqual([]);
   });
 
+  it('permite requisicao com query parameter token valido para aberturas no navegador', async () => {
+    const app = express();
+    app.use(localAuthMiddleware);
+    app.get('/api/documents/batch-print', (_req, res) => res.send('<html>danfe</html>'));
+    await startTestServer(app);
+
+    const res = await fetch(`${baseUrl}/api/documents/batch-print?ids=123&autoprint=true&token=${SECRET}`);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toBe('<html>danfe</html>');
+  });
+
+  it('rejeita com 401 requisicao com query parameter token invalido', async () => {
+    const app = express();
+    app.use(localAuthMiddleware);
+    app.get('/api/documents/batch-print', (_req, res) => res.send('<html>danfe</html>'));
+    await startTestServer(app);
+
+    const res = await fetch(`${baseUrl}/api/documents/batch-print?ids=123&autoprint=true&token=invalid-token`);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized local session');
+  });
+
   it('permite bypass se BYPASS_LOCAL_AUTH=true e NODE_ENV!==production', async () => {
     process.env.BYPASS_LOCAL_AUTH = 'true';
     process.env.NODE_ENV = 'development';

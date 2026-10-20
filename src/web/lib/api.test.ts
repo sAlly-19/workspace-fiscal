@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { apiFetch, getApiToken, clearApiTokenCache } from './api';
+import { apiFetch, getApiToken, clearApiTokenCache, getAuthenticatedApiUrl } from './api';
 
 describe('Web API client', () => {
   const originalFetch = global.fetch;
@@ -58,5 +58,22 @@ describe('Web API client', () => {
 
     await apiFetch('/api/health');
     expect(capturedUrl).toContain('/api/health');
+  });
+
+  it('getAuthenticatedApiUrl monta URL com base e query param token', async () => {
+    (globalThis as any).window.api = {
+      getApiBaseUrl: vi.fn().mockResolvedValue('http://127.0.0.1:62395'),
+      getApiToken: vi.fn().mockResolvedValue('token-auth-secret-123'),
+    };
+
+    const url = await getAuthenticatedApiUrl('/api/documents/batch-print', {
+      ids: 'id1,id2',
+      autoprint: true,
+    });
+
+    expect(url).toContain('http://127.0.0.1:62395/api/documents/batch-print');
+    expect(url).toContain('ids=id1%2Cid2');
+    expect(url).toContain('autoprint=true');
+    expect(url).toContain('token=token-auth-secret-123');
   });
 });
