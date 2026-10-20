@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
-import { PreviewToolbar } from './PreviewToolbar';
+import { PreviewToolbar, MoreActionsDropdown } from './PreviewToolbar';
 
 describe('PreviewToolbar - Fiscal Status Pill (IMP-019)', () => {
   const defaultProps = {
@@ -90,5 +90,64 @@ describe('PreviewToolbar - Fiscal Status Pill (IMP-019)', () => {
       expect(JSON.stringify(tree)).toContain('0/0');
     });
   });
-});
 
+  describe('Option 2: Minimalist Header with Dropdown Actions', () => {
+    it('renders primary Print / PDF button in the toolbar', () => {
+      const tree = PreviewToolbar(defaultProps);
+      const serialized = JSON.stringify(tree);
+      expect(serialized).toContain('Imprimir / PDF');
+    });
+
+    it('renders MoreActionsDropdown when open with all secondary items', () => {
+      const dropdownTree = MoreActionsDropdown({
+        currentTheme: 'dark',
+        accessKey: '35261012345678000195550010000458921098765432',
+        copiedKey: false,
+        handleCopyKey: () => {},
+        mode: 'xml',
+        copiedXml: false,
+        handleCopyXml: () => {},
+        handleDownloadXml: () => {},
+        onDepreciate: () => {},
+        isOpen: true,
+      });
+      const serialized = JSON.stringify(dropdownTree);
+      expect(serialized).toContain('Copiar Chave de Acesso');
+      expect(serialized).toContain('Baixar Arquivo XML');
+      expect(serialized).toContain('Copiar Conteúdo XML');
+      expect(serialized).toContain('Depreciar Nota (Imobilizado)');
+    });
+
+    it('shows [Chave copiada!] feedback when copiedKey is true', () => {
+      const dropdownTree = MoreActionsDropdown({
+        currentTheme: 'dark',
+        accessKey: '35261012345678000195550010000458921098765432',
+        copiedKey: true,
+        handleCopyKey: () => {},
+        mode: 'visualizar',
+        copiedXml: false,
+        handleCopyXml: () => {},
+        handleDownloadXml: () => {},
+        isOpen: true,
+      });
+      const serialized = JSON.stringify(dropdownTree);
+      expect(serialized).toContain('Chave copiada!');
+    });
+
+    it('omits Depreciate option when onDepreciate is not provided', () => {
+      const dropdownTree = MoreActionsDropdown({
+        currentTheme: 'dark',
+        accessKey: '35261012345678000195550010000458921098765432',
+        copiedKey: false,
+        handleCopyKey: () => {},
+        mode: 'visualizar',
+        copiedXml: false,
+        handleCopyXml: () => {},
+        handleDownloadXml: () => {},
+        isOpen: true,
+      });
+      const serialized = JSON.stringify(dropdownTree);
+      expect(serialized).not.toContain('Depreciar Nota (Imobilizado)');
+    });
+  });
+});

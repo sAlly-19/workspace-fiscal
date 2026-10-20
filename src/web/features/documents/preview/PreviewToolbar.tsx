@@ -15,6 +15,7 @@ import {
   ChevronDown,
   X,
   PackagePlus,
+  MoreVertical,
 } from 'lucide-react';
 import React from 'react';
 import { motion } from 'motion/react';
@@ -34,6 +35,140 @@ const TABS: TabItem[] = [
   { id: 'dados', label: 'Dados da Nota', shortLabel: 'Dados', icon: Table },
   { id: 'xml', label: 'XML Original', shortLabel: 'XML', icon: Code2 },
 ];
+
+export interface MoreActionsDropdownProps {
+  currentTheme: string;
+  accessKey?: string;
+  copiedKey: boolean;
+  handleCopyKey: () => void;
+  mode: PreviewMode;
+  copiedXml: boolean;
+  handleCopyXml: () => void;
+  handleDownloadXml: () => void;
+  onDepreciate?: () => void;
+  isOpen?: boolean;
+}
+
+export function MoreActionsDropdown({
+  currentTheme,
+  accessKey,
+  copiedKey,
+  handleCopyKey,
+  mode,
+  copiedXml,
+  handleCopyXml,
+  handleDownloadXml,
+  onDepreciate,
+  isOpen,
+}: MoreActionsDropdownProps) {
+  return (
+    <details
+      className="relative shrink-0 group"
+      open={isOpen}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          e.currentTarget.removeAttribute('open');
+        }
+      }}
+    >
+      <summary
+        title="Mais ações do documento"
+        aria-label="Mais ações"
+        className={`list-none [&::-webkit-details-marker]:hidden p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center select-none ${
+          currentTheme === 'light'
+            ? 'bg-white hover:bg-[#f1f5f9] text-[#475569] hover:text-[#0f172a] border-[#cbd5e1] group-open:bg-[#e2e8f0] group-open:border-[#94a3b8] group-open:text-[#0f172a]'
+            : 'bg-[#18181b] hover:bg-[#27272a] text-[#a1a1aa] hover:text-white border-[#27272a] group-open:bg-[#27272a] group-open:border-[#3f3f46] group-open:text-white'
+        }`}
+      >
+        <MoreVertical className="w-4 h-4" />
+      </summary>
+
+      <div
+        role="menu"
+        className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl border p-1 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 ${
+          currentTheme === 'light'
+            ? 'bg-white border-[#e2e8f0] text-[#0f172a] shadow-slate-300/50'
+            : 'bg-[#18181b] border-[#27272a] text-[#fafafa] shadow-black/80'
+        }`}
+      >
+        {accessKey && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleCopyKey}
+            className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-lg transition-colors cursor-pointer text-left ${
+              currentTheme === 'light'
+                ? 'hover:bg-[#f1f5f9] text-[#334155]'
+                : 'hover:bg-[#27272a] text-[#d4d4d8]'
+            }`}
+          >
+            {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedKey ? 'Chave copiada!' : 'Copiar Chave de Acesso'}</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          role="menuitem"
+          onClick={(e) => {
+            handleDownloadXml();
+            e.currentTarget.closest('details')?.removeAttribute('open');
+          }}
+          className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-lg transition-colors cursor-pointer text-left ${
+            currentTheme === 'light'
+              ? 'hover:bg-[#f1f5f9] text-[#334155]'
+              : 'hover:bg-[#27272a] text-[#d4d4d8]'
+          }`}
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Baixar Arquivo XML</span>
+        </button>
+
+        {mode === 'xml' && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleCopyXml}
+            className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs rounded-lg transition-colors cursor-pointer text-left ${
+              currentTheme === 'light'
+                ? 'hover:bg-[#f1f5f9] text-[#334155]'
+                : 'hover:bg-[#27272a] text-[#d4d4d8]'
+            }`}
+          >
+            {copiedXml ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedXml ? 'XML copiado!' : 'Copiar Conteúdo XML'}</span>
+          </button>
+        )}
+
+        {onDepreciate && (
+          <>
+            <div
+              className={`my-1 border-t ${
+                currentTheme === 'light' ? 'border-[#e2e8f0]' : 'border-[#27272a]'
+              }`}
+            />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                onDepreciate();
+                e.currentTarget.closest('details')?.removeAttribute('open');
+              }}
+              className={`w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer text-left ${
+                currentTheme === 'light'
+                  ? 'hover:bg-emerald-50 text-emerald-700'
+                  : 'hover:bg-emerald-950/40 text-emerald-400'
+              }`}
+            >
+              <PackagePlus className="w-3.5 h-3.5" />
+              <span>Depreciar Nota (Imobilizado)</span>
+            </button>
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
 
 export interface PreviewToolbarProps {
   currentTheme: string;
@@ -105,13 +240,14 @@ export function PreviewToolbar({
     hasAuthorizationProtocol,
     documentStatus,
   });
+
   return (
     <div
-      className={`min-h-[48px] py-1.5 border-b flex flex-wrap items-center px-3 md:px-4 justify-between shrink-0 print:hidden gap-2 ${
+      className={`min-h-[48px] py-1.5 border-b flex items-center px-3 md:px-4 justify-between shrink-0 print:hidden gap-2 ${
         currentTheme === 'light' ? 'bg-white border-[#e2e8f0]' : 'bg-[#111114] border-[#27272a]'
       }`}
     >
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 shrink-0">
         {/* Mobile Back Button */}
         {onBackToList && (
           <button
@@ -128,7 +264,7 @@ export function PreviewToolbar({
           </button>
         )}
 
-        {/* Mode Switcher with Animated Tab Indicator */}
+        {/* Mode Switcher with Animated Tab Indicator - 100% UNTOUCHED */}
         <div
           className={`flex items-center gap-1 p-0.5 rounded-xl border relative ${
             currentTheme === 'light' ? 'bg-[#f1f5f9] border-[#e2e8f0]' : 'bg-[#09090b] border-[#27272a]'
@@ -233,7 +369,10 @@ export function PreviewToolbar({
             </button>
           </div>
         )}
+      </div>
 
+      {/* Right Controls: Search, Status, Print, More Actions Dropdown */}
+      <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
         {/* In-Document Search Input */}
         {setSearchTerm && (
           <div
@@ -266,7 +405,7 @@ export function PreviewToolbar({
                 }
               }}
               placeholder="Buscar na nota... (Ctrl+F)"
-              className="bg-transparent border-none outline-none text-xs w-28 sm:w-36 md:w-44 placeholder:opacity-50"
+              className="bg-transparent border-none outline-none text-xs w-24 sm:w-32 md:w-40 focus:w-44 transition-all duration-200 placeholder:opacity-50"
             />
             {searchTerm && (
               <div className="flex items-center gap-0.5 shrink-0 ml-1">
@@ -315,88 +454,47 @@ export function PreviewToolbar({
             )}
           </div>
         )}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
         {/* Status Fiscal Pill (IMP-019) */}
         <div
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border ${statusInfo.badgeClass}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusInfo.badgeClass}`}
           title={statusInfo.description}
         >
-          {statusInfo.category === 'AUTHORIZED' && <span>✓</span>}
-          {statusInfo.category === 'CANCELLED_DENIED' && <span>✕</span>}
-          {statusInfo.category === 'UNAUTHORIZED_OR_DRAFT' && <span>!</span>}
+          {statusInfo.category === 'AUTHORIZED' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+          {statusInfo.category === 'CANCELLED_DENIED' && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
+          {statusInfo.category === 'UNAUTHORIZED_OR_DRAFT' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
           <span>{statusInfo.badgeText}</span>
         </div>
 
-        {accessKey && (
-          <button
-            onClick={handleCopyKey}
-            title="Copiar chave de acesso de 44 dígitos"
-            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 border rounded-md text-xs transition-all cursor-pointer ${
-              currentTheme === 'light'
-                ? 'bg-white hover:bg-[#f1f5f9] text-[#334155] border-[#cbd5e1]'
-                : 'bg-[#18181b] border-[#27272a] text-[#fafafa] hover:bg-[#27272a]'
-            }`}
-          >
-            {copiedKey ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{copiedKey ? 'Chave copiada!' : 'Copiar Chave'}</span>
-          </button>
-        )}
-
-        {mode === 'xml' && (
-          <button
-            onClick={handleCopyXml}
-            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 border rounded-md text-xs transition-all cursor-pointer ${
-              currentTheme === 'light'
-                ? 'bg-white hover:bg-[#f1f5f9] text-[#334155] border-[#cbd5e1]'
-                : 'bg-[#18181b] border-[#27272a] text-[#fafafa] hover:bg-[#27272a]'
-            }`}
-          >
-            {copiedXml ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{copiedXml ? 'XML copiado!' : 'Copiar XML'}</span>
-          </button>
-        )}
-
-        <button
-          onClick={handleDownloadXml}
-          className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 border rounded-md text-xs transition-all cursor-pointer ${
-            currentTheme === 'light'
-              ? 'bg-white hover:bg-[#f1f5f9] text-[#334155] border-[#cbd5e1]'
-              : 'bg-[#18181b] border-[#27272a] text-[#a1a1aa] hover:text-white hover:bg-[#27272a]'
+        <div
+          className={`w-[1px] h-4 mx-0.5 ${
+            currentTheme === 'light' ? 'bg-[#cbd5e1]' : 'bg-[#27272a]'
           }`}
-          title="Baixar arquivo XML"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Baixar XML</span>
-        </button>
+        />
 
-        {onDepreciate && (
-          <button
-            onClick={onDepreciate}
-            className={`flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 border rounded-md text-xs font-semibold transition-all cursor-pointer ${
-              currentTheme === 'light'
-                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300'
-                : 'bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 border-emerald-500/40'
-            }`}
-            title="Depreciar Nota Fiscal (Imobilizado)"
-          >
-            <PackagePlus className="w-3.5 h-3.5" />
-            <span>Depreciar</span>
-          </button>
-        )}
-
+        {/* Primary Action Button: Print / PDF */}
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium rounded-md text-xs shadow-md transition-all cursor-pointer"
+          className="flex items-center gap-1.5 md:gap-2 px-3 md:px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium rounded-lg text-xs shadow-md transition-all cursor-pointer shrink-0"
           title="Imprimir ou Salvar em PDF (A4)"
         >
           <Printer className="w-3.5 h-3.5" />
           <span>Imprimir / PDF</span>
         </button>
+
+        {/* Secondary Actions Dropdown */}
+        <MoreActionsDropdown
+          currentTheme={currentTheme}
+          accessKey={accessKey}
+          copiedKey={copiedKey}
+          handleCopyKey={handleCopyKey}
+          mode={mode}
+          copiedXml={copiedXml}
+          handleCopyXml={handleCopyXml}
+          handleDownloadXml={handleDownloadXml}
+          onDepreciate={onDepreciate}
+        />
       </div>
     </div>
   );
 }
-
