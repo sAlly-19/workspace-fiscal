@@ -5,6 +5,7 @@ import { importService as defaultImportService, ImportService } from './import.s
 import { activityLogService as defaultActivityLogService, ActivityLogService } from './activity-log.service';
 import { workspaceRepository as defaultWorkspaceRepo, WorkspaceRepository } from '../repositories/workspace.repository';
 import { logger } from '../utils/logger';
+import { sniffXmlFile } from '../../core/parsers/utils/fast-xml-identifier';
 
 export interface WatchedFolder {
   id: string;
@@ -19,6 +20,28 @@ export interface FolderWatcherServiceOptions {
   activityLogService?: ActivityLogService;
   workspaceRepository?: WorkspaceRepository;
   debounceMs?: number;
+}
+
+const GENERIC_FILE_NAMES = new Set([
+  'nota.xml',
+  'danfe.xml',
+  'documento.xml',
+  'document.xml',
+  'nfe.xml',
+  'cte.xml',
+  'nfse.xml',
+  'nfce.xml',
+  'xml.xml',
+  'fiscal.xml',
+]);
+
+function isGenericXmlFileName(fileName: string): boolean {
+  const lower = fileName.toLowerCase().trim();
+  if (GENERIC_FILE_NAMES.has(lower)) return true;
+  if (/^(?:nota|danfe|documento?|nfe|cte|nfse|nfce|xml)[-_(\s]?\d*\)?\.xml$/i.test(lower)) {
+    return true;
+  }
+  return false;
 }
 
 export class FolderWatcherService extends EventEmitter {
@@ -298,8 +321,16 @@ export class FolderWatcherService extends EventEmitter {
 
     const foundXmls: string[] = [];
 
-    // Pre-carrega chaves de acesso já existentes no banco para essa pasta
-    const existingKeys = await this.workspaceRepository.getExistingAccessKeysForFolder(folderId);
+    // Pre-carrega identificadores globais do banco (todo o workspace) com fallback gracioso
+    const globalIdentifiers =
+      typeof (this.workspaceRepository as any).getExistingDocumentIdentifiers === 'function'
+        ? await (this.workspaceRepository as any).getExistingDocumentIdentifiers()
+        : {
+            accessKeys: await this.workspaceRepository.getExistingAccessKeysForFolder(folderId),
+            numbersByIssuer: new Set<string>(),
+            rawXmlFileNames: new Set<string>(),
+          };
+
     const processedSet = this.processedFiles.get(folderId) || new Set();
     const ignoredSet = this.ignoredFiles.get(folderId) || new Set();
     const newlyIdentifiedAsImported: Array<{ filePath: string; status: 'imported' }> = [];
@@ -322,17 +353,40 @@ export class FolderWatcherService extends EventEmitter {
         }
 
         if (entry.isFile() && this.isXmlFile(full)) {
-          // 1. Checagem em memória ultra-rápida (O(1))
+          // 1. Checagem em memória ultra-rápida (O(1)) para esta pasta
           if (processedSet.has(full) || ignoredSet.has(full)) {
             continue;
           }
 
-          // 2. Se o nome do arquivo contém a chave de acesso de 44 dígitos já existente no banco para esta pasta
+          // 2. Chave de acesso de 44 dígitos presente no nome do arquivo (NFe/CTe/NFCe)
           const keyMatch = entry.name.match(/(?:NFe|CTe|NFCe)?(\d{44})/i);
-          if (keyMatch && existingKeys.has(keyMatch[1])) {
+          if (keyMatch && globalIdentifiers.accessKeys.has(keyMatch[1])) {
             processedSet.add(full);
             newlyIdentifiedAsImported.push({ filePath: full, status: 'imported' });
             continue;
+          }
+
+          // 3. Nome único não-genérico já existente no banco de dados
+          const isGeneric = isGenericXmlFileName(entry.name);
+          if (!isGeneric && globalIdentifiers.rawXmlFileNames.has(entry.name)) {
+            processedSet.add(full);
+            newlyIdentifiedAsImported.push({ filePath: full, status: 'imported' });
+            continue;
+          }
+
+          // 4. Sniffer de cabeçalho rápido (até 4 KB) para NFS-e ou nomes genéricos
+          const sniffed = await sniffXmlFile(full);
+          if (sniffed) {
+            if (sniffed.type === 'KEY' && sniffed.accessKey && globalIdentifiers.accessKeys.has(sniffed.accessKey)) {
+              processedSet.add(full);
+              newlyIdentifiedAsImported.push({ filePath: full, status: 'imported' });
+              continue;
+            }
+            if (sniffed.type === 'NFSE' && sniffed.compositeKey && globalIdentifiers.numbersByIssuer.has(sniffed.compositeKey)) {
+              processedSet.add(full);
+              newlyIdentifiedAsImported.push({ filePath: full, status: 'imported' });
+              continue;
+            }
           }
 
           foundXmls.push(full);
@@ -349,6 +403,7 @@ export class FolderWatcherService extends EventEmitter {
     }
 
     if (foundXmls.length === 0) {
+      this.pendingFiles.set(folderId, new Set());
       this.emitSse('WATCH_SYNC_PROGRESS', {
         folderId,
         folderName,

@@ -241,5 +241,71 @@ describe('FolderWatcherService', () => {
     await new Promise((r) => setTimeout(r, 220));
     expect(service.getPendingFiles('folder-delay').length).toBe(1);
   });
+
+  it('reconcilia arquivos com chave de acesso pertencente a outra pasta sem colocar em pendingFiles', async () => {
+    const key = '35260100000000000000550010000000099000000099';
+    const xmlFile = path.join(tempDir, `${key}-nfe.xml`);
+    fs.writeFileSync(xmlFile, `<NFe><infNFe Id="NFe${key}"></infNFe></NFe>`, 'utf-8');
+
+    // Chave existente globalmente (importada em outra pasta)
+    mockWorkspaceRepo.getExistingDocumentIdentifiers = vi.fn().mockResolvedValue({
+      accessKeys: new Set([key]),
+      numbersByIssuer: new Set(),
+      rawXmlFileNames: new Set(),
+    });
+
+    await service.startWatcher({
+      id: 'folder-supreme',
+      name: 'SUPREME',
+      watchPath: tempDir,
+      watchRecursive: false,
+      watchMode: 'prompt',
+    });
+
+    await new Promise((r) => setTimeout(r, 120));
+
+    // Nao deve ter pendencias
+    expect(service.getPendingFiles('folder-supreme').length).toBe(0);
+    // Nao deve ter emitido WATCH_PROMPT_IMPORT
+    const promptEvent = emittedEvents.find((e) => e.event === 'WATCH_PROMPT_IMPORT');
+    expect(promptEvent).toBeUndefined();
+    // Deve ter gravado em lote como imported
+    expect(mockWorkspaceRepo.recordWatchFilesBatch).toHaveBeenCalledWith(
+      'folder-supreme',
+      expect.arrayContaining([{ filePath: xmlFile, status: 'imported' }])
+    );
+  });
+
+  it('arquivo com nome generico (nota.xml) passa pelo sniffer e se bate com NFS-e do banco e reconciliado', async () => {
+    const xmlFile = path.join(tempDir, 'nota.xml');
+    fs.writeFileSync(
+      xmlFile,
+      `<CompNfse><Nfse><InfNfse><Numero>7711</Numero><PrestadorServico><IdentificacaoPrestador><CpfCnpj><Cnpj>99887766000199</Cnpj></CpfCnpj></IdentificacaoPrestador></PrestadorServico></InfNfse></Nfse></CompNfse>`,
+      'utf-8'
+    );
+
+    mockWorkspaceRepo.getExistingDocumentIdentifiers = vi.fn().mockResolvedValue({
+      accessKeys: new Set(),
+      numbersByIssuer: new Set(['99887766000199:7711']),
+      rawXmlFileNames: new Set(['nota.xml']), // Mesmo que o nome de arquivo exista, sendo generico ele deve passar pelo sniffer
+    });
+
+    await service.startWatcher({
+      id: 'folder-nfse',
+      name: 'NFS-e Folder',
+      watchPath: tempDir,
+      watchRecursive: false,
+      watchMode: 'prompt',
+    });
+
+    await new Promise((r) => setTimeout(r, 120));
+
+    // Reconciliado com sucesso
+    expect(service.getPendingFiles('folder-nfse').length).toBe(0);
+    expect(mockWorkspaceRepo.recordWatchFilesBatch).toHaveBeenCalledWith(
+      'folder-nfse',
+      expect.arrayContaining([{ filePath: xmlFile, status: 'imported' }])
+    );
+  });
 });
 
