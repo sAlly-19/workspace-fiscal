@@ -20,7 +20,7 @@ export function parsePrestador(data: any): Party {
       number: end.Numero ? String(end.Numero) : (end.nro ? String(end.nro) : undefined),
       complement: end.Complemento || end.xCpl,
       neighborhood: end.Bairro || end.xBairro,
-      city: end.CodigoMunicipio ? String(end.CodigoMunicipio) : (end.xMun || end.Cidade),
+      city: typeof end.xMun === 'string' ? end.xMun : (typeof end.Cidade === 'string' ? end.Cidade : (end.CodigoMunicipio ? String(end.CodigoMunicipio) : undefined)),
       state: end.Uf || end.UF,
       zipCode: end.Cep ? String(end.Cep) : (end.CEP ? String(end.CEP) : undefined),
     };
@@ -47,7 +47,7 @@ export function parseTomador(data: any): Party {
       number: end.Numero ? String(end.Numero) : (end.nro ? String(end.nro) : undefined),
       complement: end.Complemento || end.xCpl,
       neighborhood: end.Bairro || end.xBairro,
-      city: end.CodigoMunicipio ? String(end.CodigoMunicipio) : (end.xMun || end.Cidade),
+      city: typeof end.xMun === 'string' ? end.xMun : (typeof end.Cidade === 'string' ? end.Cidade : (end.CodigoMunicipio ? String(end.CodigoMunicipio) : undefined)),
       state: end.Uf || end.UF,
       zipCode: end.Cep ? String(end.Cep) : (end.CEP ? String(end.CEP) : undefined),
     };

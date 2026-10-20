@@ -45,7 +45,7 @@ export function parseSefinNacional(inf: any, rawXmlPath: string, batchId?: strin
       number: endEmit.nro ? String(endEmit.nro) : undefined,
       complement: endEmit.xCpl,
       neighborhood: endEmit.xBairro,
-      city: inf.xLocEmi || endEmit.cMun || endEmit.xMun,
+      city: typeof inf.xLocEmi === 'string' ? inf.xLocEmi : (typeof endEmit.xMun === 'string' ? endEmit.xMun : (endEmit.cMun ? String(endEmit.cMun) : undefined)),
       state: endEmit.UF,
       zipCode: endEmit.CEP ? String(endEmit.CEP) : undefined,
     };
@@ -61,7 +61,7 @@ export function parseSefinNacional(inf: any, rawXmlPath: string, batchId?: strin
       number: endToma.nro ? String(endToma.nro) : undefined,
       complement: endToma.xCpl,
       neighborhood: endToma.xBairro,
-      city: endToma.cMun || endToma.xMun,
+      city: typeof endToma.xMun === 'string' ? endToma.xMun : (endToma.cMun ? String(endToma.cMun) : undefined),
       state: endToma.UF,
       zipCode: endToma.CEP ? String(endToma.CEP) : undefined,
     };

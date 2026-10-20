@@ -73,7 +73,7 @@ export function DanfeNFSe({ doc }: DanfeNFSeProps) {
         <div className="border-b border-black flex">
           <div className="w-[65%] p-2.5 border-r border-black flex flex-col justify-center">
             <div className="text-[10px] font-bold uppercase tracking-wide text-gray-700">
-              PREFEITURA MUNICIPAL DE {issuerCity.toUpperCase()}
+              PREFEITURA MUNICIPAL DE {String(issuerCity || 'MUNICÍPIO').toUpperCase()}
             </div>
             <div className="text-[9px] text-gray-600 font-semibold uppercase">
               SECRETARIA MUNICIPAL DE FINANÇAS E TRIBUTAÇÃO

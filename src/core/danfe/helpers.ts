@@ -200,3 +200,37 @@ export function formatUnit(unit: string): string {
   };
   return map[unit] || unit;
 }
+
+
+/**
+ * Converte de forma resiliente qualquer valor (incluindo objetos/artefatos do fast-xml-parser e números) para string segura.
+ */
+export function safeString(val: any, fallback: string = ''): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    return trimmed.length > 0 ? trimmed : fallback;
+  }
+  if (typeof val === 'number') {
+    return isNaN(val) ? fallback : String(val);
+  }
+  if (typeof val === 'object') {
+    if (typeof val['#text'] === 'string' || typeof val['#text'] === 'number') {
+      return safeString(val['#text'], fallback);
+    }
+    if (typeof val._text === 'string' || typeof val._text === 'number') {
+      return safeString(val._text, fallback);
+    }
+    if (typeof val.xMun === 'string' || typeof val.xMun === 'number') {
+      return safeString(val.xMun, fallback);
+    }
+    if (typeof val.cMun === 'string' || typeof val.cMun === 'number') {
+      return safeString(val.cMun, fallback);
+    }
+    if (typeof val.Cidade === 'string' || typeof val.Cidade === 'number') {
+      return safeString(val.Cidade, fallback);
+    }
+    return fallback;
+  }
+  return String(val).trim() || fallback;
+}

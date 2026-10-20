@@ -146,6 +146,17 @@ describe('DANFE HTML Generators & Renderers', () => {
       expect(html).toContain('TOMADOR DE SERVICO LTDA');
       expect(html).toContain('ASSESSORIA FISCAL');
     });
+
+    it('handles non-string, missing or object issuerCity gracefully without throwing', () => {
+      const html1 = renderDanfeNFSeHtml({ type: 'NFSE', issuerCity: {} }, 0, 1);
+      expect(html1).toContain('PREFEITURA MUNICIPAL DE MUNICÍPIO');
+
+      const html2 = renderDanfeNFSeHtml({ type: 'NFSE', issuerCity: 3550308 }, 0, 1);
+      expect(html2).toContain('PREFEITURA MUNICIPAL DE 3550308');
+
+      const html3 = renderDanfeNFSeHtml({ type: 'NFSE', issuer: { address: { city: {} } } }, 0, 1);
+      expect(html3).toContain('PREFEITURA MUNICIPAL DE MUNICÍPIO');
+    });
   });
 
   describe('renderDanfeCardHtml dispatch', () => {

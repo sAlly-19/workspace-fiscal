@@ -4,6 +4,7 @@ import {
   formatCnpjCpf,
   formatCep,
   formatPhone,
+  safeString,
 } from '../helpers';
 
 export interface NfseViewModel {
@@ -66,71 +67,77 @@ export interface NfseViewModel {
 }
 
 export function buildNfseViewModel(doc: any): NfseViewModel {
-  const issuerName = doc.issuer?.name || doc.issuerName || 'PRESTADOR DE SERVIÇOS';
-  const issuerDoc = formatCnpjCpf(doc.issuer?.document || doc.issuerDocument);
-  const issuerIM = doc.issuer?.im || doc.issuerIM || '-';
-  const issuerIE = doc.issuer?.ie || doc.issuerIE || '-';
-  const issuerStreet = doc.issuer?.address?.street 
-    ? `${doc.issuer.address.street}${doc.issuer.address.number ? ', ' + doc.issuer.address.number : ''}${doc.issuer.address.complement ? ' - ' + doc.issuer.address.complement : ''}`
-    : (doc.issuerAddress || '-');
-  const issuerBairro = doc.issuer?.address?.neighborhood || '-';
-  const issuerCep = formatCep(doc.issuer?.address?.zipCode);
-  const issuerCity = doc.issuer?.address?.city || doc.issuerCity || 'MUNICÍPIO';
-  const issuerState = doc.issuer?.address?.state || doc.issuerState || 'UF';
-  const issuerPhone = formatPhone(doc.issuer?.phone);
-  const issuerEmail = doc.issuer?.email || '-';
+  const d = doc || {};
+  const issuer = d.issuer || {};
+  const issuerAddress = issuer.address || {};
+  const recipient = d.recipient || {};
+  const recipientAddress = recipient.address || {};
 
-  const recipientName = doc.recipient?.name || doc.recipientName || 'TOMADOR DO SERVIÇO';
-  const recipientDoc = formatCnpjCpf(doc.recipient?.document || doc.recipientDocument);
-  const recipientIM = doc.recipient?.im || doc.recipientIM || '-';
-  const recipientIE = doc.recipient?.ie || doc.recipientIE || '-';
-  const recipientStreet = doc.recipient?.address?.street 
-    ? `${doc.recipient.address.street}${doc.recipient.address.number ? ', ' + doc.recipient.address.number : ''}${doc.recipient.address.complement ? ' - ' + doc.recipient.address.complement : ''}`
-    : (doc.recipientAddress || '-');
-  const recipientBairro = doc.recipient?.address?.neighborhood || '-';
-  const recipientCep = formatCep(doc.recipient?.address?.zipCode);
-  const recipientCity = doc.recipient?.address?.city || doc.recipientCity || '-';
-  const recipientState = doc.recipient?.address?.state || doc.recipientState || '-';
-  const recipientPhone = formatPhone(doc.recipient?.phone);
-  const recipientEmail = doc.recipient?.email || doc.recipientEmail || '-';
+  const issuerName = safeString(issuer.name || d.issuerName, 'PRESTADOR DE SERVIÇOS');
+  const issuerDoc = formatCnpjCpf(issuer.document || d.issuerDocument);
+  const issuerIM = safeString(issuer.im || d.issuerIM, '-');
+  const issuerIE = safeString(issuer.ie || d.issuerIE, '-');
+  const issuerStreet = issuerAddress.street 
+    ? `${safeString(issuerAddress.street)}${issuerAddress.number ? ', ' + safeString(issuerAddress.number) : ''}${issuerAddress.complement ? ' - ' + safeString(issuerAddress.complement) : ''}`
+    : safeString(d.issuerAddress, '-');
+  const issuerBairro = safeString(issuerAddress.neighborhood, '-');
+  const issuerCep = formatCep(issuerAddress.zipCode);
+  const issuerCity = safeString(issuerAddress.city || d.issuerCity, 'MUNICÍPIO');
+  const issuerState = safeString(issuerAddress.state || d.issuerState, 'UF');
+  const issuerPhone = formatPhone(issuer.phone);
+  const issuerEmail = safeString(issuer.email, '-');
 
-  const serviceCode = doc.serviceCode || doc.items?.[0]?.code || '-';
-  const cnaeCode = doc.cnaeCode || '-';
-  const cityServiceCode = doc.cityServiceCode || '-';
-  const serviceCity = doc.serviceCity || issuerCity;
-  const serviceDescription = doc.serviceDescription || doc.items?.[0]?.description || '-';
+  const recipientName = safeString(recipient.name || d.recipientName, 'TOMADOR DO SERVIÇO');
+  const recipientDoc = formatCnpjCpf(recipient.document || d.recipientDocument);
+  const recipientIM = safeString(recipient.im || d.recipientIM, '-');
+  const recipientIE = safeString(recipient.ie || d.recipientIE, '-');
+  const recipientStreet = recipientAddress.street 
+    ? `${safeString(recipientAddress.street)}${recipientAddress.number ? ', ' + safeString(recipientAddress.number) : ''}${recipientAddress.complement ? ' - ' + safeString(recipientAddress.complement) : ''}`
+    : safeString(d.recipientAddress, '-');
+  const recipientBairro = safeString(recipientAddress.neighborhood, '-');
+  const recipientCep = formatCep(recipientAddress.zipCode);
+  const recipientCity = safeString(recipientAddress.city || d.recipientCity, '-');
+  const recipientState = safeString(recipientAddress.state || d.recipientState, '-');
+  const recipientPhone = formatPhone(recipient.phone);
+  const recipientEmail = safeString(recipient.email || d.recipientEmail, '-');
 
-  const number = doc.number || '000.000';
-  const series = doc.series || '1';
-  const rpsNumber = doc.rpsNumber || '-';
-  const rpsSeries = doc.rpsSeries || '-';
-  const verificationCode = doc.verificationCode || doc.accessKey || '-';
-  const issueDateStr = doc.issueDate ? formatDate(doc.issueDate) : '-';
-  const issueTimeStr = doc.issueDate ? formatTime(doc.issueDate) : '';
+  const serviceCode = safeString(d.serviceCode || d.items?.[0]?.code, '-');
+  const cnaeCode = safeString(d.cnaeCode, '-');
+  const cityServiceCode = safeString(d.cityServiceCode, '-');
+  const serviceCity = safeString(d.serviceCity, issuerCity);
+  const serviceDescription = safeString(d.serviceDescription || d.items?.[0]?.description, '-');
 
-  const taxesObj = doc.totals?.taxes || {};
-  const valorServicos = doc.totals?.products ?? doc.totalAmount ?? 0;
-  const deducoes = doc.totals?.deductions ?? taxesObj.deductions ?? 0;
-  const descIncond = doc.totals?.unconditionalDiscount ?? doc.totals?.discount ?? 0;
-  const descCond = doc.totals?.conditionalDiscount ?? 0;
+  const number = safeString(d.number, '000.000');
+  const series = safeString(d.series, '1');
+  const rpsNumber = safeString(d.rpsNumber, '-');
+  const rpsSeries = safeString(d.rpsSeries, '-');
+  const verificationCode = safeString(d.verificationCode || d.accessKey, '-');
+  const issueDateStr = d.issueDate ? formatDate(d.issueDate) : '-';
+  const issueTimeStr = d.issueDate ? formatTime(d.issueDate) : '';
 
-  const issValor = taxesObj.iss ?? (doc.taxes?.find((t: any) => t.taxType === 'ISS')?.amount ?? 0);
-  const issBase = taxesObj.issBase ?? doc.totals?.icmsBase ?? (valorServicos - deducoes - descIncond);
+  const taxesObj = d.totals?.taxes || {};
+  const valorServicos = Number(d.totals?.products ?? d.totalAmount ?? 0) || 0;
+  const deducoes = Number(d.totals?.deductions ?? taxesObj.deductions ?? 0) || 0;
+  const descIncond = Number(d.totals?.unconditionalDiscount ?? d.totals?.discount ?? 0) || 0;
+  const descCond = Number(d.totals?.conditionalDiscount ?? 0) || 0;
+
+  const issValor = Number(taxesObj.iss ?? (d.taxes?.find((t: any) => t.taxType === 'ISS')?.amount ?? 0)) || 0;
+  const issBase = Number(taxesObj.issBase ?? d.totals?.icmsBase ?? (valorServicos - deducoes - descIncond)) || 0;
   const issAliquot = taxesObj.issAliquot !== undefined && taxesObj.issAliquot !== null 
     ? Number(taxesObj.issAliquot) 
-    : (doc.issAliquot ? Number(doc.issAliquot) : null);
+    : (d.issAliquot ? Number(d.issAliquot) : null);
   
   const issRetidoValor = typeof taxesObj.issRetained === 'number' 
     ? taxesObj.issRetained 
     : (taxesObj.issRetained ? issValor : 0);
-  const isIssRetido = issRetidoValor > 0 || taxesObj.issRetained === true || doc.issRetained === true;
+  const isIssRetido = issRetidoValor > 0 || taxesObj.issRetained === true || d.issRetained === true;
 
-  const pisValor = taxesObj.pis ?? (doc.taxes?.find((t: any) => t.taxType === 'PIS')?.amount ?? 0);
-  const cofinsValor = taxesObj.cofins ?? (doc.taxes?.find((t: any) => t.taxType === 'COFINS')?.amount ?? 0);
-  const inssValor = taxesObj.inss ?? (doc.taxes?.find((t: any) => t.taxType === 'INSS')?.amount ?? 0);
-  const irValor = taxesObj.ir ?? (doc.taxes?.find((t: any) => t.taxType === 'IR' || t.taxType === 'IRRF')?.amount ?? 0);
-  const csllValor = taxesObj.csll ?? (doc.taxes?.find((t: any) => t.taxType === 'CSLL')?.amount ?? 0);
-  const outrasRetencoes = taxesObj.outrasRetencoes ?? 0;
+  const pisValor = Number(taxesObj.pis ?? (d.taxes?.find((t: any) => t.taxType === 'PIS')?.amount ?? 0)) || 0;
+  const cofinsValor = Number(taxesObj.cofins ?? (d.taxes?.find((t: any) => t.taxType === 'COFINS')?.amount ?? 0)) || 0;
+  const inssValor = Number(taxesObj.inss ?? (d.taxes?.find((t: any) => t.taxType === 'INSS')?.amount ?? 0)) || 0;
+  const irValor = Number(taxesObj.ir ?? (d.taxes?.find((t: any) => t.taxType === 'IR' || t.taxType === 'IRRF')?.amount ?? 0)) || 0;
+  const csllValor = Number(taxesObj.csll ?? (d.taxes?.find((t: any) => t.taxType === 'CSLL')?.amount ?? 0)) || 0;
+  const outrasRetencoes = Number(taxesObj.outrasRetencoes ?? 0) || 0;
 
   const totalRetencoes = (isIssRetido ? issRetidoValor : 0) + pisValor + cofinsValor + inssValor + irValor + csllValor + outrasRetencoes;
   const valorLiquido = valorServicos - totalRetencoes - descIncond;
@@ -194,4 +201,3 @@ export function buildNfseViewModel(doc: any): NfseViewModel {
     valorLiquido,
   };
 }
-

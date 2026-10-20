@@ -15,7 +15,7 @@ export function renderDanfeNFSeHtml(doc: any, _pageIndex: number, _totalPages: n
         <!-- Cabeçalho Oficial -->
         <div style="display: flex; border-bottom: 1px solid #000;">
           <div style="width: 65%; padding: 6px; border-right: 1px solid #000;">
-            <div style="font-size: 9px; font-weight: bold; text-transform: uppercase; color: #444;">PREFEITURA MUNICIPAL DE ${escapeHtml(vm.issuerCity.toUpperCase())}</div>
+            <div style="font-size: 9px; font-weight: bold; text-transform: uppercase; color: #444;">PREFEITURA MUNICIPAL DE ${escapeHtml(String(vm.issuerCity || 'MUNICÍPIO').toUpperCase())}</div>
             <div style="font-size: 8px; font-weight: 600; text-transform: uppercase; color: #555;">SECRETARIA MUNICIPAL DE FINANÇAS E TRIBUTAÇÃO</div>
             <div style="font-size: 13px; font-weight: 900; text-transform: uppercase; margin-top: 2px;">NOTA FISCAL DE SERVIÇOS ELETRÔNICA - NFS-e</div>
             <div style="font-size: 7.5px; color: #666; margin-top: 1px;">Documento Auxiliar da NFS-e (Padrão Nacional / ABRASF)</div>

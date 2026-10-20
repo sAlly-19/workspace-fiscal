@@ -61,7 +61,7 @@ export function matchCompanyByPriority(
       return {
         company: foundDest,
         source: 'DESTINATARIO',
-        badgeText: '✨ Sugerida automaticamente pelo CNPJ do Destinatário',
+        badgeText: 'Sugerida automaticamente pelo CNPJ do Destinatário',
       };
     }
   }
@@ -77,7 +77,7 @@ export function matchCompanyByPriority(
       return {
         company: foundEmit,
         source: 'EMITENTE',
-        badgeText: '✨ Sugerida automaticamente pelo CNPJ do Emitente',
+        badgeText: 'Sugerida automaticamente pelo CNPJ do Emitente',
       };
     }
   }
