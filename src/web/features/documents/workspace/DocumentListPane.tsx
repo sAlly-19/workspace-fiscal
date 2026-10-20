@@ -373,38 +373,81 @@ export function DocumentListPane({
 
       {/* Floating Bulk Actions Toolbar when documents are selected */}
       {selectedDocIds.length > 0 && (
-        <div className="p-2 bg-blue-950/90 border-b border-blue-500/30 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1">
-          <span className="font-semibold text-white">
-            {selectedDocIds.length} {selectedDocIds.length === 1 ? 'selecionado' : 'selecionados'}
-          </span>
-          <div className="flex items-center gap-1.5">
+        <div
+          className={`px-2.5 py-1.5 border-b flex items-center justify-between gap-1.5 text-xs animate-in fade-in slide-in-from-top-1 ${
+            currentTheme === 'light'
+              ? 'bg-[#f1f5f9] border-[#e2e8f0]'
+              : 'bg-[#18181b] border-[#27272a]'
+          }`}
+        >
+          {/* Badge contador */}
+          <div className="flex items-center gap-1 shrink-0 select-none">
+            <span
+              className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                currentTheme === 'light'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
+              }`}
+            >
+              {selectedDocIds.length}
+            </span>
+            <span
+              className={`text-[11px] font-medium whitespace-nowrap ${
+                currentTheme === 'light' ? 'text-slate-600' : 'text-zinc-400'
+              }`}
+            >
+              {selectedDocIds.length === 1 ? 'selecionado' : 'selecionados'}
+            </span>
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Imprimir / PDF */}
             <button
               onClick={() => onBatchPrint(selectedDocIds)}
-              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+              className="h-7 px-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-xs whitespace-nowrap shrink-0"
               title="Exportar e imprimir notas fiscais selecionadas em PDF"
             >
-              <Printer className="w-3 h-3" />
-              Exportar PDF ({selectedDocIds.length})
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF</span>
             </button>
+
+            {/* Mover */}
             <button
               onClick={onOpenBulkMove}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+              className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                currentTheme === 'light'
+                  ? 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300/80 shadow-2xs'
+                  : 'bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10'
+              }`}
               title="Mover selecionados para outra pasta"
             >
-              <MoveRight className="w-3 h-3" />
-              Mover
+              <MoveRight className="w-3 h-3 text-slate-400" />
+              <span>Mover</span>
             </button>
+
+            {/* Excluir (Soft Ghost Destructive) */}
             <button
               onClick={onTriggerBulkDelete}
-              className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+              className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                currentTheme === 'light'
+                  ? 'bg-red-50 hover:bg-red-100/80 text-red-600 border border-red-200'
+                  : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
+              }`}
               title="Excluir documentos selecionados"
             >
               <Trash2 className="w-3 h-3" />
-              Excluir
+              <span>Excluir</span>
             </button>
+
+            {/* Limpar Seleção (Deselect / Cancel) */}
             <button
               onClick={onClearDocSelection}
-              className="p-1 text-blue-300 hover:text-white cursor-pointer"
+              className={`h-7 w-7 flex items-center justify-center rounded-md transition-colors cursor-pointer shrink-0 ${
+                currentTheme === 'light'
+                  ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/60'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
               title="Limpar seleção"
             >
               <X className="w-3.5 h-3.5" />
