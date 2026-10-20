@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { importService } from '../services/import.service';
+import { workspaceRepository } from '../repositories/workspace.repository';
 import { sanitizeFileName } from '../../core/security/pathSanitizer';
 
 const router = Router();
@@ -267,6 +268,12 @@ router.post('/paths', async (req, res) => {
           if ((i + 1) % BATCH_YIELD_INTERVAL === 0) {
             await yieldEventLoop();
           }
+        }
+
+        // Se a importação ocorreu direcionada a uma pasta, registra os arquivos em disco no histórico de watch
+        if (batchId && targetXmlPaths.length > 0) {
+          const filesToRecord = targetXmlPaths.map((fp) => ({ filePath: fp, status: 'imported' as const }));
+          await workspaceRepository.recordWatchFilesBatch(batchId, filesToRecord).catch(() => {});
         }
 
         // 2. Processa arquivos extraídos de ZIPs
