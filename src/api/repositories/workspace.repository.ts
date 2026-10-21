@@ -1,7 +1,7 @@
 import path from 'path';
 import { db } from '../../db';
 import { folders, batches, documents, documentItems, documentTaxes, importJobs, folderWatchFiles } from '../../db/schema';
-import { eq, inArray, or } from 'drizzle-orm';
+import { eq, inArray, or, sql } from 'drizzle-orm';
 
 export interface ExistingDocumentIdentifiers {
   accessKeys: Set<string>;
@@ -142,25 +142,23 @@ export class WorkspaceRepository {
     files: Array<{ filePath: string; status: 'imported' | 'ignored' }>
   ): Promise<void> {
     if (files.length === 0) return;
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 100;
     try {
       for (let i = 0; i < files.length; i += CHUNK_SIZE) {
         const chunk = files.slice(i, i + CHUNK_SIZE);
-        await db.transaction(async (tx) => {
-          for (const f of chunk) {
-            await tx
-              .insert(folderWatchFiles)
-              .values({
-                folderId,
-                filePath: f.filePath,
-                status: f.status,
-              })
-              .onConflictDoUpdate({
-                target: [folderWatchFiles.folderId, folderWatchFiles.filePath],
-                set: { status: f.status },
-              });
-          }
-        });
+        await db
+          .insert(folderWatchFiles)
+          .values(
+            chunk.map((f) => ({
+              folderId,
+              filePath: f.filePath,
+              status: f.status,
+            }))
+          )
+          .onConflictDoUpdate({
+            target: [folderWatchFiles.folderId, folderWatchFiles.filePath],
+            set: { status: sql`excluded.status` },
+          });
       }
     } catch {
       // Ignore conflict / transient errors

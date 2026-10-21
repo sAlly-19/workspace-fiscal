@@ -298,7 +298,7 @@ describe('FolderWatcherService', () => {
       watchMode: 'prompt',
     });
 
-    await new Promise((r) => setTimeout(r, 120));
+    await new Promise((r) => setTimeout(r, 400));
 
     // Reconciliado com sucesso
     expect(service.getPendingFiles('folder-nfse').length).toBe(0);

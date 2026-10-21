@@ -22,20 +22,56 @@ export function sniffXmlIdentifier(content: string): SniffedXmlIdentifier | null
     return { type: 'KEY', accessKey: attrKeyMatch[1] };
   }
 
-  // 1b. Tags <chNFe>, <chCTe>, <chNFCe> com suporte a namespaces opcionais
+  // 1b. Atributo Id de Eventos: Id="ID[tpEvento:6][chNFe:44][nSeq:2]"
+  const eventAttrKeyMatch = content.match(/Id\s*=\s*["']ID\d{6}(\d{44})\d{2}["']/i);
+  if (eventAttrKeyMatch && eventAttrKeyMatch[1]) {
+    return { type: 'KEY', accessKey: eventAttrKeyMatch[1] };
+  }
+
+  // 1c. Tags <chNFe>, <chCTe>, <chNFCe> com suporte a namespaces opcionais
   const tagKeyMatch = content.match(/<(?:\w+:)?(?:chNFe|chCTe|chNFCe)[^>]*>(\d{44})<\/(?:\w+:)?(?:chNFe|chCTe|chNFCe)>/i);
   if (tagKeyMatch && tagKeyMatch[1]) {
     return { type: 'KEY', accessKey: tagKeyMatch[1] };
   }
 
-  // 2. NFS-e (Número da nota + CNPJ/CPF do Prestador)
-  // 2a. Número da nota (evitando tags <Numero> de <Endereco> ou <IdentificacaoRps>)
-  let nfseNumber: string | null = null;
+  // 2. Inutilização (NFe / NFCe) via bloco <infInut>
+  if (/<(?:\w+:)?(?:infInut|inutNFe|retInutNFe)/i.test(content)) {
+    const inutCnpj = content.match(/<(?:\w+:)?CNPJ[^>]*>(\d{14})<\/(?:\w+:)?CNPJ>/i);
+    const inutIni = content.match(/<(?:\w+:)?nNFIni[^>]*>(\d+)<\/(?:\w+:)?nNFIni>/i);
+    const inutFin = content.match(/<(?:\w+:)?nNFFin[^>]*>(\d+)<\/(?:\w+:)?nNFFin>/i);
+    if (inutCnpj && inutIni) {
+      const cnpj = inutCnpj[1];
+      const ini = inutIni[1];
+      const fin = inutFin ? inutFin[1] : ini;
+      const num = ini === fin ? ini : `${ini} a ${fin}`;
+      return {
+        type: 'NFSE',
+        number: num,
+        issuerDocument: cnpj,
+        compositeKey: `${cnpj}:${num}`,
+      };
+    }
+  }
 
-  // Prioridade para tags explícitas de número de NFS-e
-  const explicitNumberMatch = content.match(/<(?:\w+:)?(?:NumeroNfse|NumeroNota)[^>]*>(\d+)<\/(?:\w+:)?(?:NumeroNfse|NumeroNota)>/i);
-  if (explicitNumberMatch && explicitNumberMatch[1]) {
-    nfseNumber = explicitNumberMatch[1];
+  // 3. NFS-e (Número da nota + CNPJ/CPF do Prestador)
+  let nfseNumber: string | null = null;
+  let issuerDoc: string | null = null;
+
+  // 3a. Tags convertidas ou planas de sistemas municipais/legados (<N_DA_NFSE>, <CPFCNPJ_PRESTADOR>)
+  const flatNumberMatch = content.match(/<(?:\w+:)?(?:N_DA_NFSE|NUMERO_NOTA|NumeroNfse|NumeroNota)[^>]*>(\d+)<\/(?:\w+:)?(?:N_DA_NFSE|NUMERO_NOTA|NumeroNfse|NumeroNota)>/i);
+  const flatDocMatch = content.match(/<(?:\w+:)?(?:CPFCNPJ_PRESTADOR|CPFCNPJ_EMISSOR|CNPJ_PRESTADOR)[^>]*>(\d{11,14})<\/(?:\w+:)?(?:CPFCNPJ_PRESTADOR|CPFCNPJ_EMISSOR|CNPJ_PRESTADOR)>/i);
+
+  if (flatNumberMatch && flatDocMatch) {
+    return {
+      type: 'NFSE',
+      number: flatNumberMatch[1],
+      issuerDocument: flatDocMatch[1],
+      compositeKey: `${flatDocMatch[1]}:${flatNumberMatch[1]}`,
+    };
+  }
+
+  if (flatNumberMatch && flatNumberMatch[1]) {
+    nfseNumber = flatNumberMatch[1];
   } else {
     // Procura <Numero> dentro de <InfNfse> ou <IdentificacaoNfse> antes de <Endereco>
     const infNfseBlock = content.match(/<(?:\w+:)?(?:InfNfse|IdentificacaoNfse)[^>]*>([\s\S]*?)(?:<\/(?:\w+:)?(?:InfNfse|IdentificacaoNfse)>|<(?:\w+:)?Endereco>)/i);
@@ -47,8 +83,7 @@ export function sniffXmlIdentifier(content: string): SniffedXmlIdentifier | null
     }
   }
 
-  // 2b. CNPJ / CPF do Prestador (estritamente dentro de bloco Prestador/Emitente, evitando Tomador)
-  let issuerDoc: string | null = null;
+  // 3b. CNPJ / CPF do Prestador (estritamente dentro de bloco Prestador/Emitente, evitando Tomador)
   const prestadorBlock = content.match(/<(?:\w+:)?(?:PrestadorServico|Prestador|IdentificacaoPrestador|emit|Emitente)[^>]*>([\s\S]*?)<\/(?:\w+:)?(?:PrestadorServico|Prestador|IdentificacaoPrestador|emit|Emitente)>/i);
   if (prestadorBlock && prestadorBlock[1]) {
     const docMatch = prestadorBlock[1].match(/<(?:\w+:)?(?:Cnpj|CNPJ|Cpf|CPF)[^>]*>(\d{11,14})<\/(?:\w+:)?(?:Cnpj|CNPJ|Cpf|CPF)>/i);
