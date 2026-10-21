@@ -12,7 +12,7 @@ export type DepreciationRule = 'MONTH_OF_ACQUISITION' | 'NEXT_MONTH' | 'PROPORTI
 export interface AssetInput {
   acquisitionValue: number; // centavos
   annualRate: number; // % ex: 10.00
-  acquisitionDate: Date;
+  acquisitionDate: Date | string;
   depreciationRule: DepreciationRule;
 }
 
@@ -44,8 +44,41 @@ function addMonths(year: number, month: number, add: number): { year: number; mo
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
-function competenceFromDate(d: Date): string {
-  return formatCompetence(d.getFullYear(), d.getMonth() + 1);
+export function parseDateParts(d: Date | string): { year: number; month: number; day: number } {
+  if (typeof d === 'string') {
+    const m = d.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);
+    if (m) {
+      return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+    }
+    d = new Date(d);
+  }
+  if (!(d instanceof Date) || isNaN(d.getTime())) {
+    throw new Error('Data inválida');
+  }
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0) {
+    return {
+      year: d.getUTCFullYear(),
+      month: d.getUTCMonth() + 1,
+      day: d.getUTCDate(),
+    };
+  }
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) {
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+    };
+  }
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  };
+}
+
+function competenceFromDate(d: Date | string): string {
+  const { year, month } = parseDateParts(d);
+  return formatCompetence(year, month);
 }
 
 export { competenceFromDate };
@@ -66,11 +99,9 @@ export function monthlyFullCents(acquisitionCents: number, annualRate: number): 
 export function proportionalFirstMonthCents(
   acquisitionCents: number,
   annualRate: number,
-  acquisitionDate: Date
+  acquisitionDate: Date | string
 ): number {
-  const year = acquisitionDate.getFullYear();
-  const month = acquisitionDate.getMonth() + 1;
-  const day = acquisitionDate.getDate();
+  const { year, month, day } = parseDateParts(acquisitionDate);
   const dim = daysInMonth(year, month);
   const daysRemaining = dim - day + 1; // inclusive
   // Operação inteira antes da divisão para evitar float drift
@@ -89,9 +120,7 @@ export function generateSchedule(input: AssetInput, maxMonths = 600): Depreciati
   const monthlyFull = monthlyFullCents(acquisitionValue, annualRate);
   if (monthlyFull <= 0) throw new Error('Taxa resulta em depreciação mensal zero');
 
-  const acqYear = acquisitionDate.getFullYear();
-  const acqMonth = acquisitionDate.getMonth() + 1;
-  const acqDay = acquisitionDate.getDate();
+  const { year: acqYear, month: acqMonth, day: acqDay } = parseDateParts(acquisitionDate);
 
   let startYear = acqYear;
   let startMonth = acqMonth;

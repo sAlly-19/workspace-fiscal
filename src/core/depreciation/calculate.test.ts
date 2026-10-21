@@ -78,6 +78,25 @@ describe('proportionalFirstMonthCents', () => {
     expect(totalDepreciated).toBe(100000);
     expect(schedule[schedule.length - 1].currentValue).toBe(0);
   });
+
+  it('preserva data exata de aquisicao quando fornecida em UTC ISO ou YYYY-MM-DD (sem regressao por timezone local)', () => {
+    const utcDate = new Date('2026-09-09T00:00:00.000Z');
+    const propFromUtc = proportionalFirstMonthCents(600000, 10, utcDate);
+    expect(propFromUtc).toBe(3667);
+
+    const propFromString = proportionalFirstMonthCents(600000, 10, '2026-09-09' as any);
+    expect(propFromString).toBe(3667);
+
+    const schedule = generateSchedule({
+      acquisitionValue: 600000,
+      annualRate: 10,
+      acquisitionDate: utcDate,
+      depreciationRule: 'PROPORTIONAL',
+    });
+    expect(schedule[0].competence).toBe('2026-09');
+    expect(schedule[0].depreciationValue).toBe(3667);
+    expect(schedule[0].currentValue).toBe(596333);
+  });
 });
 
 describe('generateSchedule', () => {

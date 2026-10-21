@@ -21,6 +21,29 @@ export type AppVersion = '3.5.3' | '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.
 
 export const CURRENT_APP_VERSION = '3.5.3';
 
+export function parseSemver(versionStr: string): [number, number, number] {
+  const clean = (versionStr || '').trim().replace(/^[vV]/, '');
+  const parts = clean.split('.').map((p) => {
+    const num = parseInt(p, 10);
+    return isNaN(num) ? 0 : num;
+  });
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+}
+
+export function compareSemver(v1: string, v2: string): number {
+  const [maj1, min1, pat1] = parseSemver(v1);
+  const [maj2, min2, pat2] = parseSemver(v2);
+
+  if (maj1 !== maj2) return maj1 - maj2;
+  if (min1 !== min2) return min1 - min2;
+  return pat1 - pat2;
+}
+
+export function isNewerVersion(latest: string, current: string): boolean {
+  return compareSemver(latest, current) > 0;
+}
+
+
 export interface VersionBulletPoint {
   boldPrefix?: string;
   text: string;
@@ -54,62 +77,62 @@ export const WHATS_NEW_VERSIONS: VersionSectionData[] = [
     subtitleText: 'Lançamento mais recente',
     cards: [
       {
-        id: '3.5.3-watcher-reconciliation',
+        id: '3.5.3-monitoramento-pastas',
         icon: FolderTree,
         iconClasses: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
         hoverBorderClasses: 'hover:border-purple-300 dark:hover:border-purple-500/30',
-        title: 'Reconciliação e Deduplicação Inteligente de Pastas Monitoradas',
-        badgeText: 'Pastas Monitoradas',
+        title: 'Monitoramento Automático e Inteligente de Pastas',
+        badgeText: 'Novidade',
         badgeClasses: 'text-purple-600 dark:text-purple-400',
-        description: 'Eliminação definitiva de alertas falsos e sincronização ultra-rápida de diretórios fiscais:',
+        description: 'Sincronização contínua das suas pastas de XMLs locais ou em rede sem interrupções:',
         bullets: [
           {
-            boldPrefix: 'Sniffer Fiscal Inteligente: ',
-            text: 'Reconhecimento de Inutilizações (<infInut>), Eventos de NF-e/CT-e e NFS-e convertidas (<N_DA_NFSE>) sem necessidade de parsing pesado.',
+            boldPrefix: 'Importação Automática em Segundo Plano: ',
+            text: 'Novos arquivos salvos nas pastas monitoradas são reconhecidos e processados com rapidez, prontos para consulta.',
           },
           {
-            boldPrefix: 'Persistência em Lote SQLite: ',
-            text: 'Tabela dedicada folder_watch_files gravando milhares de arquivos em chunks otimizados com reconciliação global em todo o workspace.',
+            boldPrefix: 'Sem Notificações Repetidas: ',
+            text: 'O sistema reconhece com precisão as notas já importadas, eliminando avisos repetidos e evitando qualquer duplicidade no banco.',
           },
         ],
       },
       {
-        id: '3.5.3-hide-unidentified-docs',
-        icon: Filter,
+        id: '3.5.3-correcao-depreciacao-datas',
+        icon: FileSpreadsheet,
         iconClasses: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
         hoverBorderClasses: 'hover:border-blue-300 dark:hover:border-blue-500/30',
-        title: 'Ocultação de Documentos Não Identificados (S/N)',
-        badgeText: 'Produtividade & Visualização',
+        title: 'Correção na Exibição de Datas na Depreciação',
+        badgeText: 'Módulo Imobilizado',
         badgeClasses: 'text-blue-600 dark:text-blue-400',
-        description: 'Visualização mais limpa e focada exclusivamente em notas fiscais homologadas válidas:',
+        description: 'Precisão e confiabilidade nas informações de aquisição e cálculo dos bens:',
         bullets: [
           {
-            boldPrefix: 'Filtro em Configurações: ',
-            text: 'Nova opção em Configurações ➔ NF View para ocultar eventos fiscais, cancelamentos e XMLs incompletos sem número ou emitente.',
+            boldPrefix: 'Datas de Aquisição Exatas: ',
+            text: 'Corrigida a divergência de fuso horário que exibia a data de aquisição com o dia ou mês anterior ao cadastrado ou vindo da nota fiscal.',
           },
           {
-            boldPrefix: 'Contador em Tempo Real: ',
-            text: 'Métricas instantâneas do total de documentos sem identificação no banco e badge discreto de itens ocultos no cabeçalho.',
+            boldPrefix: 'Segurança nos Relatórios: ',
+            text: 'Maior tranquilidade na emissão do razão auxiliar, conferência de quotas mensais e exportações para a contabilidade.',
           },
         ],
       },
       {
-        id: '3.5.3-toolbar-launcher-ux',
+        id: '3.5.3-visualizacao-limpa-toolbar',
         icon: LayoutTemplate,
         iconClasses: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
         hoverBorderClasses: 'hover:border-emerald-300 dark:hover:border-emerald-500/30',
-        title: 'Novo Toolbar Executivo Minimalista e Launcher Seguro',
-        badgeText: 'Interface & Estabilidade',
+        title: 'Visualização Limpa e Ações Diretas',
+        badgeText: 'Interface & Produtividade',
         badgeClasses: 'text-emerald-600 dark:text-emerald-400',
-        description: 'Ergonomia aprimorada no visualizador de notas e garantia de inicialização sempre atualizada:',
+        description: 'Mais clareza na listagem de documentos e navegação mais fluida no dia a dia:',
         bullets: [
           {
-            boldPrefix: 'Cabeçalho Executivo em Linha Única: ',
-            text: 'Ações secundárias (Copiar Chave, Baixar XML, Depreciar e Busca) consolidadas em dropdown elegante com atalhos de teclado.',
+            boldPrefix: 'Ocultar Documentos Sem Número (S/N): ',
+            text: 'Opção em Configurações para manter a tela limpa, exibindo apenas notas fiscais emitidas válidas e ocultando eventos e rascunhos.',
           },
           {
-            boldPrefix: 'Compilação Automática no Boot: ',
-            text: 'Launcher e scripts de execução agora compilam os bundles prévios do Electron, garantindo execução sempre sincronizada.',
+            boldPrefix: 'Barra de Ações Simplificada: ',
+            text: 'Botão de impressão direto com um clique e menu organizado para copiar chaves e baixar XMLs, sem poluição de botões.',
           },
         ],
       },

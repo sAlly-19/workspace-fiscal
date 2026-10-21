@@ -191,6 +191,7 @@ class AppUpdaterManager {
     // para consultar a release sem quebrar por falta de app-update.yml
     if (this.isDev) {
       try {
+        updateService.setCurrentVersion(app.getVersion());
         const ghResult = await updateService.checkLatestRelease();
         if (ghResult.hasUpdate) {
           this.state.status = 'available';

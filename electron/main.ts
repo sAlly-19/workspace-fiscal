@@ -121,7 +121,10 @@ function registerIpcHandlers(apiBaseUrl: string) {
     return { success: false };
   });
   ipcMain.handle('app:version', () => app.getVersion());
-  ipcMain.handle('app:checkForUpdates', async () => updateService.checkLatestRelease());
+  ipcMain.handle('app:checkForUpdates', async () => {
+    updateService.setCurrentVersion(app.getVersion());
+    return updateService.checkLatestRelease();
+  });
   ipcMain.handle('app:getPaths', () => ({
     userData: app.getPath('userData'),
     documents: app.getPath('documents'),

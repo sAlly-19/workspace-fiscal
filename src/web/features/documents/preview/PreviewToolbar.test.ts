@@ -95,7 +95,7 @@ describe('PreviewToolbar - Fiscal Status Pill (IMP-019)', () => {
     it('renders primary Print / PDF button in the toolbar', () => {
       const tree = PreviewToolbar(defaultProps);
       const serialized = JSON.stringify(tree);
-      expect(serialized).toContain('Imprimir / PDF');
+      expect(serialized).toContain('Imprimir ou Salvar em PDF');
     });
 
     it('renders MoreActionsDropdown when open with all secondary items', () => {

@@ -4,6 +4,16 @@ import path from 'path';
 import os from 'os';
 import { FolderWatcherService } from './folder-watcher.service';
 
+
+async function waitForCondition(fn: () => boolean, timeoutMs = 2000, stepMs = 25): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (fn()) return true;
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+  return fn();
+}
+
 describe('FolderWatcherService', () => {
   let tempDir: string;
   let service: FolderWatcherService;
@@ -78,7 +88,7 @@ describe('FolderWatcherService', () => {
     });
 
     // Wait for catch-up scanning
-    await new Promise((r) => setTimeout(r, 120));
+    await waitForCondition(() => Boolean(emittedEvents.find((e) => e.event === 'WATCH_PROMPT_IMPORT')));
 
     // Initially queues for confirmation
     expect(mockImportService.createImportJob).not.toHaveBeenCalled();
@@ -128,7 +138,7 @@ describe('FolderWatcherService', () => {
       watchMode: 'prompt',
     });
 
-    await new Promise((r) => setTimeout(r, 120));
+    await waitForCondition(() => service.getPendingFiles('folder-2').length === 1);
 
     // In prompt mode, importService should NOT be called automatically
     expect(mockImportService.createImportJob).not.toHaveBeenCalled();
@@ -162,7 +172,7 @@ describe('FolderWatcherService', () => {
       watchMode: 'prompt',
     });
 
-    await new Promise((r) => setTimeout(r, 120));
+    await waitForCondition(() => service.getPendingFiles('folder-3').length === 1);
     expect(service.getPendingFiles('folder-3').length).toBe(1);
 
     // Dismiss pending

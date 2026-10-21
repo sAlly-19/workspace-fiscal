@@ -1,4 +1,4 @@
-﻿export function formatCents(cents: number): string {
+export function formatCents(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -17,9 +17,26 @@ export function competenceLabel(comp: string): string {
   return `${MONTHS_PT_FULL[idx]} ${y}`;
 }
 
-export function formatDateBR(d: string | Date): string {
+export function formatDateBR(d: string | Date | null | undefined): string {
+  if (!d) return '-';
+  if (typeof d === 'string') {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      return `${m[3]}/${m[2]}/${m[1]}`;
+    }
+  }
   const date = new Date(d);
-  return date.toLocaleDateString('pt-BR');
+  if (isNaN(date.getTime())) return '-';
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 export function cnpjMask(v: string): string {
@@ -44,7 +61,16 @@ export function getLastClosedCompetence(): string {
   return `${lastClosed.getFullYear()}-${String(lastClosed.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function competenceFromDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+export function competenceFromDate(d: string | Date | null | undefined): string {
+  if (!d) return '';
+  if (typeof d === 'string') {
+    const m = d.match(/^(\d{4})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}`;
+  }
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }

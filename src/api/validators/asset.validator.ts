@@ -30,6 +30,20 @@ export interface DisposeAssetInput {
   generateResidual?: boolean;
 }
 
+export function parseDateInput(val: unknown): Date | null {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    const match = val.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, y, m, d] = match;
+      const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+      return isNaN(date.getTime()) ? null : date;
+    }
+  }
+  const d = new Date(val as any);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export function validateCreateAsset(body: unknown): ValidationResult<CreateAssetInput> {
   const errors: string[] = [];
 
@@ -56,8 +70,8 @@ export function validateCreateAsset(body: unknown): ValidationResult<CreateAsset
   if (!b.acquisitionDate) {
     errors.push('Data de aquisição é obrigatória');
   } else {
-    const d = new Date(b.acquisitionDate);
-    if (isNaN(d.getTime())) {
+    const d = parseDateInput(b.acquisitionDate);
+    if (!d) {
       errors.push('Data de aquisição inválida');
     } else {
       acquisitionDate = d;
@@ -149,8 +163,8 @@ export function validateUpdateAsset(body: unknown): ValidationResult<UpdateAsset
   }
 
   if (b.acquisitionDate !== undefined) {
-    const d = new Date(b.acquisitionDate);
-    if (isNaN(d.getTime())) {
+    const d = parseDateInput(b.acquisitionDate);
+    if (!d) {
       errors.push('Data de aquisição inválida');
     } else {
       data.acquisitionDate = d;
@@ -228,8 +242,8 @@ export function validateDisposeAsset(body: unknown): ValidationResult<DisposeAss
   let disposedAt = new Date();
 
   if (b.disposedAt !== undefined && b.disposedAt !== null && String(b.disposedAt).trim() !== '') {
-    const d = new Date(b.disposedAt);
-    if (isNaN(d.getTime())) {
+    const d = parseDateInput(b.disposedAt);
+    if (!d) {
       errors.push('Data de baixa inválida');
     } else {
       disposedAt = d;
@@ -253,4 +267,3 @@ export function validateDisposeAsset(body: unknown): ValidationResult<DisposeAss
     },
   };
 }
-

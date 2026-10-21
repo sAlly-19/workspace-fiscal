@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
+import { CURRENT_APP_VERSION, isNewerVersion } from '../components/whats-new/whatsNewData';
 
 export interface UpdateProgressData {
   percent: number;
@@ -127,8 +128,9 @@ export function useAutoUpdate() {
         const res = await apiFetch('/api/updates/check');
         if (res.ok) {
           const info: UpdateInfo = await res.json();
+          const hasActualUpdate = Boolean(info.hasUpdate && isNewerVersion(info.latestVersion || (info as any).version, CURRENT_APP_VERSION));
           const state: UpdaterState = {
-            status: info.hasUpdate ? 'available' : 'not-available',
+            status: hasActualUpdate ? 'available' : 'not-available',
             updateInfo: info,
             progress: null,
             errorMessage: null,
@@ -136,7 +138,7 @@ export function useAutoUpdate() {
             isDev: true,
           };
           setUpdaterState(state);
-          if (info.hasUpdate || force) setIsOpen(true);
+          if (hasActualUpdate || force) setIsOpen(true);
           return state;
         }
       }

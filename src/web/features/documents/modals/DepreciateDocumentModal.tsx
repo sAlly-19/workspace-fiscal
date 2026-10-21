@@ -180,8 +180,13 @@ export function DepreciateDocumentModal({
             };
 
         const issueDateIso = data.invoice.issueDate
-          ? new Date(data.invoice.issueDate).toISOString().slice(0, 10)
-          : new Date().toISOString().slice(0, 10);
+          ? (data.invoice.issueDate.match(/^(\d{4}-\d{2}-\d{2})/)
+              ? data.invoice.issueDate.match(/^(\d{4}-\d{2}-\d{2})/)![1]
+              : new Date(data.invoice.issueDate).toISOString().slice(0, 10))
+          : (() => {
+              const now = new Date();
+              return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            })();
 
         setForm({
           code: itemPrefill.code,

@@ -472,14 +472,14 @@ export function PreviewToolbar({
           }`}
         />
 
-        {/* Primary Action Button: Print / PDF */}
+        {/* Primary Action Button: Print / PDF (Icon only) */}
         <button
           onClick={handlePrint}
-          className="flex items-center gap-1.5 md:gap-2 px-3 md:px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium rounded-lg text-xs shadow-md transition-all cursor-pointer shrink-0"
+          className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-lg shadow-sm transition-all cursor-pointer shrink-0"
           title="Imprimir ou Salvar em PDF (A4)"
+          aria-label="Imprimir ou Salvar em PDF (A4)"
         >
-          <Printer className="w-3.5 h-3.5" />
-          <span>Imprimir / PDF</span>
+          <Printer className="w-4 h-4" />
         </button>
 
         {/* Secondary Actions Dropdown */}

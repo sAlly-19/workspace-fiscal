@@ -108,15 +108,12 @@ export function WhatsNewModal({ open, onClose }: WhatsNewModalProps) {
                   <h2 className="font-extrabold text-base tracking-tight">
                     Novidades da Versão
                   </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-purple-600 text-white shadow-xs">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-purple-600 text-white shadow-xs tracking-wide">
                     v{CURRENT_APP_VERSION}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
-                    Versão 3.5
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                  Confira as principais melhorias e novos recursos disponíveis no Workspace Fiscal.
+                  Confira os novos recursos, correções e melhorias disponíveis para seu fluxo fiscal.
                 </p>
               </div>
             </div>

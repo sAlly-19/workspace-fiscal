@@ -1,4 +1,4 @@
-﻿export interface ColumnMappingItem {
+export interface ColumnMappingItem {
   id: string;
   column: string;
   label?: string;
@@ -36,6 +36,36 @@ export function colLetterToIndex(col: string): number {
     index = index * 26 + (upper.charCodeAt(i) - 64);
   }
   return index - 1;
+}
+
+function formatCsvDate(d: string | Date | undefined, dateFormat?: 'DD/MM/YYYY' | 'YYYY-MM-DD'): string {
+  if (!d) return '';
+  let y = '', m = '', day = '';
+  if (typeof d === 'string') {
+    const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      [, y, m, day] = match;
+    } else {
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return '';
+      y = String(dt.getUTCFullYear());
+      m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      day = String(dt.getUTCDate()).padStart(2, '0');
+    }
+  } else {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    if (dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0 && dt.getUTCSeconds() === 0 && dt.getUTCMilliseconds() === 0) {
+      y = String(dt.getUTCFullYear());
+      m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      day = String(dt.getUTCDate()).padStart(2, '0');
+    } else {
+      y = String(dt.getFullYear());
+      m = String(dt.getMonth() + 1).padStart(2, '0');
+      day = String(dt.getDate()).padStart(2, '0');
+    }
+  }
+  return dateFormat === 'YYYY-MM-DD' ? `${y}-${m}-${day}` : `${day}/${m}/${y}`;
 }
 
 export function formatDepreciationRowsToCsv(
@@ -98,7 +128,7 @@ export function formatDepreciationRowsToCsv(
       category: r.categoryName || 'Outros',
       documentNumber: docNumFormatted,
       supplier: r.supplier || '',
-      acquisitionDate: r.acquisitionDate ? new Date(r.acquisitionDate).toLocaleDateString('pt-BR') : '',
+      acquisitionDate: formatCsvDate(r.acquisitionDate, options?.dateFormat),
       acquisitionValue: formatNum(r.acquisitionValue),
       annualRate: `${r.annualRate}%`,
       depreciationValue: formatNum(r.depreciationValue),

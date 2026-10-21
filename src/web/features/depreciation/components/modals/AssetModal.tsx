@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Save } from 'lucide-react';
 import { AssetXmlDropZone } from '../../AssetXmlDropZone';
@@ -12,10 +12,36 @@ export interface AssetModalProps {
   onSave: (data: any) => Promise<void> | void;
 }
 
+function toInputDateString(dateVal: any): string {
+  if (!dateVal) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof dateVal === 'string') {
+    const match = dateVal.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+  const dt = new Date(dateVal);
+  if (isNaN(dt.getTime())) return '';
+  if (dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0 && dt.getUTCSeconds() === 0 && dt.getUTCMilliseconds() === 0) {
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dt.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function AssetModal({ isLight, editing, categories, selectedCompanyId, onClose, onSave }: AssetModalProps) {
   const [form, setForm] = useState({
     supplier: editing?.supplier || '',
-    acquisitionDate: editing?.acquisitionDate ? new Date(editing.acquisitionDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+    acquisitionDate: toInputDateString(editing?.acquisitionDate),
     documentNumber: editing?.documentNumber || '',
     description: editing?.description || '',
     acquisitionValue: editing ? (editing.acquisitionValue / 100).toFixed(2).replace('.', ',') : '',

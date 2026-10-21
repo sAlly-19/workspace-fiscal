@@ -42,7 +42,7 @@ export function isNewerVersion(latest: string, current: string): boolean {
 }
 
 export class UpdateService {
-  private currentVersion = '3.0.0';
+  private currentVersion = '3.5.3';
   private repo = 'sAlly-19/workspace-fiscal';
 
   constructor() {
@@ -59,6 +59,12 @@ export class UpdateService {
       }
     } catch {
       this.currentVersion = '3.0.0';
+    }
+  }
+
+  setCurrentVersion(version: string) {
+    if (version && typeof version === 'string') {
+      this.currentVersion = version.trim().replace(/^[vV]/, '');
     }
   }
 
