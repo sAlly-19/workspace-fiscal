@@ -71,7 +71,14 @@ export function AssetXmlDropZone({ onPrefill }: Props) {
         supplier: data.supplier,
         documentNumber: data.documentNumber ?? '',
         series: data.series,
-        acquisitionDate: data.issueDate ? data.issueDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        acquisitionDate: data.issueDate
+          ? (data.issueDate.match(/^(\d{4}-\d{2}-\d{2})/)
+              ? data.issueDate.match(/^(\d{4}-\d{2}-\d{2})/)[1]
+              : data.issueDate.slice(0, 10))
+          : (() => {
+              const now = new Date();
+              return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            })(),
         acquisitionValue: data.total,
         description: bestDescription,
         ncm: data.items?.[0]?.ncm ?? null,

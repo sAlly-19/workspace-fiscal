@@ -51,7 +51,15 @@ function getCompetenceRange(start: string, end: string): string[] {
 }
 
 function defaultStartForAsset(asset: Asset): string {
+  if (typeof asset.acquisitionDate === 'string') {
+    const m = asset.acquisitionDate.match(/^(\d{4})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}`;
+  }
   const d = new Date(asset.acquisitionDate);
+  if (isNaN(d.getTime())) return '';
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0) {
+    return formatComp(d.getUTCFullYear(), d.getUTCMonth() + 1);
+  }
   return formatComp(d.getFullYear(), d.getMonth() + 1);
 }
 
@@ -81,7 +89,7 @@ export function RetroactiveBatchModal({ isLight, assets, lastClosed, depreciatio
         const schedule = generateSchedule({
           acquisitionValue: a.acquisitionValue,
           annualRate: a.annualRate || 10,
-          acquisitionDate: new Date(a.acquisitionDate),
+          acquisitionDate: a.acquisitionDate,
           depreciationRule: rule,
         });
         for (const m of schedule) {

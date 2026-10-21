@@ -39,6 +39,7 @@ export interface AppSettings {
   autoOpenPrint: boolean;
   defaultFormat: 'A4' | 'A5';
   theme: 'dark' | 'light';
+  hideUnidentifiedDocs?: boolean;
 }
 
 export interface FolderSyncProgress {

@@ -8,6 +8,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AppSettings, DocumentItem, FolderNode } from '../../stores/workspace.store';
+import { countUnidentifiedDocuments } from '../../features/documents/workspace/unidentified-documents.utils';
 
 export interface DedupePolicy {
   policy: 'IGNORE' | 'OVERWRITE' | 'CREATE_VERSION';
@@ -39,6 +40,8 @@ export function NfViewSettingsTab({
   exportCsv,
   onOpenResetConfirm,
 }: NfViewSettingsTabProps) {
+  const unidentifiedCount = countUnidentifiedDocuments(documents);
+
   return (
     <div className="space-y-6">
       {/* 1. Preferências do DANFE */}
@@ -79,6 +82,28 @@ export function NfViewSettingsTab({
               type="checkbox"
               checked={settings.autoOpenPrint}
               onChange={(e) => updateSettings({ autoOpenPrint: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+          </label>
+
+          <label className="flex items-center justify-between cursor-pointer pt-2.5 border-t border-white/10">
+            <div>
+              <div className={`font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
+                Ocultar Documentos Não Identificados (S/N)
+              </div>
+              <div className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#71717a]'}`}>
+                Oculta da listagem eventos fiscais, cancelamentos, inutilizações ou arquivos sem número e emitente (S/N e R$ 0,00).
+                {unidentifiedCount > 0 && (
+                  <span className="block mt-0.5 text-amber-500 font-medium">
+                    {unidentifiedCount} documento(s) com este perfil detectado(s) no banco.
+                  </span>
+                )}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={Boolean(settings.hideUnidentifiedDocs)}
+              onChange={(e) => updateSettings({ hideUnidentifiedDocs: e.target.checked })}
               className="w-4 h-4 rounded border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
           </label>

@@ -23,6 +23,7 @@ export interface DocumentListPaneProps {
   allFilteredSelected: boolean;
   isDocsLoading: boolean;
   searchQuery: string;
+  hiddenCount?: number;
   onSelectAllDocs: (checked: boolean) => void;
   onSelectDocument: (id: string, label?: string) => void;
   onToggleDocSelection: (id: string) => void;
@@ -247,6 +248,7 @@ export function DocumentListPane({
   allFilteredSelected,
   isDocsLoading,
   searchQuery,
+  hiddenCount,
   onSelectAllDocs,
   onSelectDocument,
   onToggleDocSelection,
@@ -345,6 +347,14 @@ export function DocumentListPane({
           >
             {filteredDocuments.length}
           </span>
+          {Boolean(hiddenCount && hiddenCount > 0) && (
+            <span
+              title={`${hiddenCount} notas sem número/identificação estão ocultas pelas configurações`}
+              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0"
+            >
+              {hiddenCount} ocultas
+            </span>
+          )}
         </div>
 
         {/* Quick batch export button & selection counter */}

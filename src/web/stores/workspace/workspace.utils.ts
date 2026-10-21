@@ -41,6 +41,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoOpenPrint: false,
   defaultFormat: 'A4',
   theme: 'dark',
+  hideUnidentifiedDocs: false,
 };
 
 export const getStoredSettings = (): AppSettings => {

@@ -13,6 +13,7 @@ import { WorkspaceModals } from './components/WorkspaceModals';
 import { DocumentListPane } from '../features/documents/workspace/DocumentListPane';
 import { DocumentPreviewEmptyState } from '../features/documents/workspace/DocumentPreviewEmptyState';
 import { DepreciateDocumentModal } from '../features/documents/modals/DepreciateDocumentModal';
+import { isUnidentifiedDocument } from '../features/documents/workspace/unidentified-documents.utils';
 
 export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   const {
@@ -217,24 +218,35 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     [selectedFolderId, folders]
   );
 
-  // Filter documents by search and by selected workspace folder
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      !searchQuery ||
-      (doc.number && doc.number.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.issuerName && doc.issuerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Filter documents by search, by selected workspace folder, and by settings
+  const { filteredDocuments, hiddenUnidentifiedCount } = useMemo(() => {
+    let hiddenCount = 0;
+    const filtered = documents.filter((doc) => {
+      const isUnidentified = isUnidentifiedDocument(doc);
+      if (settings.hideUnidentifiedDocs && isUnidentified) {
+        hiddenCount++;
+        return false;
+      }
 
-    const matchesFolder =
-      allowedFolderIds === null
-        ? true
-        : doc.batchId
-        ? allowedFolderIds.has(doc.batchId)
-        : false;
+      const matchesSearch =
+        !searchQuery ||
+        (doc.number && doc.number.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (doc.issuerName && doc.issuerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchesSearch && matchesFolder;
-  });
+      const matchesFolder =
+        allowedFolderIds === null
+          ? true
+          : doc.batchId
+          ? allowedFolderIds.has(doc.batchId)
+          : false;
+
+      return matchesSearch && matchesFolder;
+    });
+
+    return { filteredDocuments: filtered, hiddenUnidentifiedCount: hiddenCount };
+  }, [documents, settings.hideUnidentifiedDocs, searchQuery, allowedFolderIds]);
 
   const allFilteredSelected =
     filteredDocuments.length > 0 && filteredDocuments.every((d) => selectedDocIds.includes(d.id));
@@ -891,6 +903,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
           listWidth={listWidth}
           currentTheme={currentTheme}
           filteredDocuments={filteredDocuments}
+          hiddenCount={hiddenUnidentifiedCount}
           selectedDocumentId={selectedDocumentId}
           selectedDocIds={selectedDocIds}
           selectedFolderName={selectedFolderName}

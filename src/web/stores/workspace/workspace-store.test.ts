@@ -29,6 +29,7 @@ describe('Workspace Store Slices & State Management', () => {
       expect(DEFAULT_SETTINGS.showReceiptStub).toBe(true);
       expect(DEFAULT_SETTINGS.defaultFormat).toBe('A4');
       expect(DEFAULT_SETTINGS.theme).toBe('dark');
+      expect(DEFAULT_SETTINGS.hideUnidentifiedDocs).toBe(false);
       expect(getStoredSettings()).toBeDefined();
     });
   });
@@ -65,9 +66,10 @@ describe('Workspace Store Slices & State Management', () => {
       setSearchQuery('fornecedor teste');
       expect(useWorkspaceStore.getState().searchQuery).toBe('fornecedor teste');
 
-      updateSettings({ theme: 'light', defaultFormat: 'A5' });
+      updateSettings({ theme: 'light', defaultFormat: 'A5', hideUnidentifiedDocs: true });
       expect(useWorkspaceStore.getState().settings.theme).toBe('light');
       expect(useWorkspaceStore.getState().settings.defaultFormat).toBe('A5');
+      expect(useWorkspaceStore.getState().settings.hideUnidentifiedDocs).toBe(true);
 
       setIsSettingsOpen(true);
       expect(useWorkspaceStore.getState().isSettingsOpen).toBe(true);
