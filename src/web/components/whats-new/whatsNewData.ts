@@ -14,11 +14,12 @@ import {
   ZoomIn,
   FolderTree,
   Archive,
+  LayoutTemplate,
 } from 'lucide-react';
 
-export type AppVersion = '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
+export type AppVersion = '3.5.3' | '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
-export const CURRENT_APP_VERSION = '3.5.2';
+export const CURRENT_APP_VERSION = '3.5.3';
 
 export interface VersionBulletPoint {
   boldPrefix?: string;
@@ -47,10 +48,78 @@ export interface VersionSectionData {
 
 export const WHATS_NEW_VERSIONS: VersionSectionData[] = [
   {
-    id: '3.5.2',
-    label: 'v3.5.2 (Atual)',
+    id: '3.5.3',
+    label: 'v3.5.3 (Atual)',
     isCurrent: true,
     subtitleText: 'Lançamento mais recente',
+    cards: [
+      {
+        id: '3.5.3-watcher-reconciliation',
+        icon: FolderTree,
+        iconClasses: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        hoverBorderClasses: 'hover:border-purple-300 dark:hover:border-purple-500/30',
+        title: 'Reconciliação e Deduplicação Inteligente de Pastas Monitoradas',
+        badgeText: 'Pastas Monitoradas',
+        badgeClasses: 'text-purple-600 dark:text-purple-400',
+        description: 'Eliminação definitiva de alertas falsos e sincronização ultra-rápida de diretórios fiscais:',
+        bullets: [
+          {
+            boldPrefix: 'Sniffer Fiscal Inteligente: ',
+            text: 'Reconhecimento de Inutilizações (<infInut>), Eventos de NF-e/CT-e e NFS-e convertidas (<N_DA_NFSE>) sem necessidade de parsing pesado.',
+          },
+          {
+            boldPrefix: 'Persistência em Lote SQLite: ',
+            text: 'Tabela dedicada folder_watch_files gravando milhares de arquivos em chunks otimizados com reconciliação global em todo o workspace.',
+          },
+        ],
+      },
+      {
+        id: '3.5.3-hide-unidentified-docs',
+        icon: Filter,
+        iconClasses: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        hoverBorderClasses: 'hover:border-blue-300 dark:hover:border-blue-500/30',
+        title: 'Ocultação de Documentos Não Identificados (S/N)',
+        badgeText: 'Produtividade & Visualização',
+        badgeClasses: 'text-blue-600 dark:text-blue-400',
+        description: 'Visualização mais limpa e focada exclusivamente em notas fiscais homologadas válidas:',
+        bullets: [
+          {
+            boldPrefix: 'Filtro em Configurações: ',
+            text: 'Nova opção em Configurações ➔ NF View para ocultar eventos fiscais, cancelamentos e XMLs incompletos sem número ou emitente.',
+          },
+          {
+            boldPrefix: 'Contador em Tempo Real: ',
+            text: 'Métricas instantâneas do total de documentos sem identificação no banco e badge discreto de itens ocultos no cabeçalho.',
+          },
+        ],
+      },
+      {
+        id: '3.5.3-toolbar-launcher-ux',
+        icon: LayoutTemplate,
+        iconClasses: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        hoverBorderClasses: 'hover:border-emerald-300 dark:hover:border-emerald-500/30',
+        title: 'Novo Toolbar Executivo Minimalista e Launcher Seguro',
+        badgeText: 'Interface & Estabilidade',
+        badgeClasses: 'text-emerald-600 dark:text-emerald-400',
+        description: 'Ergonomia aprimorada no visualizador de notas e garantia de inicialização sempre atualizada:',
+        bullets: [
+          {
+            boldPrefix: 'Cabeçalho Executivo em Linha Única: ',
+            text: 'Ações secundárias (Copiar Chave, Baixar XML, Depreciar e Busca) consolidadas em dropdown elegante com atalhos de teclado.',
+          },
+          {
+            boldPrefix: 'Compilação Automática no Boot: ',
+            text: 'Launcher e scripts de execução agora compilam os bundles prévios do Electron, garantindo execução sempre sincronizada.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3.5.2',
+    label: 'v3.5.2',
+    isCurrent: false,
+    subtitleText: 'Conformidade Tributária 2026 e Performance',
     cards: [
       {
         id: '3.5.2-reforma-tributaria-cnpj',

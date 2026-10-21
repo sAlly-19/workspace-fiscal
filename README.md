@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **3.5.2**
+Versão: **3.5.3**
 
 ---
 
@@ -413,7 +413,21 @@ npm run lint
 
 O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
 
-### Versão 3.5.2 (Atual)
+### Versão 3.5.3 (Atual)
+- **Reconciliação e Deduplicação Inteligente de Pastas Monitoradas:**
+  - Reconciliação global em lote para diretórios locais e de rede (`Z:\`, downloads e subpastas).
+  - Sniffer rápido inteligente com reconhecimento de Inutilizações (`<infInut>`), Eventos (`<procEventoNFe>`, `<procEventoCTe>`) e NFS-e convertidas (`<N_DA_NFSE>`, `<CPFCNPJ_PRESTADOR>`).
+  - Persistência persistente em banco SQLite (`folder_watch_files`) com inserções em lote em chunks otimizados de 100 itens, eliminando alertas falsos ao reabrir o app.
+- **Ocultação de Documentos Não Identificados (S/N e R$ 0,00):**
+  - Nova opção em *Configurações ➔ NF View*: "Ocultar Documentos Não Identificados (S/N)".
+  - Filtro reativo para eventos fiscais, cancelamentos ou XMLs incompletos sem número/emitente, com contador em tempo real no menu e badge discreto na listagem (`X ocultas`).
+- **Novo Toolbar Executivo Minimalista no Visualizador de Notas:**
+  - Redesenho do cabeçalho superior do visualizador de DANFE/XML com layout limpo em linha única.
+  - Ações secundárias consolidadas em dropdown elegante (Copiar Chave, Baixar XML, Depreciar Bem e Busca na Nota com atalhos de teclado).
+- **Garantia de Compilação no Launcher e Boot:**
+  - `launch.bat` e `npm run dev:electron` atualizados para sempre compilar o backend Electron previamente, garantindo execução sincronizada.
+
+### Versão 3.5.2
 - **Conformidade Tributária 2026 (IBS, CBS e Imposto Seletivo):**
   - Extração híbrida para layout plano e agrupadores oficiais da NT 2024.002 / NT 2025.002 (`gIBSCBS`, `gIBS`, `gCBS`, `IBSCBSTot`) nos parsers NF-e, CT-e e NFS-e.
   - Exibição analítica condicional no DANFE e na aba "Dados da Nota", preservando 100% da visualização legada para notas anteriores a 2026.

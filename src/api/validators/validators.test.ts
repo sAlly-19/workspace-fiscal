@@ -318,10 +318,10 @@ describe('API Input Contract Validators (IMP-011 / IMP-T03)', () => {
     });
 
     it('validates seen version with string up to 50 chars', () => {
-      const valid = validateSeenVersion({ version: '3.5.2' });
+      const valid = validateSeenVersion({ version: '3.5.3' });
       expect(valid.success).toBe(true);
       if (valid.success) {
-        expect(valid.data.version).toBe('3.5.2');
+        expect(valid.data.version).toBe('3.5.3');
       }
     });
 
