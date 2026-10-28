@@ -99,7 +99,13 @@ export default function App() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="min-h-screen"
           >
-            <BuscadorApp onBackToHome={() => setView('home')} />
+            <BuscadorApp
+              onBackToHome={() => setView('home')}
+              onNavigateNfView={(folderId, folderName) => {
+                useWorkspaceStore.getState().selectFolder(folderId, folderName);
+                setView('nfview');
+              }}
+            />
           </motion.div>
         )}
       </AnimatePresence>

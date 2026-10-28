@@ -4,12 +4,18 @@ import { CheckCircle2, AlertCircle, Info, X, AlertTriangle } from 'lucide-react'
 
 export type ToastKind = 'success' | 'error' | 'info' | 'warning';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   kind: ToastKind;
   title: string;
   description?: string;
   durationMs?: number;
+  action?: ToastAction;
 }
 
 interface ToastState {
@@ -29,12 +35,12 @@ export const useToastStore = create<ToastState>((set) => ({
 }));
 
 export const toast = {
-  success: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: 'success', title, description }),
+  success: (title: string, description?: string, action?: ToastAction) =>
+    useToastStore.getState().push({ kind: 'success', title, description, action, durationMs: action ? 8000 : undefined }),
   error: (title: string, description?: string) =>
     useToastStore.getState().push({ kind: 'error', title, description }),
-  info: (title: string, description?: string) =>
-    useToastStore.getState().push({ kind: 'info', title, description }),
+  info: (title: string, description?: string, action?: ToastAction) =>
+    useToastStore.getState().push({ kind: 'info', title, description, action, durationMs: action ? 8000 : undefined }),
   warning: (title: string, description?: string) =>
     useToastStore.getState().push({ kind: 'warning', title, description }),
 };
@@ -101,6 +107,18 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
         <p className="text-xs font-semibold">{t.title}</p>
         {t.description && (
           <p className="text-[11px] text-[#a1a1aa] mt-0.5 leading-snug">{t.description}</p>
+        )}
+        {t.action && (
+          <button
+            type="button"
+            onClick={() => {
+              t.action?.onClick();
+              onDismiss();
+            }}
+            className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <span>{t.action.label}</span>
+          </button>
         )}
       </div>
       <button

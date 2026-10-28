@@ -271,7 +271,7 @@ export class DocumentRepository {
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Contagem total
-    const fromClause = `FROM ${this.table} d JOIN companies c ON (c.numeric_id = d.company_id OR c.id = d.company_id OR c.id = CAST(d.company_id AS TEXT))`;
+    const fromClause = `FROM ${this.table} d JOIN companies c ON (c.numeric_id = d.company_id OR (c.numeric_id IS NULL AND c.id = CAST(d.company_id AS TEXT)))`;
     const countSql = `SELECT COUNT(*) as total ${fromClause} ${whereClause};`;
     const countRow = this.db.queryOne<{ total: number }>(countSql, params);
     const total = countRow?.total || 0;

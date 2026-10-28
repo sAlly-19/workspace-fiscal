@@ -100,3 +100,6 @@ tmp/
 *.dmg
 *.AppImage
 *.snap
+
+# Presentations & Slide Decks
+presentation/

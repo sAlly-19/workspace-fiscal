@@ -9,6 +9,8 @@ import { SefazProgressModal } from './SefazProgressModal';
 import { DocumentDetailsModal } from './DocumentDetailsModal';
 import { ConfirmDialog } from './feedback/ConfirmDialog';
 import { FeedbackModalHost } from './feedback/FeedbackModalHost';
+import { SendToNfViewModal } from './SendToNfViewModal';
+import { ImportProgressModal } from '@/web/components/ImportProgressModal';
 
 export interface BuscadorModalsProps {
   showSplash: boolean;
@@ -58,6 +60,19 @@ export interface BuscadorModalsProps {
   isDeletingCompany: boolean;
   onConfirmDeleteCompany: () => void;
   onCancelDeleteCompany: () => void;
+  // Send to NF View Modal
+  isSendToNfViewModalOpen?: boolean;
+  onCloseSendToNfViewModal?: () => void;
+  docsToSendToNfView?: FiscalDocument[];
+  onConfirmSendToNfView?: (targetFolderId: string | null, targetFolderName: string, validDocs: FiscalDocument[]) => Promise<void>;
+  isSendingToNfView?: boolean;
+  // Send Import Progress
+  sendProgress?: { total: number; processed: number; percent: number } | null;
+  sendTargetFolderName?: string;
+  isSendCancelled?: boolean;
+  isSendCancelling?: boolean;
+  onCancelSendImport?: () => void;
+  onCloseSendProgress?: () => void;
 }
 
 export function BuscadorModals({
@@ -100,6 +115,17 @@ export function BuscadorModals({
   isDeletingCompany,
   onConfirmDeleteCompany,
   onCancelDeleteCompany,
+  isSendToNfViewModalOpen,
+  onCloseSendToNfViewModal,
+  docsToSendToNfView,
+  onConfirmSendToNfView,
+  isSendingToNfView,
+  sendProgress,
+  sendTargetFolderName,
+  isSendCancelled,
+  isSendCancelling,
+  onCancelSendImport,
+  onCloseSendProgress,
 }: BuscadorModalsProps) {
   return (
     <>
@@ -179,6 +205,28 @@ export function BuscadorModals({
         isBusy={isDeletingCompany}
         onConfirm={onConfirmDeleteCompany}
         onCancel={onCancelDeleteCompany}
+      />
+
+      {docsToSendToNfView && onConfirmSendToNfView && (
+        <SendToNfViewModal
+          isOpen={Boolean(isSendToNfViewModalOpen)}
+          onClose={onCloseSendToNfViewModal || (() => {})}
+          documents={docsToSendToNfView}
+          onConfirmSend={onConfirmSendToNfView}
+          isSending={isSendingToNfView}
+        />
+      )}
+
+      <ImportProgressModal
+        isOpen={Boolean(isSendingToNfView)}
+        total={sendProgress?.total || 0}
+        processed={sendProgress?.processed || 0}
+        percent={sendProgress?.percent || 0}
+        targetFolderName={sendTargetFolderName}
+        isCancelled={isSendCancelled}
+        isCancelling={isSendCancelling}
+        onCancel={onCancelSendImport}
+        onClose={onCloseSendProgress || (() => {})}
       />
 
       <FeedbackModalHost />

@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { documents, documentItems, documentTaxes, folders, type DocumentType, type DocumentStatus } from '../../db/schema';
-import { eq, inArray, sql, and, or, like } from 'drizzle-orm';
+import { eq, inArray, sql, and, or, like, gte, lte } from 'drizzle-orm';
 
 export interface CreateDocumentInput {
   id: string;
@@ -47,7 +47,7 @@ export class DocumentsRepository {
     });
   }
 
-  async findAll(batchId?: string, search?: string, limit?: number, offset?: number) {
+  async findAll(batchId?: string, search?: string, searchType?: string, limit?: number, offset?: number) {
     const conditions: any[] = [];
     if (batchId && batchId !== 'all') {
       const { workspaceRepository } = await import('./workspace.repository');
@@ -56,15 +56,59 @@ export class DocumentsRepository {
       conditions.push(inArray(documents.batchId, targetFolderIds));
     }
     if (search && search.trim()) {
-      const term = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          like(documents.number, term),
-          like(documents.issuerName, term),
-          like(documents.recipientName, term),
-          like(documents.accessKey, term)
-        )
-      );
+      const trimmed = search.trim();
+      const term = `%${trimmed}%`;
+
+      if (searchType === 'number') {
+        conditions.push(like(documents.number, term));
+      } else if (searchType === 'type') {
+        const cleanType = trimmed.toUpperCase().replace(/[^A-Z]/g, '');
+        conditions.push(eq(documents.type, cleanType as any));
+      } else if (searchType === 'issuer') {
+        conditions.push(like(documents.issuerName, term));
+      } else if (searchType === 'date') {
+        const dateMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        const monthYearMatch = trimmed.match(/^(\d{1,2})\/(\d{4})$/);
+        const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateMatch) {
+          const day = parseInt(dateMatch[1], 10);
+          const month = parseInt(dateMatch[2], 10) - 1;
+          const year = parseInt(dateMatch[3], 10);
+          const start = new Date(year, month, day, 0, 0, 0, 0);
+          const end = new Date(year, month, day, 23, 59, 59, 999);
+          conditions.push(and(gte(documents.issueDate, start), lte(documents.issueDate, end)));
+        } else if (isoMatch) {
+          const year = parseInt(isoMatch[1], 10);
+          const month = parseInt(isoMatch[2], 10) - 1;
+          const day = parseInt(isoMatch[3], 10);
+          const start = new Date(year, month, day, 0, 0, 0, 0);
+          const end = new Date(year, month, day, 23, 59, 59, 999);
+          conditions.push(and(gte(documents.issueDate, start), lte(documents.issueDate, end)));
+        } else if (monthYearMatch) {
+          const month = parseInt(monthYearMatch[1], 10) - 1;
+          const year = parseInt(monthYearMatch[2], 10);
+          const start = new Date(year, month, 1, 0, 0, 0, 0);
+          const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+          conditions.push(and(gte(documents.issueDate, start), lte(documents.issueDate, end)));
+        } else {
+          conditions.push(like(documents.number, term));
+        }
+      } else if (searchType === 'value') {
+        const numericStr = trimmed.replace(/[^\d,\.]/g, '').replace(/\./g, '').replace(',', '.');
+        const num = parseFloat(numericStr);
+        if (!isNaN(num)) {
+          conditions.push(and(gte(documents.totalAmount, num - 0.01), lte(documents.totalAmount, num + 0.01)));
+        }
+      } else {
+        conditions.push(
+          or(
+            like(documents.number, term),
+            like(documents.issuerName, term),
+            like(documents.recipientName, term),
+            like(documents.accessKey, term)
+          )
+        );
+      }
     }
     const whereClause = conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0] : and(...conditions);
     // Nota: limit/offset opcionais para paginação futura; por enquanto retorna tudo compatível com frontend atual

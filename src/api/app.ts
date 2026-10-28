@@ -66,7 +66,7 @@ export function createApp(): express.Express {
       res.json({
         status: 'ok',
         service: 'nf-view-api',
-        version: '3.5.3',
+        version: '3.5.4',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         database: {

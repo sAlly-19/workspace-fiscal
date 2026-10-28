@@ -52,6 +52,8 @@ export interface FolderSyncProgress {
   phase?: 'scanning' | 'importing' | 'completed';
 }
 
+export type SearchType = 'all' | 'number' | 'type' | 'issuer' | 'date' | 'value';
+
 export interface WorkspaceState {
   folders: FolderNode[];
   selectedFolderId: string | null;
@@ -60,6 +62,7 @@ export interface WorkspaceState {
   selectedDocumentId: string | null;
   selectedDocIds: string[];
   searchQuery: string;
+  searchType: SearchType;
   expandedFolderIds: Record<string, boolean>;
 
   // Folder real-time watch sync tracking
@@ -117,6 +120,7 @@ export interface WorkspaceState {
 
   // Search & Settings & Progress
   setSearchQuery: (query: string) => void;
+  setSearchType: (type: SearchType) => void;
   setImporting: (importing: boolean, progress?: ImportProgress | null) => void;
   setImportProgress: (progress: ImportProgress | null) => void;
   setIsSettingsOpen: (open: boolean) => void;

@@ -2,27 +2,27 @@ import { describe, it, expect } from 'vitest';
 import { CURRENT_APP_VERSION, WHATS_NEW_VERSIONS, type AppVersion } from './whatsNewData';
 
 describe('whatsNewData integrity tests', () => {
-  it('should define CURRENT_APP_VERSION as 3.5.3', () => {
-    expect(CURRENT_APP_VERSION).toBe('3.5.3');
+  it('should define CURRENT_APP_VERSION as 3.5.4', () => {
+    expect(CURRENT_APP_VERSION).toBe('3.5.4');
   });
 
-  it('should include all 9 supported application versions in descending order', () => {
-    const expectedVersions: AppVersion[] = ['3.5.3', '3.5.2', '3.5.1', '3.5.0', '3.0.0', '2.5.3', '2.5.2', '2.5.1', '2.5.0'];
+  it('should include all 10 supported application versions in descending order', () => {
+    const expectedVersions: AppVersion[] = ['3.5.4', '3.5.3', '3.5.2', '3.5.1', '3.5.0', '3.0.0', '2.5.3', '2.5.2', '2.5.1', '2.5.0'];
     const actualVersions = WHATS_NEW_VERSIONS.map((v) => v.id);
     expect(actualVersions).toEqual(expectedVersions);
   });
 
-  it('should mark version 3.5.3 as current with proper label and subtitle', () => {
+  it('should mark version 3.5.4 as current with proper label and subtitle', () => {
+    const v354 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.4');
+    expect(v354).toBeDefined();
+    expect(v354?.isCurrent).toBe(true);
+    expect(v354?.label).toBe('v3.5.4 (Atual)');
+    expect(v354?.subtitleText).toBe('Lançamento mais recente');
+
     const v353 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.3');
     expect(v353).toBeDefined();
-    expect(v353?.isCurrent).toBe(true);
-    expect(v353?.label).toBe('v3.5.3 (Atual)');
-    expect(v353?.subtitleText).toBe('Lançamento mais recente');
-
-    const v352 = WHATS_NEW_VERSIONS.find((v) => v.id === '3.5.2');
-    expect(v352).toBeDefined();
-    expect(v352?.isCurrent).toBe(false);
-    expect(v352?.label).toBe('v3.5.2');
+    expect(v353?.isCurrent).toBe(false);
+    expect(v353?.label).toBe('v3.5.3');
   });
 
   it('should ensure each version contains exactly 3 detailed cards with required visual classes', () => {

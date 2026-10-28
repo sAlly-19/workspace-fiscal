@@ -54,6 +54,76 @@ describe('Layout Components Contracts & Props', () => {
       expect(element.props.uploadError).toBe('Erro no arquivo XML');
       expect(element.props.isUploading).toBe(true);
     });
+
+    it('supports searchType selection and specialized query types', () => {
+      const setSearchType = vi.fn();
+      const setSearchQuery = vi.fn();
+
+      const element = React.createElement(MainHeader, {
+        searchQuery: 'NFE',
+        setSearchQuery,
+        searchType: 'type',
+        setSearchType,
+        searchInputRef: { current: null },
+        currentTheme: 'dark',
+        onUpdateTheme: () => {},
+        selectedFolderId: 'folder-1',
+        selectedFolderName: 'Notas de Entrada',
+        isUploading: false,
+        onTriggerUploadXml: () => {},
+        onImportDirectory: () => {},
+        onOpenSettings: () => {},
+        uploadError: null,
+        onDismissUploadError: () => {},
+      });
+
+      expect(element).toBeDefined();
+      expect(element.props.searchType).toBe('type');
+      expect(element.props.searchQuery).toBe('NFE');
+      expect(element.props.setSearchType).toBe(setSearchType);
+    });
+
+    it('renders with date and value search types', () => {
+      const elementDate = React.createElement(MainHeader, {
+        searchQuery: '15/10/2026',
+        setSearchQuery: () => {},
+        searchType: 'date',
+        searchInputRef: { current: null },
+        currentTheme: 'light',
+        onUpdateTheme: () => {},
+        selectedFolderId: null,
+        selectedFolderName: 'Todas as Notas',
+        isUploading: false,
+        onTriggerUploadXml: () => {},
+        onImportDirectory: () => {},
+        onOpenSettings: () => {},
+        uploadError: null,
+        onDismissUploadError: () => {},
+      });
+
+      expect(elementDate.props.searchType).toBe('date');
+      expect(elementDate.props.searchQuery).toBe('15/10/2026');
+
+      const elementValue = React.createElement(MainHeader, {
+        searchQuery: '150,00',
+        setSearchQuery: () => {},
+        searchType: 'value',
+        searchInputRef: { current: null },
+        currentTheme: 'dark',
+        onUpdateTheme: () => {},
+        selectedFolderId: null,
+        selectedFolderName: 'Todas as Notas',
+        isUploading: false,
+        onTriggerUploadXml: () => {},
+        onImportDirectory: () => {},
+        onOpenSettings: () => {},
+        uploadError: null,
+        onDismissUploadError: () => {},
+      });
+
+      expect(elementValue.props.searchType).toBe('value');
+      expect(elementValue.props.searchQuery).toBe('150,00');
+    });
   });
 
   describe('MainFooter', () => {

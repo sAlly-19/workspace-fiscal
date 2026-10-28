@@ -44,6 +44,7 @@ export const DocumentWorkspace: React.FC<DocumentWorkspaceProps> = (props) => {
         onViewDetails={props.onViewDetails}
         onDownloadXml={props.onDownloadXml}
         onDownloadPdf={props.onDownloadPdf}
+        onSendToNfView={props.onSendToNfView}
         onPageChange={props.onPageChange}
         onPageSizeChange={props.onPageSizeChange}
       />

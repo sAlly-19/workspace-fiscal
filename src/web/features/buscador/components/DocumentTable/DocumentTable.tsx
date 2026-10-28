@@ -18,6 +18,7 @@ export interface DocumentTableProps {
   onViewDetails: (doc: FiscalDocument) => void;
   onDownloadXml: (id: number) => void;
   onDownloadPdf: (id: number) => void;
+  onSendToNfView?: (doc: FiscalDocument) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: PageSize) => void;
 }
@@ -35,6 +36,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onViewDetails,
   onDownloadXml,
   onDownloadPdf,
+  onSendToNfView,
   onPageChange,
   onPageSizeChange,
 }) => {
@@ -96,6 +98,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                   onViewDetails={() => onViewDetails(doc)}
                   onDownloadXml={() => onDownloadXml(doc.id)}
                   onDownloadPdf={() => onDownloadPdf(doc.id)}
+                  onSendToNfView={onSendToNfView ? () => onSendToNfView(doc) : undefined}
                 />
               ))}
             </tbody>

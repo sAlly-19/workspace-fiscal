@@ -38,6 +38,7 @@ async function loadDedupeSettings(): Promise<DedupeSettings> {
 export class ImportService {
   private jobDuplicates = new Map<string, number>();
   private jobTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private cancelledJobs = new Set<string>();
 
   async createImportJob(totalFiles: number) {
     const id = crypto.randomUUID();
@@ -46,6 +47,7 @@ export class ImportService {
     const timer = setTimeout(() => {
       this.jobDuplicates.delete(id);
       this.jobTimers.delete(id);
+      this.cancelledJobs.delete(id);
     }, 30 * 60 * 1000);
     // Permite processo encerrar sem esperar timer
     if ((timer as any)?.unref) (timer as any).unref();
@@ -58,6 +60,18 @@ export class ImportService {
     }).returning();
     
     return job;
+  }
+
+  isJobCancelled(jobId: string): boolean {
+    return this.cancelledJobs.has(jobId);
+  }
+
+  async cancelImportJob(jobId: string) {
+    this.cancelledJobs.add(jobId);
+    await db.update(importJobs)
+      .set({ status: 'CANCELLED' })
+      .where(eq(importJobs.id, jobId));
+    return { success: true };
   }
 
   async getImportJobStatus(jobId: string) {
@@ -273,6 +287,9 @@ export class ImportService {
   }
 
   async markJobCompleted(jobId: string) {
+    if (this.isJobCancelled(jobId)) {
+      return;
+    }
     await db.update(importJobs)
       .set({ status: 'COMPLETED' })
       .where(eq(importJobs.id, jobId));

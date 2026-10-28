@@ -86,7 +86,7 @@ export function registerDocumentHandlers(services: ApplicationContext, getMainWi
   registerSecureHandler('documents:search', getMainWindow, (_event, value) => {
     const filters = parseFilters(value);
     filters.company_id = requireActiveCompanyId(services, filters.company_id);
-    services.reconciliationService.reconcileCompanyStorage(filters.company_id);
+    services.reconciliationService.reconcileCompanyStorageThrottled(filters.company_id);
     return services.docRepo.search(filters);
   });
   registerSecureHandler('documents:getById', getMainWindow, (_event, value) => {

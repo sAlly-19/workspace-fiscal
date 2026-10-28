@@ -90,5 +90,24 @@ describe('BuscadorModals component contracts', () => {
     expect(element.props.companyToDelete).toEqual(mockCompany);
     expect(element.props.isDeletingCompany).toBe(true);
   });
+
+  it('binds SendToNfViewModal and progress props', () => {
+    const onConfirmSend = vi.fn().mockResolvedValue(undefined);
+    const element = React.createElement(BuscadorModals, {
+      ...defaultProps,
+      isSendToNfViewModalOpen: true,
+      docsToSendToNfView: [],
+      onConfirmSendToNfView: onConfirmSend,
+      isSendingToNfView: true,
+      sendProgress: { total: 5, processed: 2, percent: 40 },
+      sendTargetFolderName: 'Notas de Entrada',
+    });
+
+    expect(element).toBeDefined();
+    expect(element.props.isSendToNfViewModalOpen).toBe(true);
+    expect(element.props.isSendingToNfView).toBe(true);
+    expect(element.props.sendProgress?.percent).toBe(40);
+    expect(element.props.sendTargetFolderName).toBe('Notas de Entrada');
+  });
 });
 

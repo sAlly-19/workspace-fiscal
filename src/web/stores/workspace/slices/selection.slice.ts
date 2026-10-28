@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppSettings, ImportProgress, WorkspaceState } from '../workspace.types';
+import { AppSettings, ImportProgress, SearchType, WorkspaceState } from '../workspace.types';
 import { writeUrlParams } from '../workspace.utils';
 
 export interface SelectionAndSettingsSlice {
@@ -7,6 +7,7 @@ export interface SelectionAndSettingsSlice {
   selectAllDocs: (selected: boolean) => void;
   clearDocSelection: () => void;
   setSearchQuery: (query: string) => void;
+  setSearchType: (type: SearchType) => void;
   setImporting: (importing: boolean, progress?: ImportProgress | null) => void;
   setImportProgress: (progress: ImportProgress | null) => void;
   setIsSettingsOpen: (open: boolean) => void;
@@ -43,6 +44,10 @@ export const createSelectionAndSettingsSlice: StateCreator<
   setSearchQuery: (query: string) => {
     writeUrlParams(get().selectedFolderId, get().selectedFolderName, query);
     set({ searchQuery: query });
+  },
+
+  setSearchType: (type: SearchType) => {
+    set({ searchType: type });
   },
 
   setImporting: (importing: boolean, progress?: ImportProgress | null) => {

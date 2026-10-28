@@ -10,10 +10,11 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { batchId, search, limit, offset } = req.query;
+    const { batchId, search, searchType, limit, offset } = req.query;
     const docs = await documentsRepository.findAll(
       batchId as string | undefined,
       search as string | undefined,
+      searchType as string | undefined,
       limit ? parseInt(limit as string, 10) : undefined,
       offset ? parseInt(offset as string, 10) : undefined
     );

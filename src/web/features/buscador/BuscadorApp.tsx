@@ -22,6 +22,8 @@ import { changePageSize } from './features/documents/page-size-controller';
 import { useUiStore } from './stores/ui.store';
 import { feedbackFromError } from './features/feedback/feedback-adapters';
 import type { BuscadorWorkspaceMode } from './features/workspace/workspace-controller';
+import { toast } from '@/web/components/Toast';
+import { apiFetch } from '@/web/lib/api';
 
 function formatLocalDate(date: Date): string {
   const year = date.getFullYear();
@@ -32,9 +34,10 @@ function formatLocalDate(date: Date): string {
 
 export interface BuscadorAppProps {
   onBackToHome?: () => void;
+  onNavigateNfView?: (folderId: string | null, folderName: string) => void;
 }
 
-export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
+export function BuscadorApp({ onBackToHome, onNavigateNfView }: BuscadorAppProps) {
   const { settings: wfSettings, updateSettings: updateWfSettings } = useWorkspaceStore();
   const theme = (wfSettings.theme || 'dark') as 'dark' | 'light';
   const toggleTheme = () => updateWfSettings({ theme: theme === 'dark' ? 'light' : 'dark' });
@@ -98,6 +101,26 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
   const nfseSyncTriggerRef = useRef<(() => Promise<void>) | null>(null);
   const [isNfseSyncing, setIsNfseSyncing] = useState(false);
 
+  // Estados para Envio ao NF View
+  const [isSendToNfViewModalOpen, setIsSendToNfViewModalOpen] = useState(false);
+  const [docsToSendToNfView, setDocsToSendToNfView] = useState<FiscalDocument[]>([]);
+  const [isSendingToNfView, setIsSendingToNfView] = useState(false);
+  const [sendProgress, setSendProgress] = useState<{ total: number; processed: number; percent: number } | null>(null);
+  const [sendTargetFolderName, setSendTargetFolderName] = useState<string>('Sem Pasta (Raiz / Geral)');
+  const [sendJobId, setSendJobId] = useState<string | null>(null);
+  const [isSendCancelled, setIsSendCancelled] = useState(false);
+  const [isSendCancelling, setIsSendCancelling] = useState(false);
+  const sendPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (sendPollIntervalRef.current) {
+        clearInterval(sendPollIntervalRef.current);
+        sendPollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   // Carregamento inicial e sincronização reativa de empresas (IMP-012)
   useEffect(() => {
     loadInitialData();
@@ -143,7 +166,9 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       setCompanyCert(cert);
       setNsuStatus(status);
       setCertHealth(health);
-      await searchLocalDocuments(company.id, 1, undefined, settingsOverride?.items_per_page);
+      if (workspaceMode !== 'NFSE') {
+        await searchLocalDocuments(company.id, 1, undefined, settingsOverride?.items_per_page);
+      }
     } catch (err: any) {
       console.error(err);
     }
@@ -173,22 +198,17 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     const targetCompanyId = companyId || activeCompany?.id;
     if (!targetCompanyId) return;
     const currentMode = modeOverride || workspaceMode;
+    if (currentMode === 'NFSE') return;
     const requestId = ++documentSearchRequest.current;
 
     setLoadingDocs(true);
 
     const docTypes: DocumentType[] = [];
-    if (currentMode === 'NFSE') {
-      docTypes.push('NFSE');
-    } else {
-      const effectiveTypes = typeOverride || selectedDocTypes;
-      if (effectiveTypes.nfe) docTypes.push('NFE');
-      if (effectiveTypes.cte) docTypes.push('CTE');
-    }
+    const effectiveTypes = typeOverride || selectedDocTypes;
+    if (effectiveTypes.nfe) docTypes.push('NFE');
+    if (effectiveTypes.cte) docTypes.push('CTE');
 
-    const currentEnv = currentMode === 'NFSE'
-      ? (settings?.nfse_environment || 'production')
-      : (settings?.sefaz_environment || 'production');
+    const currentEnv = settings?.sefaz_environment || 'production';
 
     try {
       const result = await window.fiscalApi?.documents.search({
@@ -222,7 +242,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
     setSelectedDocIds([]);
     setSelectedNfseDocIds([]);
     setCurrentPage(1);
-    if (activeCompany) {
+    if (activeCompany && newMode !== 'NFSE') {
       searchLocalDocuments(activeCompany.id, 1, undefined, undefined, newMode);
     }
   };
@@ -318,6 +338,176 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
       company_id: activeCompany.id,
       file_path: filePath,
     });
+  };
+
+  // Envio de Notas para o NF View
+  const handleTriggerSendSingle = (doc: FiscalDocument) => {
+    if (doc.xml_status !== 'XML_DISPONIVEL' || !doc.xml_path) {
+      toast.warning('XML Indisponível', 'Esta nota não possui XML baixado localmente para envio.');
+      return;
+    }
+    setDocsToSendToNfView([doc]);
+    setIsSendToNfViewModalOpen(true);
+  };
+
+  const handleTriggerSendBatch = () => {
+    const isNfse = workspaceMode === 'NFSE';
+    const currentList = isNfse ? nfseDocuments : documents;
+    const currentSelectedIds = isNfse ? selectedNfseDocIds : selectedDocIds;
+    const selectedDocs = currentList.filter((d) => currentSelectedIds.includes(d.id));
+
+    if (selectedDocs.length === 0) {
+      toast.info('Nenhuma nota selecionada', 'Selecione ao menos uma nota fiscal para enviar ao NF View.');
+      return;
+    }
+
+    setDocsToSendToNfView(selectedDocs);
+    setIsSendToNfViewModalOpen(true);
+  };
+
+  const handleConfirmSendToNfView = async (
+    targetFolderId: string | null,
+    targetFolderName: string,
+    validDocs: FiscalDocument[]
+  ) => {
+    const filePaths = validDocs.map((d) => d.xml_path!).filter(Boolean);
+    if (filePaths.length === 0) {
+      toast.warning('Nenhum XML disponível', 'Nenhum documento selecionado possui arquivo XML baixado localmente.');
+      return;
+    }
+
+    setIsSendToNfViewModalOpen(false);
+    setIsSendingToNfView(true);
+    setSendTargetFolderName(targetFolderName);
+    setSendProgress({ total: filePaths.length, processed: 0, percent: 0 });
+    setIsSendCancelled(false);
+    setIsSendCancelling(false);
+
+    try {
+      const res = await apiFetch('/api/import/paths', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePaths,
+          batchId: targetFolderId || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        let errMsg = 'Falha ao iniciar envio ao NF View.';
+        try {
+          const errData = await res.json();
+          if (errData?.error) errMsg = errData.error;
+        } catch {}
+        throw new Error(errMsg);
+      }
+
+      const data = await res.json();
+      const jobId = data.jobId;
+      setSendJobId(jobId);
+
+      if (sendPollIntervalRef.current) {
+        clearInterval(sendPollIntervalRef.current);
+      }
+
+      const totalExpected = data.queued ?? filePaths.length;
+
+      sendPollIntervalRef.current = setInterval(async () => {
+        try {
+          const statusRes = await apiFetch(`/api/import/${jobId}`);
+          if (!statusRes.ok) return;
+          const statusData = await statusRes.json();
+          const processed = statusData.processed ?? 0;
+          const total = statusData.total ?? totalExpected;
+          const isCancelled = statusData.status === 'cancelled' || statusData.status === 'CANCELLED';
+          const isCompleted =
+            !isCancelled &&
+            (statusData.status === 'completed' ||
+              statusData.status === 'COMPLETED' ||
+              (total > 0 && processed >= total));
+          const isFailed = statusData.status === 'error' || statusData.status === 'failed' || statusData.status === 'FAILED';
+
+          const pct = isCompleted
+            ? 100
+            : total > 0
+              ? Math.min(isCancelled ? 100 : 99, Math.round((processed / total) * 100))
+              : 0;
+
+          setSendProgress({
+            total,
+            processed: isCompleted ? total : processed,
+            percent: pct,
+          });
+
+          if (isCancelled) {
+            if (sendPollIntervalRef.current) {
+              clearInterval(sendPollIntervalRef.current);
+              sendPollIntervalRef.current = null;
+            }
+            setIsSendCancelled(true);
+            return;
+          }
+
+          if (isCompleted || isFailed) {
+            if (sendPollIntervalRef.current) {
+              clearInterval(sendPollIntervalRef.current);
+              sendPollIntervalRef.current = null;
+            }
+
+            // Limpa seleções no buscador
+            setSelectedDocIds([]);
+            setSelectedNfseDocIds([]);
+
+            if (isCompleted) {
+              const duplicates = statusData.duplicates || 0;
+              const imported = total - duplicates;
+              const desc = duplicates > 0
+                ? `${imported} nota(s) importada(s) para "${targetFolderName}" (${duplicates} já existiam no NF View e foram ignoradas).`
+                : `${total} nota(s) enviada(s) com sucesso para "${targetFolderName}".`;
+
+              toast.success('Envio Concluído', desc, onNavigateNfView ? {
+                label: 'Ver no NF View',
+                onClick: () => onNavigateNfView(targetFolderId, targetFolderName),
+              } : undefined);
+            } else {
+              toast.error('Falha no Envio', statusData.error || 'Ocorreu um erro ao processar os arquivos no NF View.');
+            }
+
+            setTimeout(() => {
+              setIsSendingToNfView(false);
+              setSendProgress(null);
+              setSendJobId(null);
+            }, 2000);
+          }
+        } catch (pollErr) {
+          console.error('[SendPoll] Erro ao consultar status da importação:', pollErr);
+        }
+      }, 250);
+    } catch (err: any) {
+      console.error('[handleConfirmSendToNfView] Erro:', err);
+      setIsSendingToNfView(false);
+      setSendProgress(null);
+      setSendJobId(null);
+      toast.error('Erro no Envio', err.message || 'Falha ao enviar notas para o NF View.');
+    }
+  };
+
+  const handleCancelSendImport = async () => {
+    if (!sendJobId || isSendCancelled || isSendCancelling) return;
+    setIsSendCancelling(true);
+    try {
+      if (sendPollIntervalRef.current) {
+        clearInterval(sendPollIntervalRef.current);
+        sendPollIntervalRef.current = null;
+      }
+      await apiFetch(`/api/import/${sendJobId}/cancel`, { method: 'POST' });
+      setIsSendCancelled(true);
+      toast.info('Cancelamento Solicitado', 'O envio ao NF View foi interrompido.');
+    } catch (err: any) {
+      console.error('[handleCancelSendImport] Erro ao cancelar:', err);
+    } finally {
+      setIsSendCancelling(false);
+    }
   };
 
   const toggleSelectDoc = (id: number) => {
@@ -456,6 +646,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
             );
           }}
           onDocumentsChange={setNfseDocuments}
+          onSendToNfView={handleTriggerSendSingle}
         />
       ) : (
         <DocumentWorkspace
@@ -490,6 +681,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onViewDetails={(doc) => setSelectedDetailsDoc(doc)}
           onDownloadXml={handleDownloadXml}
           onDownloadPdf={handleDownloadPdf}
+          onSendToNfView={handleTriggerSendSingle}
           onPageChange={(page) => searchLocalDocuments(undefined, page)}
           onPageSizeChange={(size) => void handlePageSizeChange(size)}
         />
@@ -501,6 +693,7 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           totalOnPage={workspaceMode === 'NFSE' ? nfseDocuments.length : documents.length}
           defaultStoragePath={settings?.default_storage_path}
           onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
+          onOpenSendModal={handleTriggerSendBatch}
         />
       )}
       overlays={(
@@ -580,6 +773,20 @@ export function BuscadorApp({ onBackToHome }: BuscadorAppProps) {
           onConfirmDeleteCompany={() => void handleConfirmDeleteCompany()}
           onCancelDeleteCompany={() => {
             if (!isDeletingCompany) setCompanyToDelete(null);
+          }}
+          isSendToNfViewModalOpen={isSendToNfViewModalOpen}
+          onCloseSendToNfViewModal={() => setIsSendToNfViewModalOpen(false)}
+          docsToSendToNfView={docsToSendToNfView}
+          onConfirmSendToNfView={handleConfirmSendToNfView}
+          isSendingToNfView={isSendingToNfView}
+          sendProgress={sendProgress}
+          sendTargetFolderName={sendTargetFolderName}
+          isSendCancelled={isSendCancelled}
+          isSendCancelling={isSendCancelling}
+          onCancelSendImport={handleCancelSendImport}
+          onCloseSendProgress={() => {
+            setIsSendingToNfView(false);
+            setSendProgress(null);
           }}
         />
       )}

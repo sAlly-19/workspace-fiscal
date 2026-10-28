@@ -23,6 +23,9 @@ export interface WorkspaceModalsProps {
   isUploading: boolean;
   uploadProgress: { total: number; processed: number; percent: number } | null;
   selectedFolderName: string;
+  isImportCancelled?: boolean;
+  isImportCancelling?: boolean;
+  onCancelImport?: () => void;
   onCloseImportProgress: () => void;
   isDeleting?: boolean;
   deleteProgress?: { total: number; processed: number; percent: number } | null;
@@ -63,6 +66,9 @@ export function WorkspaceModals({
   isUploading,
   uploadProgress,
   selectedFolderName,
+  isImportCancelled,
+  isImportCancelling,
+  onCancelImport,
   onCloseImportProgress,
   isDeleting,
   deleteProgress,
@@ -101,18 +107,6 @@ export function WorkspaceModals({
       {/* Settings Modal */}
       <SettingsModal />
 
-      {/* Confirmation Modal */}
-      <ConfirmModal
-        isOpen={confirmConfig.isOpen}
-        title={confirmConfig.title}
-        description={confirmConfig.description}
-        confirmLabel={confirmConfig.confirmLabel}
-        confirmVariant="danger"
-        isLoading={isConfirmLoading}
-        onConfirm={confirmConfig.onConfirm}
-        onCancel={onCancelConfirm}
-      />
-
       {/* Watch Folder Modal */}
       {watchFolderConfig && (
         <FolderWatchModal
@@ -131,6 +125,9 @@ export function WorkspaceModals({
         processed={uploadProgress?.processed || 0}
         percent={uploadProgress?.percent || 0}
         targetFolderName={selectedFolderName}
+        isCancelled={isImportCancelled}
+        isCancelling={isImportCancelling}
+        onCancel={onCancelImport}
         onClose={onCloseImportProgress}
       />
 
@@ -268,6 +265,18 @@ export function WorkspaceModals({
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal - Rendered on top of all modals (z-[70]) */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        confirmLabel={confirmConfig.confirmLabel}
+        confirmVariant="danger"
+        isLoading={isConfirmLoading}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={onCancelConfirm}
+      />
     </>
   );
 }

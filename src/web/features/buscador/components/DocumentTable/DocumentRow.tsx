@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Eye, FileText } from 'lucide-react';
+import { Download, Eye, FileText, Send } from 'lucide-react';
 import { FiscalDocument } from '@/core/buscador/domain/types';
 import { isEventOnlyDocument } from '@/core/buscador/domain/document-presentation';
 
@@ -10,6 +10,7 @@ export interface DocumentRowProps {
   onViewDetails: () => void;
   onDownloadXml: () => void;
   onDownloadPdf: () => void;
+  onSendToNfView?: () => void;
 }
 
 function displayDate(value?: string): string {
@@ -25,6 +26,7 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
   onViewDetails,
   onDownloadXml,
   onDownloadPdf,
+  onSendToNfView,
 }) => {
   const isEventOnly = isEventOnlyDocument(doc);
   const typeLabel = doc.document_type === 'NFE' ? 'NF-e' : doc.document_type === 'NFSE' ? 'NFS-e' : 'CT-e';
@@ -118,6 +120,19 @@ export const DocumentRow: React.FC<DocumentRowProps> = ({
           >
             <FileText className="h-3.5 w-3.5" />
           </button>
+
+          {onSendToNfView && (
+            <button
+              type="button"
+              onClick={onSendToNfView}
+              disabled={doc.xml_status !== 'XML_DISPONIVEL' || !doc.xml_path}
+              className="rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] p-1 text-[var(--text-secondary)] transition hover:border-blue-500 hover:bg-blue-600/10 hover:text-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer"
+              title={doc.xml_status !== 'XML_DISPONIVEL' || !doc.xml_path ? 'XML não disponível localmente para envio' : 'Enviar para o NF View'}
+              aria-label="Enviar para o NF View"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          )}
 
           {doc.document_type !== 'NFSE' && (
             <button

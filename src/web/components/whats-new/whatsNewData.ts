@@ -15,11 +15,12 @@ import {
   FolderTree,
   Archive,
   LayoutTemplate,
+  Send,
 } from 'lucide-react';
 
-export type AppVersion = '3.5.3' | '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
+export type AppVersion = '3.5.4' | '3.5.3' | '3.5.2' | '3.5.1' | '3.5.0' | '3.0.0' | '2.5.3' | '2.5.2' | '2.5.1' | '2.5.0';
 
-export const CURRENT_APP_VERSION = '3.5.3';
+export const CURRENT_APP_VERSION = '3.5.4';
 
 export function parseSemver(versionStr: string): [number, number, number] {
   const clean = (versionStr || '').trim().replace(/^[vV]/, '');
@@ -71,10 +72,86 @@ export interface VersionSectionData {
 
 export const WHATS_NEW_VERSIONS: VersionSectionData[] = [
   {
-    id: '3.5.3',
-    label: 'v3.5.3 (Atual)',
+    id: '3.5.4',
+    label: 'v3.5.4 (Atual)',
     isCurrent: true,
     subtitleText: 'Lançamento mais recente',
+    cards: [
+      {
+        id: '3.5.4-envio-buscador-nfview',
+        icon: Send,
+        iconClasses: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        hoverBorderClasses: 'hover:border-blue-300 dark:hover:border-blue-500/30',
+        title: 'Envio Direto de Notas para Pastas do NF View',
+        badgeText: 'Buscador & Pastas',
+        badgeClasses: 'text-blue-600 dark:text-blue-400',
+        description: 'Integração completa entre a busca da SEFAZ e a organização dos seus documentos fiscais:',
+        bullets: [
+          {
+            boldPrefix: 'Envio em Lote ou Individual: ',
+            text: 'Envie uma nota diretamente pelo botão de ação na tabela ou selecione múltiplos documentos na lista para encaminhar de uma só vez para qualquer pasta.',
+          },
+          {
+            boldPrefix: 'Criação de Pastas na Hora: ',
+            text: 'Crie novas pastas e subpastas no NF View diretamente na janela de envio, sem precisar sair do Buscador.',
+          },
+          {
+            boldPrefix: 'Importação Inteligente com Acesso Imediato: ',
+            text: 'Apenas notas novas são importadas (evitando duplicidades) e uma notificação permite abrir a pasta de destino com apenas um clique.',
+          },
+        ],
+      },
+      {
+        id: '3.5.4-busca-avancada-filtros',
+        icon: Search,
+        iconClasses: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        hoverBorderClasses: 'hover:border-emerald-300 dark:hover:border-emerald-500/30',
+        title: 'Busca Rápida com Filtros Segmentados no NF View',
+        badgeText: 'Produtividade',
+        badgeClasses: 'text-emerald-600 dark:text-emerald-400',
+        description: 'Localize qualquer nota fiscal de forma instantânea e assertiva:',
+        bullets: [
+          {
+            boldPrefix: 'Filtros Especializados: ',
+            text: 'Alterne rapidamente entre busca por Número da Nota, Fornecedor/Emitente, Data de Emissão e Valor exato.',
+          },
+          {
+            boldPrefix: 'Filtro Ágil por Modelo: ',
+            text: 'Botões rápidos para segmentar instantaneamente por NF-e, NFC-e, NFS-e ou CT-e com um único clique.',
+          },
+          {
+            boldPrefix: 'Entrada Facilitada de Dados: ',
+            text: 'Seletor de calendário intuitivo para busca por data e formatação monetária automática ao pesquisar por valores.',
+          },
+        ],
+      },
+      {
+        id: '3.5.4-controle-importacao-cancelamento',
+        icon: SlidersHorizontal,
+        iconClasses: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+        hoverBorderClasses: 'hover:border-purple-300 dark:hover:border-purple-500/30',
+        title: 'Controle Total e Cancelamento de Importação',
+        badgeText: 'Operação Segura',
+        badgeClasses: 'text-purple-600 dark:text-purple-400',
+        description: 'Mais autonomia e praticidade durante o processamento de grandes volumes de notas:',
+        bullets: [
+          {
+            boldPrefix: 'Cancelamento Seguro: ',
+            text: 'Interrompa a importação de notas quando desejar, com preservação de todas as notas que já foram processadas.',
+          },
+          {
+            boldPrefix: 'Confirmação Transparente: ',
+            text: 'Janela de confirmação sempre em primeiro plano, garantindo clareza antes de qualquer cancelamento, mesmo com o progresso minimizado.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: '3.5.3',
+    label: 'v3.5.3',
+    isCurrent: false,
+    subtitleText: 'Monitoramento Automático de Pastas e Produtividade',
     cards: [
       {
         id: '3.5.3-monitoramento-pastas',

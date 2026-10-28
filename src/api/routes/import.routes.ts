@@ -89,6 +89,9 @@ router.post(['/', '/upload'], upload.array('files'), async (req, res) => {
     (async () => {
       try {
         for (let i = 0; i < unpackedFiles.length; i++) {
+          if (importService.isJobCancelled(job.id)) {
+            break;
+          }
           await importService.processFile(job.id, unpackedFiles[i], batchId);
           if ((i + 1) % BATCH_YIELD_INTERVAL === 0) {
             await yieldEventLoop();
@@ -97,7 +100,9 @@ router.post(['/', '/upload'], upload.array('files'), async (req, res) => {
       } catch (loopErr) {
         console.error('[ImportRoute] Error during file processing loop:', loopErr);
       } finally {
-        await importService.markJobCompleted(job.id);
+        if (!importService.isJobCancelled(job.id)) {
+          await importService.markJobCompleted(job.id);
+        }
       }
     })();
 
@@ -141,6 +146,20 @@ router.get('/:jobId', async (req, res) => {
   } catch (error) {
     console.error('[ImportRoute] Erro ao buscar status:', error);
     res.status(500).json({ error: 'Erro ao buscar status da importação.' });
+  }
+});
+
+router.post('/:jobId/cancel', async (req, res) => {
+  try {
+    const job = await importService.getImportJobStatus(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Job não encontrado.' });
+    }
+    await importService.cancelImportJob(req.params.jobId);
+    res.json({ message: 'Importação cancelada com sucesso.', jobId: req.params.jobId });
+  } catch (error) {
+    console.error('[ImportRoute] Erro ao cancelar importação:', error);
+    res.status(500).json({ error: 'Erro ao cancelar importação.' });
   }
 });
 
@@ -240,6 +259,9 @@ router.post('/paths', async (req, res) => {
       try {
         // 1. Processa arquivos XML em disco
         for (let i = 0; i < targetXmlPaths.length; i++) {
+          if (importService.isJobCancelled(job.id)) {
+            break;
+          }
           const filePath = targetXmlPaths[i];
           try {
             const stat = await fs.promises.stat(filePath);
@@ -271,13 +293,16 @@ router.post('/paths', async (req, res) => {
         }
 
         // Se a importação ocorreu direcionada a uma pasta, registra os arquivos em disco no histórico de watch
-        if (batchId && targetXmlPaths.length > 0) {
+        if (!importService.isJobCancelled(job.id) && batchId && targetXmlPaths.length > 0) {
           const filesToRecord = targetXmlPaths.map((fp) => ({ filePath: fp, status: 'imported' as const }));
           await workspaceRepository.recordWatchFilesBatch(batchId, filesToRecord).catch(() => {});
         }
 
         // 2. Processa arquivos extraídos de ZIPs
         for (let j = 0; j < inMemoryFiles.length; j++) {
+          if (importService.isJobCancelled(job.id)) {
+            break;
+          }
           const file = inMemoryFiles[j];
           try {
             await importService.processFile(job.id, file, batchId);
@@ -291,7 +316,9 @@ router.post('/paths', async (req, res) => {
       } catch (err) {
         console.error('[ImportRoute] Erro no worker de paths:', err);
       } finally {
-        await importService.markJobCompleted(job.id);
+        if (!importService.isJobCancelled(job.id)) {
+          await importService.markJobCompleted(job.id);
+        }
       }
     })();
   } catch (e) {

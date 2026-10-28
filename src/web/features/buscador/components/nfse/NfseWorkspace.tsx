@@ -23,6 +23,7 @@ export interface NfseWorkspaceProps {
   onToggleSelectDoc?: (id: number) => void;
   onToggleSelectAll?: (allDocIds?: number[]) => void;
   onDocumentsChange?: (docs: FiscalDocument[]) => void;
+  onSendToNfView?: (doc: FiscalDocument) => void;
 }
 
 export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
@@ -36,6 +37,7 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
   onToggleSelectDoc: propOnToggleSelectDoc,
   onToggleSelectAll: propOnToggleSelectAll,
   onDocumentsChange,
+  onSendToNfView,
 }) => {
   const pushFeedback = useUiStore((state) => state.pushFeedback);
   const [internalSelectedDocIds, setInternalSelectedDocIds] = useState<number[]>([]);
@@ -180,7 +182,7 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <NfseDirectQuery onQueryByKey={handleQueryByKey} loading={state.loading} />
+          <NfseDirectQuery onQueryByKey={handleQueryByKey} loading={state.isQueryingKey} />
           <NfseFilters
             filters={state.filters}
             onChange={(f) => vm.setFilters(f)}
@@ -208,6 +210,7 @@ export const NfseWorkspace: React.FC<NfseWorkspaceProps> = ({
           onToggleSelectDoc={handleToggleSelectDoc}
           onViewDetails={handleViewDetails}
           onDownloadXml={onDownloadXml}
+          onSendToNfView={onSendToNfView}
           onDownloadPdf={() => {
             pushFeedback({
               kind: 'info',

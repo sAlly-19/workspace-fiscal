@@ -36,23 +36,23 @@ describe('Update Service - SemVer Comparison', () => {
     expect(isNewerVersion('2.4.9', '2.5.1')).toBe(false);
   });
 
-  it('never flags v3.5.2 or v3.5.3 as an update when running v3.5.3', () => {
-    expect(isNewerVersion('v3.5.2', '3.5.3')).toBe(false);
-    expect(isNewerVersion('3.5.2', '3.5.3')).toBe(false);
-    expect(isNewerVersion('v3.5.3', '3.5.3')).toBe(false);
-    expect(isNewerVersion('3.5.3', '3.5.3')).toBe(false);
-    expect(isNewerVersion('v3.5.4', '3.5.3')).toBe(true);
+  it('never flags v3.5.3 or v3.5.4 as an update when running v3.5.4', () => {
+    expect(isNewerVersion('v3.5.3', '3.5.4')).toBe(false);
+    expect(isNewerVersion('3.5.3', '3.5.4')).toBe(false);
+    expect(isNewerVersion('v3.5.4', '3.5.4')).toBe(false);
+    expect(isNewerVersion('3.5.4', '3.5.4')).toBe(false);
+    expect(isNewerVersion('v3.5.5', '3.5.4')).toBe(true);
   });
 
   it('allows setting runtime version dynamically via setCurrentVersion', () => {
-    updateService.setCurrentVersion('v3.5.3');
-    expect(updateService.getCurrentVersion()).toBe('3.5.3');
+    updateService.setCurrentVersion('v3.5.4');
+    expect(updateService.getCurrentVersion()).toBe('3.5.4');
 
     updateService.setCurrentVersion('3.6.0');
     expect(updateService.getCurrentVersion()).toBe('3.6.0');
 
-    // Reset back to 3.5.3
-    updateService.setCurrentVersion('3.5.3');
-    expect(updateService.getCurrentVersion()).toBe('3.5.3');
+    // Reset back to 3.5.4
+    updateService.setCurrentVersion('3.5.4');
+    expect(updateService.getCurrentVersion()).toBe('3.5.4');
   });
 });

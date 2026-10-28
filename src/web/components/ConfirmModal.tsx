@@ -12,6 +12,7 @@ export interface ConfirmModalProps {
   isLoading?: boolean;
   /** Quando definido, exige que o usuário digite exatamente este texto para habilitar o botão de confirmação. */
   requireText?: string;
+  zIndex?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +25,7 @@ export function ConfirmModal({
   confirmVariant = 'danger',
   isLoading = false,
   requireText,
+  zIndex = 'z-[70]',
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -51,7 +53,7 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs"
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 select-none bg-black/75 backdrop-blur-xs`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !isLoading) {
           onCancel();

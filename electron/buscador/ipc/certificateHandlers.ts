@@ -4,7 +4,12 @@ import { registerSecureHandler, requirePositiveInteger, requireString } from './
 import { activityLogService } from '../../../src/api/services/activity-log.service';
 
 export function registerCertificateHandlers(services: ApplicationContext, getMainWindow: () => BrowserWindow | null): void {
-  registerSecureHandler('certificates:listAvailable', getMainWindow, () => services.certProvider.listCertificates());
+  registerSecureHandler('certificates:listAvailable', getMainWindow, (_event, forceRefresh?: unknown) => {
+    if (Boolean(forceRefresh) && typeof (services.certProvider as any).clearCache === 'function') {
+      (services.certProvider as any).clearCache();
+    }
+    return services.certProvider.listCertificates();
+  });
   registerSecureHandler('certificates:getForCompany', getMainWindow, (_event, id) =>
     services.certRepo.getByCompanyId(requirePositiveInteger(id, 'ID da empresa')));
   registerSecureHandler('certificates:associateToCompany', getMainWindow, async (_event, id, value) => {
@@ -21,6 +26,9 @@ export function registerCertificateHandlers(services: ApplicationContext, getMai
       throw new Error('O CNPJ-base do certificado não corresponde ao CNPJ da empresa.');
     }
     services.certRepo.associate(companyId, cert);
+    if (typeof (services.certProvider as any).clearCache === 'function') {
+      (services.certProvider as any).clearCache();
+    }
 
     await activityLogService.record({
       level: 'SUCCESS',

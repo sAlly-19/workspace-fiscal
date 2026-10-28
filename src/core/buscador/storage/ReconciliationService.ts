@@ -10,6 +10,10 @@ export interface ReconciliationReport {
 }
 
 export class ReconciliationService {
+  private lastReconcileTimeByCompany = new Map<number, number>();
+  private readonly THROTTLE_INTERVAL_MS = 600_000; // 10 minutos
+  private isReconciling = false;
+
   constructor(private db: DatabaseManager) {}
 
   /**
@@ -83,5 +87,31 @@ export class ReconciliationService {
       missingPdfCount,
       repairedCount,
     };
+  }
+
+  /**
+   * Versão não-bloqueante e com controle de frequência (throttled).
+   * Executa em background de forma assíncrona, respeitando intervalo mínimo entre checagens
+   * para não travar a thread principal da aplicação nem a navegação em pastas de rede (SMB/Z:\).
+   */
+  public reconcileCompanyStorageThrottled(companyId: number, minIntervalMs: number = this.THROTTLE_INTERVAL_MS): void {
+    const now = Date.now();
+    const last = this.lastReconcileTimeByCompany.get(companyId) || 0;
+    if (now - last < minIntervalMs || this.isReconciling) {
+      return;
+    }
+    this.lastReconcileTimeByCompany.set(companyId, now);
+
+    setImmediate(() => {
+      if (this.isReconciling) return;
+      try {
+        this.isReconciling = true;
+        this.reconcileCompanyStorage(companyId);
+      } catch (err) {
+        console.warn('[ReconciliationService] Erro na reconciliação em background:', err);
+      } finally {
+        this.isReconciling = false;
+      }
+    });
   }
 }

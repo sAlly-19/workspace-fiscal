@@ -3,7 +3,7 @@
 Hub desktop corporativo para gestão, visualização, auditoria e impressão de documentos fiscais eletrônicos brasileiros e controle patrimonial com cálculo linear de depreciação de ativos imobilizados.
 
 Repositório: [https://github.com/sAlly-19/workspace-fiscal](https://github.com/sAlly-19/workspace-fiscal)  
-Versão: **3.5.3**
+Versão: **3.5.4**
 
 ---
 
@@ -413,7 +413,21 @@ npm run lint
 
 O Workspace Fiscal mantém o histórico documentado de todas as suas versões e recursos lançados, acessível também no modal interno de novidades da aplicação:
 
-### Versão 3.5.3 (Atual)
+### Versão 3.5.4 (Atual)
+- **Envio Direto de Notas do Buscador para o NF View:**
+  - Encaminhamento individual (botão de envio por linha na tabela) ou em lote (barra inferior de ações) de notas localizadas na SEFAZ diretamente para pastas e subpastas do NF View.
+  - Modal inteligente de seleção de pasta de destino com suporte a busca em tempo real e criação inline de novas pastas sem sair do fluxo.
+  - Sincronização via API de importação, deduplicação automática e notificação Toast com ação direta para abrir a pasta de destino com 1 clique.
+- **Busca Rápida com Filtros Segmentados no NF View:**
+  - Dropdown com modos de busca especializados: Número da Nota, Tipo de Documento (NF-e, NFC-e, NFS-e, CT-e), Fornecedor/Emitente, Data de Emissão e Valor.
+  - Seletor nativo de calendário para filtro por data e máscara monetária para pesquisa por valor financeiro.
+  - Animações fluidas de abertura e transição respeitando a identidade visual do sistema.
+- **Controle de Importação e Cancelamento Seguro:**
+  - Botão de cancelamento de importações em andamento no modal de progresso.
+  - Janela de confirmação com elevação de camada (`z-[70]`), garantindo visibilidade e usabilidade tanto no modo normal quanto minimizado em bolha.
+  - Preservação integral das notas fiscais que já foram processadas até o momento da solicitação de interrupção.
+
+### Versão 3.5.3
 - **Reconciliação e Deduplicação Inteligente de Pastas Monitoradas:**
   - Reconciliação global em lote para diretórios locais e de rede (`Z:\`, downloads e subpastas).
   - Sniffer rápido inteligente com reconhecimento de Inutilizações (`<infInut>`), Eventos (`<procEventoNFe>`, `<procEventoCTe>`) e NFS-e convertidas (`<N_DA_NFSE>`, `<CPFCNPJ_PRESTADOR>`).

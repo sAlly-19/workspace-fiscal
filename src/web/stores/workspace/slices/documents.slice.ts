@@ -24,9 +24,13 @@ export const createDocumentsSlice: StateCreator<
     try {
       const targetFolderId = folderId !== undefined ? folderId : get().selectedFolderId;
       const search = get().searchQuery?.trim();
+      const searchType = get().searchType;
       const params = new URLSearchParams();
       if (targetFolderId && targetFolderId !== 'all') params.set('batchId', targetFolderId);
-      if (search) params.set('search', search);
+      if (search) {
+        params.set('search', search);
+        if (searchType && searchType !== 'all') params.set('searchType', searchType);
+      }
       const query = params.toString() ? `?${params.toString()}` : '';
       const url = `/api/documents${query}`;
 

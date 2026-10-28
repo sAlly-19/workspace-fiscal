@@ -35,6 +35,8 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     moveDocument,
     searchQuery,
     setSearchQuery,
+    searchType,
+    setSearchType,
     settings,
     updateSettings,
     setIsSettingsOpen,
@@ -49,6 +51,18 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     null
   );
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [activeImportJobId, setActiveImportJobId] = useState<string | null>(null);
+  const [isImportCancelled, setIsImportCancelled] = useState(false);
+  const [isImportCancelling, setIsImportCancelling] = useState(false);
+  const importPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (importPollIntervalRef.current) {
+        clearInterval(importPollIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Deletion Progress state
   const [isDeleting, setIsDeleting] = useState(false);
@@ -135,7 +149,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     }, 350);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  }, [searchQuery, searchType]);
 
   // Load selected document details
   useEffect(() => {
@@ -228,12 +242,54 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         return false;
       }
 
-      const matchesSearch =
-        !searchQuery ||
-        (doc.number && doc.number.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (doc.issuerName && doc.issuerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (doc.recipientName && doc.recipientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (doc.accessKey && doc.accessKey.toLowerCase().includes(searchQuery.toLowerCase()));
+      let matchesSearch = true;
+      if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        if (searchType === 'number') {
+          matchesSearch = Boolean(doc.number && doc.number.toLowerCase().includes(query));
+        } else if (searchType === 'type') {
+          const cleanDocType = (doc.type || '').toUpperCase().replace(/[^A-Z]/g, '');
+          const cleanQuery = query.toUpperCase().replace(/[^A-Z]/g, '');
+          matchesSearch = cleanDocType === cleanQuery;
+        } else if (searchType === 'issuer') {
+          matchesSearch = Boolean(doc.issuerName && doc.issuerName.toLowerCase().includes(query));
+        } else if (searchType === 'date') {
+          if (doc.issueDate) {
+            const d = new Date(doc.issueDate);
+            if (!isNaN(d.getTime())) {
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = String(d.getFullYear());
+              const formattedDate = `${day}/${month}/${year}`;
+              const formattedMonthYear = `${month}/${year}`;
+              const isoDate = `${year}-${month}-${day}`;
+              matchesSearch =
+                formattedDate.includes(query) ||
+                formattedMonthYear.includes(query) ||
+                isoDate.includes(query);
+            } else {
+              matchesSearch = false;
+            }
+          } else {
+            matchesSearch = false;
+          }
+        } else if (searchType === 'value') {
+          const numericStr = query.replace(/[^\d,\.]/g, '').replace(/\./g, '').replace(',', '.');
+          const targetNum = parseFloat(numericStr);
+          if (!isNaN(targetNum) && doc.totalAmount !== null && doc.totalAmount !== undefined) {
+            matchesSearch = Math.abs(doc.totalAmount - targetNum) < 0.01;
+          } else {
+            matchesSearch = false;
+          }
+        } else {
+          matchesSearch = Boolean(
+            (doc.number && doc.number.toLowerCase().includes(query)) ||
+            (doc.issuerName && doc.issuerName.toLowerCase().includes(query)) ||
+            (doc.recipientName && doc.recipientName.toLowerCase().includes(query)) ||
+            (doc.accessKey && doc.accessKey.toLowerCase().includes(query))
+          );
+        }
+      }
 
       const matchesFolder =
         allowedFolderIds === null
@@ -246,7 +302,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
     });
 
     return { filteredDocuments: filtered, hiddenUnidentifiedCount: hiddenCount };
-  }, [documents, settings.hideUnidentifiedDocs, searchQuery, allowedFolderIds]);
+  }, [documents, settings.hideUnidentifiedDocs, searchQuery, searchType, allowedFolderIds]);
 
   const allFilteredSelected =
     filteredDocuments.length > 0 && filteredDocuments.every((d) => selectedDocIds.includes(d.id));
@@ -295,9 +351,167 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   };
 
   // Upload handlers
+  const startImportPolling = (
+    jobId: string,
+    initialTotal: number,
+    options?: { selectFirstDoc?: boolean; successToast?: string }
+  ) => {
+    setActiveImportJobId(jobId);
+    setIsImportCancelled(false);
+    setIsImportCancelling(false);
+
+    if (importPollIntervalRef.current) {
+      clearInterval(importPollIntervalRef.current);
+    }
+
+    importPollIntervalRef.current = setInterval(async () => {
+      try {
+        const statusRes = await apiFetch(`/api/import/${jobId}`);
+        if (!statusRes.ok) return;
+        const statusData = await statusRes.json();
+        const processed = statusData.processed ?? 0;
+        const total = statusData.total ?? initialTotal;
+        const isCancelled = statusData.status === 'cancelled' || statusData.status === 'CANCELLED';
+        const isCompleted =
+          !isCancelled &&
+          (statusData.status === 'completed' ||
+            statusData.status === 'COMPLETED' ||
+            (total > 0 && processed >= total));
+        const isFailed = statusData.status === 'error' || statusData.status === 'failed' || statusData.status === 'FAILED';
+
+        const pct = isCompleted
+          ? 100
+          : total > 0
+            ? Math.min(isCancelled ? 100 : 99, Math.round((processed / total) * 100))
+            : 0;
+
+        setUploadProgress({
+          total,
+          processed: isCompleted ? total : processed,
+          percent: pct,
+        });
+
+        if (isCancelled) {
+          if (importPollIntervalRef.current) {
+            clearInterval(importPollIntervalRef.current);
+            importPollIntervalRef.current = null;
+          }
+          setIsImportCancelled(true);
+          setTargetUploadFolderId(null);
+          await fetchDocuments(selectedFolderId);
+          await fetchWorkspace();
+          return;
+        }
+
+        if (isCompleted || isFailed) {
+          if (importPollIntervalRef.current) {
+            clearInterval(importPollIntervalRef.current);
+            importPollIntervalRef.current = null;
+          }
+          setTargetUploadFolderId(null);
+          await fetchDocuments(selectedFolderId);
+          await fetchWorkspace();
+
+          if (isCompleted) {
+            if (options?.successToast) {
+              toast.success(
+                'Importação de pasta concluída',
+                options.successToast.replace('{total}', String(total)).replace('{duplicates}', String(statusData.duplicates || 0))
+              );
+            }
+            if (options?.selectFirstDoc && statusData.results && statusData.results.length > 0) {
+              selectDocument(statusData.results[0].id);
+            }
+          }
+
+          setTimeout(() => {
+            setIsUploading(false);
+            setUploadProgress(null);
+            setActiveImportJobId(null);
+          }, 2200);
+        }
+      } catch (pollErr) {
+        console.error('[ImportPoll] Erro:', pollErr);
+        if (importPollIntervalRef.current) {
+          clearInterval(importPollIntervalRef.current);
+          importPollIntervalRef.current = null;
+        }
+        setIsUploading(false);
+        setUploadProgress(null);
+        setTargetUploadFolderId(null);
+        setActiveImportJobId(null);
+      }
+    }, 180);
+  };
+
+  const handleCancelImport = useCallback(() => {
+    if (!activeImportJobId || isImportCancelled || isImportCancelling) return;
+
+    setConfirmConfig({
+      isOpen: true,
+      title: 'Cancelar Importação?',
+      description:
+        'Tem certeza que deseja cancelar a importação em andamento? As notas fiscais já processadas até este momento serão mantidas na pasta.',
+      confirmLabel: 'Sim, Cancelar',
+      onConfirm: async () => {
+        setIsConfirmLoading(true);
+        setIsImportCancelling(true);
+        try {
+          if (importPollIntervalRef.current) {
+            clearInterval(importPollIntervalRef.current);
+            importPollIntervalRef.current = null;
+          }
+
+          const res = await apiFetch(`/api/import/${activeImportJobId}/cancel`, {
+            method: 'POST',
+          });
+
+          if (!res.ok) {
+            let errMsg = 'Falha ao comunicar cancelamento ao servidor.';
+            try {
+              const data = await res.json();
+              if (data?.error) errMsg = data.error;
+            } catch {}
+            throw new Error(errMsg);
+          }
+
+          const statusRes = await apiFetch(`/api/import/${activeImportJobId}`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            const processed = statusData.processed ?? 0;
+            const total = statusData.total ?? uploadProgress?.total ?? 0;
+            const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            setUploadProgress({
+              total,
+              processed,
+              percent: pct,
+            });
+          }
+
+          setIsImportCancelled(true);
+          await fetchDocuments(selectedFolderId);
+          await fetchWorkspace();
+          toast.warning(
+            'Importação cancelada',
+            'O processamento foi interrompido. Os documentos já salvos foram mantidos.'
+          );
+        } catch (err: any) {
+          toast.error('Erro ao cancelar', err?.message || 'Não foi possível cancelar.');
+        } finally {
+          setIsImportCancelling(false);
+          setIsConfirmLoading(false);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
+  }, [activeImportJobId, isImportCancelled, isImportCancelling, uploadProgress?.total, selectedFolderId, fetchDocuments, fetchWorkspace]);
+
   const processFiles = async (files: FileList | File[], folderId?: string | null) => {
     if (!files || files.length === 0) return;
     setUploadError(null);
+    setIsImportCancelled(false);
+    setIsImportCancelling(false);
+    setActiveImportJobId(null);
     setIsUploading(true);
     setUploadProgress({ total: files.length, processed: 0, percent: 0 });
 
@@ -332,50 +546,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
 
       const data = await res.json();
       if (data && data.jobId) {
-        const poll = setInterval(async () => {
-          try {
-            const statusRes = await apiFetch(`/api/import/${data.jobId}`);
-            if (!statusRes.ok) return;
-            const statusData = await statusRes.json();
-            const processed = statusData.processed ?? 0;
-            const total = statusData.total ?? data.queued ?? files.length;
-            const isCompleted =
-              statusData.status === 'completed' ||
-              statusData.status === 'COMPLETED' ||
-              (total > 0 && processed >= total);
-            const isFailed = statusData.status === 'error' || statusData.status === 'failed' || statusData.status === 'FAILED';
-
-            const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
-
-            setUploadProgress({
-              total,
-              processed: isCompleted ? total : processed,
-              percent: pct,
-            });
-
-            if (isCompleted || isFailed) {
-              clearInterval(poll);
-              setTargetUploadFolderId(null);
-              await fetchDocuments(selectedFolderId);
-              await fetchWorkspace();
-
-              if (isCompleted && statusData.results && statusData.results.length > 0) {
-                selectDocument(statusData.results[0].id);
-              }
-
-              setTimeout(() => {
-                setIsUploading(false);
-                setUploadProgress(null);
-              }, 2200);
-            }
-          } catch (pollErr) {
-            console.error('[ImportPoll] Erro:', pollErr);
-            clearInterval(poll);
-            setIsUploading(false);
-            setUploadProgress(null);
-            setTargetUploadFolderId(null);
-          }
-        }, 180);
+        startImportPolling(data.jobId, data.queued ?? files.length, { selectFirstDoc: true });
       } else {
         await fetchDocuments(selectedFolderId);
         await fetchWorkspace();
@@ -395,6 +566,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
   const processPaths = async (paths: string[], folderId?: string | null) => {
     if (!paths || paths.length === 0) return;
     setUploadError(null);
+    setIsImportCancelled(false);
+    setIsImportCancelling(false);
+    setActiveImportJobId(null);
     setIsUploading(true);
     setUploadProgress({ total: paths.length, processed: 0, percent: 0 });
 
@@ -425,40 +599,7 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
 
       const data = await res.json();
       if (data && data.jobId) {
-        const poll = setInterval(async () => {
-          try {
-            const statusRes = await apiFetch(`/api/import/${data.jobId}`);
-            if (!statusRes.ok) return;
-            const statusData = await statusRes.json();
-            const processed = statusData.processed ?? 0;
-            const total = statusData.total ?? data.queued ?? paths.length;
-            const isCompleted =
-              statusData.status === 'completed' ||
-              statusData.status === 'COMPLETED' ||
-              (total > 0 && processed >= total);
-            const isFailed = statusData.status === 'error' || statusData.status === 'failed';
-            const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
-            setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
-
-            if (isCompleted || isFailed) {
-              clearInterval(poll);
-              setTargetUploadFolderId(null);
-              await fetchDocuments(selectedFolderId);
-              await fetchWorkspace();
-              if (isCompleted && statusData.results && statusData.results.length > 0) {
-                selectDocument(statusData.results[0].id);
-              }
-              setTimeout(() => {
-                setIsUploading(false);
-                setUploadProgress(null);
-              }, 2000);
-            }
-          } catch {
-            clearInterval(poll);
-            setIsUploading(false);
-            setUploadProgress(null);
-          }
-        }, 200);
+        startImportPolling(data.jobId, data.queued ?? paths.length, { selectFirstDoc: true });
       } else {
         await fetchDocuments(selectedFolderId);
         await fetchWorkspace();
@@ -559,38 +700,9 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         'Importação de pasta iniciada',
         `${data.queued} arquivos serão processados${data.skipped ? ` (${data.skipped} ignorados)` : ''}.`
       );
-      const jobId = data.jobId;
-      const poll = setInterval(async () => {
-        try {
-          const statusRes = await apiFetch(`/api/import/${jobId}`);
-          if (!statusRes.ok) throw new Error(`HTTP ${statusRes.status}`);
-          const statusData = await statusRes.json();
-          const processed = statusData.processed ?? 0;
-          const total = statusData.total ?? data.queued;
-          const isCompleted =
-            statusData.status === 'completed' || statusData.status === 'COMPLETED' || (total > 0 && processed >= total);
-          const pct = isCompleted ? 100 : total > 0 ? Math.min(99, Math.round((processed / total) * 100)) : 0;
-          setUploadProgress({ total, processed: isCompleted ? total : processed, percent: pct });
-          if (isCompleted) {
-            clearInterval(poll);
-            setTargetUploadFolderId(null);
-            await fetchDocuments(selectedFolderId);
-            await fetchWorkspace();
-            toast.success(
-              'Importação de pasta concluída',
-              `${total} arquivos processados${statusData.duplicates ? `, ${statusData.duplicates} duplicados ignorados` : ''}.`
-            );
-            setTimeout(() => {
-              setIsUploading(false);
-              setUploadProgress(null);
-            }, 2200);
-          }
-        } catch {
-          clearInterval(poll);
-          setIsUploading(false);
-          setUploadProgress(null);
-        }
-      }, 180);
+      startImportPolling(data.jobId, data.queued, {
+        successToast: '{total} arquivos processados.',
+      });
     } catch (err: any) {
       toast.error('Erro ao abrir diretório', err?.message || 'Tente novamente.');
       setIsUploading(false);
@@ -800,9 +912,19 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         isUploading={isUploading}
         uploadProgress={uploadProgress}
         selectedFolderName={selectedFolderName}
+        isImportCancelled={isImportCancelled}
+        isImportCancelling={isImportCancelling}
+        onCancelImport={handleCancelImport}
         onCloseImportProgress={() => {
+          if (importPollIntervalRef.current) {
+            clearInterval(importPollIntervalRef.current);
+            importPollIntervalRef.current = null;
+          }
           setIsUploading(false);
           setUploadProgress(null);
+          setActiveImportJobId(null);
+          setIsImportCancelled(false);
+          setIsImportCancelling(false);
         }}
         isDeleting={isDeleting}
         deleteProgress={deleteProgress}
@@ -844,6 +966,8 @@ export function MainLayout({ onBackToHome }: { onBackToHome?: () => void }) {
         onBackToHome={onBackToHome}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        searchType={searchType}
+        setSearchType={setSearchType}
         searchInputRef={searchInputRef}
         currentTheme={currentTheme}
         onUpdateTheme={(theme) => updateSettings({ theme })}

@@ -35,6 +35,7 @@ export interface NfseState {
   documents: FiscalDocument[];
   loading: boolean;
   syncing: boolean;
+  isQueryingKey: boolean;
   syncProgress?: {
     message: string;
     currentNsu?: string;
@@ -87,6 +88,7 @@ export class NfseViewModel {
       documents: [],
       loading: false,
       syncing: false,
+      isQueryingKey: false,
       selectedDocument: null,
       selectedDocumentEvents: [],
       eventsLoading: false,
@@ -274,6 +276,7 @@ export class NfseViewModel {
       return { success: false, eventsCount: 0, error: 'Nenhuma empresa selecionada.' };
     }
 
+    this.updateState({ isQueryingKey: true });
     try {
       const result = await this.api.consultByKey(this.state.companyId, accessKey, this.state.environment);
       if (result.success) {
@@ -288,6 +291,8 @@ export class NfseViewModel {
         this.updateState({ contractGateError: message });
       }
       return { success: false, eventsCount: 0, error: message };
+    } finally {
+      this.updateState({ isQueryingKey: false });
     }
   }
 

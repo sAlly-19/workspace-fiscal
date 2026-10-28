@@ -13,6 +13,8 @@ import { sanitizedTransportFailure, validateHttpExecutionOptions } from './http-
 
 export class WindowsStoreCertificateProvider implements ICertificateProvider {
   private scriptPath: string;
+  private cachedCertificates: { data: CertificateInfo[]; timestamp: number } | null = null;
+  private readonly cacheTtlMs: number = 60_000;
 
   constructor(customScriptPath?: string) {
     if (customScriptPath && fs.existsSync(customScriptPath)) {
@@ -35,9 +37,19 @@ export class WindowsStoreCertificateProvider implements ICertificateProvider {
     }
   }
 
-  public async listCertificates(): Promise<CertificateInfo[]> {
+  public clearCache(): void {
+    this.cachedCertificates = null;
+  }
+
+  public async listCertificates(forceRefresh = false): Promise<CertificateInfo[]> {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedCertificates && now - this.cachedCertificates.timestamp < this.cacheTtlMs) {
+      return this.cachedCertificates.data;
+    }
+
     const rawOutput = await this.runPowerShell(['-Action', 'list']);
     if (!rawOutput || rawOutput.trim() === '') {
+      this.cachedCertificates = { data: [], timestamp: now };
       return [];
     }
 
@@ -45,7 +57,7 @@ export class WindowsStoreCertificateProvider implements ICertificateProvider {
       const parsed = this.parseJsonOutput<any>(rawOutput);
       const array = Array.isArray(parsed) ? parsed : [parsed];
 
-      return array.map((item: any) => ({
+      const certificates: CertificateInfo[] = array.map((item: any) => ({
         subject: item.Subject,
         issuer: item.Issuer,
         serial_number: item.SerialNumber,
@@ -58,6 +70,9 @@ export class WindowsStoreCertificateProvider implements ICertificateProvider {
         extracted_cnpj: item.CNPJ || undefined,
         extracted_cpf: item.CPF || undefined,
       }));
+
+      this.cachedCertificates = { data: certificates, timestamp: now };
+      return certificates;
     } catch (e: any) {
       throw new Error(`Falha ao converter lista de certificados do Windows: ${e.message}`);
     }

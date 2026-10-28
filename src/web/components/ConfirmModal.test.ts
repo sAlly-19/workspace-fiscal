@@ -36,5 +36,13 @@ describe('ConfirmModal component accessibility and contracts (IMP-021)', () => {
     });
     expect(element.props.requireText).toBe('CONFIRMAR');
   });
+
+  it('supports custom zIndex prop to ensure overlay priority over active modals', () => {
+    const element = React.createElement(ConfirmModal, {
+      ...defaultProps,
+      zIndex: 'z-[80]',
+    });
+    expect(element.props.zIndex).toBe('z-[80]');
+  });
 });
 

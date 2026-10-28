@@ -21,6 +21,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get, store) => {
     selectedDocumentId: null,
     selectedDocIds: [],
     searchQuery: initial.search,
+    searchType: 'all',
     expandedFolderIds: {},
 
     isImporting: false,

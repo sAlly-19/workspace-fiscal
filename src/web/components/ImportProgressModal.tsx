@@ -1,17 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { RotateCw, Minimize2, Maximize2, CheckCircle2, FileCode, FolderOpen, X, AlertTriangle, Clock } from 'lucide-react';
+import { RotateCw, Minimize2, Maximize2, CheckCircle2, FileCode, FolderOpen, X, AlertTriangle, Clock, Ban } from 'lucide-react';
 import { useWorkspaceStore } from '../stores/workspace.store';
 
-interface ImportProgressModalProps {
+export interface ImportProgressModalProps {
   isOpen: boolean;
   total?: number;
   processed?: number;
   percent?: number;
   targetFolderName?: string;
   isComplete?: boolean;
+  isCancelled?: boolean;
+  isCancelling?: boolean;
   error?: string | null;
   onClose: () => void;
+  onCancel?: () => void;
 }
 
 export function ImportProgressModal({
@@ -21,8 +24,11 @@ export function ImportProgressModal({
   percent = 0,
   targetFolderName,
   isComplete = false,
+  isCancelled = false,
+  isCancelling = false,
   error = null,
   onClose,
+  onCancel,
 }: ImportProgressModalProps) {
   const { settings } = useWorkspaceStore();
   const currentTheme = settings.theme || 'dark';
@@ -30,9 +36,11 @@ export function ImportProgressModal({
   const [isMinimized, setIsMinimized] = useState(false);
   const startTimeRef = useRef<number>(performance.now());
 
+  const isFinished = isComplete || isCancelled;
+
   useEffect(() => {
-    if (isOpen && !isComplete) startTimeRef.current = performance.now();
-  }, [isOpen, isComplete]);
+    if (isOpen && !isFinished) startTimeRef.current = performance.now();
+  }, [isOpen, isFinished]);
 
   const calculatedPercent =
     total > 0
@@ -45,17 +53,19 @@ export function ImportProgressModal({
   const remaining = Math.max(0, total - processed);
 
   // UX9: ETA em segundos baseada em throughput atual
-  const elapsedSec = isOpen && !isComplete ? (performance.now() - startTimeRef.current) / 1000 : 0;
+  const elapsedSec = isOpen && !isFinished ? (performance.now() - startTimeRef.current) / 1000 : 0;
   const throughput = elapsedSec > 0 ? processed / elapsedSec : 0;
-  const etaSec = isComplete || throughput <= 0 ? 0 : Math.ceil(remaining / throughput);
+  const etaSec = isFinished || throughput <= 0 ? 0 : Math.ceil(remaining / throughput);
   const etaLabel = isComplete
     ? 'Concluído'
-    : throughput <= 0
-      ? 'Calculando…'
-      : etaSec < 60
-        ? `${etaSec}s restantes`
-        : `${Math.ceil(etaSec / 60)}min restantes`;
-  const throughputLabel = throughput > 0 ? `${throughput.toFixed(1)} docs/s` : '';
+    : isCancelled
+      ? 'Interrompido'
+      : throughput <= 0
+        ? 'Calculando…'
+        : etaSec < 60
+          ? `${etaSec}s restantes`
+          : `${Math.ceil(etaSec / 60)}min restantes`;
+  const throughputLabel = throughput > 0 && !isFinished ? `${throughput.toFixed(1)} docs/s` : '';
 
   return (
     <AnimatePresence>
@@ -81,6 +91,8 @@ export function ImportProgressModal({
               <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
                 {isComplete ? (
                   <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                ) : isCancelled ? (
+                  <AlertTriangle className="w-7 h-7 text-amber-400" />
                 ) : (
                   <>
                     <svg className="w-8 h-8 -rotate-90" viewBox="0 0 36 36">
@@ -108,10 +120,20 @@ export function ImportProgressModal({
 
               <div className="flex flex-col pr-1 min-w-[130px]">
                 <div className="text-xs font-bold flex items-center gap-1.5">
-                  <span>{isComplete ? 'Concluído!' : `Importando: ${processed} de ${total}`}</span>
+                  <span>
+                    {isComplete
+                      ? 'Concluído!'
+                      : isCancelled
+                        ? 'Importação Interrompida'
+                        : `Importando: ${processed} de ${total}`}
+                  </span>
                 </div>
                 <span className={`text-[10px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                  {isComplete ? `${total} notas salvas` : `${displayPercent}% • ${remaining} restantes • ${etaLabel}`}
+                  {isComplete
+                    ? `${total} notas salvas`
+                    : isCancelled
+                      ? `${processed} notas salvas (cancelado)`
+                      : `${displayPercent}% • ${remaining} restantes • ${etaLabel}`}
                 </span>
               </div>
 
@@ -153,21 +175,33 @@ export function ImportProgressModal({
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                      <FileCode className="w-5 h-5" />
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isCancelled
+                        ? 'bg-amber-600/15 border-amber-500/30 text-amber-400'
+                        : isComplete
+                          ? 'bg-emerald-600/15 border-emerald-500/30 text-emerald-400'
+                          : 'bg-blue-600/15 border-blue-500/30 text-blue-400'
+                    }`}>
+                      {isCancelled ? <AlertTriangle className="w-5 h-5" /> : <FileCode className="w-5 h-5" />}
                     </div>
                     <div>
                       <h3 className={`text-sm font-bold tracking-tight ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
-                        {isComplete ? 'Importação Concluída' : 'Importando Documentos Fiscais'}
+                        {isComplete
+                          ? 'Importação Concluída'
+                          : isCancelled
+                            ? 'Importação Interrompida'
+                            : 'Importando Documentos Fiscais'}
                       </h3>
                       <p className={`text-[11px] ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
-                        Processamento de arquivos XML em lote
+                        {isCancelled
+                          ? 'Processo interrompido pelo usuário'
+                          : 'Processamento de arquivos XML em lote'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {!isComplete && (
+                    {!isFinished && (
                       <button
                         onClick={() => setIsMinimized(true)}
                         className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
@@ -180,7 +214,7 @@ export function ImportProgressModal({
                         <Minimize2 className="w-4 h-4" />
                       </button>
                     )}
-                    {isComplete && (
+                    {isFinished ? (
                       <button
                         onClick={onClose}
                         className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
@@ -188,10 +222,24 @@ export function ImportProgressModal({
                             ? 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#e2e8f0]'
                             : 'text-slate-300 hover:text-white hover:bg-white/10'
                         }`}
+                        title="Fechar modal"
                       >
                         <X className="w-4 h-4" />
                       </button>
-                    )}
+                    ) : onCancel ? (
+                      <button
+                        onClick={onCancel}
+                        disabled={isCancelling}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          isLight
+                            ? 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                            : 'text-red-400 hover:text-red-300 hover:bg-red-950/40'
+                        } disabled:opacity-50`}
+                        title="Cancelar importação"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -202,16 +250,24 @@ export function ImportProgressModal({
                         <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
+                      ) : isCancelled ? (
+                        <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
                       ) : (
                         <RotateCw className="w-5 h-5 text-blue-400 animate-spin" />
                       )}
                       <span className={`text-xs font-semibold ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
                         {isComplete
                           ? `${total} documento${total > 1 ? 's' : ''} processado${total > 1 ? 's' : ''} com sucesso!`
-                          : `Importando: ${processed} de ${total}`}
+                          : isCancelled
+                            ? `${processed} de ${total} documento${total > 1 ? 's' : ''} salvo${processed > 1 ? 's' : ''} antes da interrupção.`
+                            : `Importando: ${processed} de ${total}`}
                       </span>
                     </div>
-                    <span className="text-lg font-black text-blue-400 font-mono tracking-tight">
+                    <span className={`text-lg font-black font-mono tracking-tight ${
+                      isCancelled ? 'text-amber-400' : isComplete ? 'text-emerald-400' : 'text-blue-400'
+                    }`}>
                       {displayPercent}%
                     </span>
                   </div>
@@ -227,7 +283,9 @@ export function ImportProgressModal({
                       className={`h-full rounded-full ${
                         isComplete
                           ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-xs shadow-green-500/40'
-                          : 'bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 shadow-xs shadow-blue-500/30'
+                          : isCancelled
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-400 shadow-xs shadow-amber-500/30'
+                            : 'bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 shadow-xs shadow-blue-500/30'
                       }`}
                       initial={{ width: 0 }}
                       animate={{ width: `${displayPercent}%` }}
@@ -253,6 +311,8 @@ export function ImportProgressModal({
                       <div className={`font-semibold mt-0.5 ${isLight ? 'text-[#0f172a]' : 'text-white'}`}>
                         {isComplete ? (
                           <span className="text-emerald-500 font-bold">Concluído (100%)</span>
+                        ) : isCancelled ? (
+                          <span className="text-amber-500 font-bold">Interrompido ({processed} de {total})</span>
                         ) : (
                           <span>
                             {processed} de {total} ({remaining} restantes)
@@ -272,9 +332,9 @@ export function ImportProgressModal({
                       <div className={`font-semibold mt-0.5 flex items-center gap-1 ${
                         isLight ? 'text-[#0f172a]' : 'text-white'
                       }`}>
-                        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Clock className={`w-3.5 h-3.5 shrink-0 ${isCancelled ? 'text-amber-400' : 'text-blue-400'}`} />
                         <span>{etaLabel}</span>
-                        {throughputLabel && !isComplete && (
+                        {throughputLabel && (
                           <span className={`text-[10px] font-normal ml-1 ${isLight ? 'text-[#64748b]' : 'text-[#a1a1aa]'}`}>
                             ({throughputLabel})
                           </span>
@@ -315,10 +375,29 @@ export function ImportProgressModal({
                       isLight ? 'text-[#64748b]' : 'text-[#71717a]'
                     }`}
                   >
-                    {isComplete ? 'Pronto para visualização' : 'Você pode minimizar e continuar navegando'}
+                    {isComplete
+                      ? 'Pronto para visualização'
+                      : isCancelled
+                        ? 'Notas salvas até a interrupção foram preservadas'
+                        : 'Você pode minimizar e continuar navegando'}
                   </span>
                   <div className="flex items-center gap-2">
-                    {!isComplete && (
+                    {!isFinished && onCancel && (
+                      <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={isCancelling}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer border ${
+                          isLight
+                            ? 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
+                            : 'bg-red-950/40 hover:bg-red-900/50 text-red-400 border-red-800/50'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        {isCancelling ? 'Cancelando...' : 'Cancelar Importação'}
+                      </button>
+                    )}
+                    {!isFinished && (
                       <button
                         onClick={() => setIsMinimized(true)}
                         className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
@@ -331,10 +410,12 @@ export function ImportProgressModal({
                         Minimizar para Bolha
                       </button>
                     )}
-                    {isComplete && (
+                    {isFinished && (
                       <button
                         onClick={onClose}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-md transition-all cursor-pointer"
+                        className={`px-4 py-1.5 text-white text-xs font-semibold rounded-lg shadow-md transition-all cursor-pointer ${
+                          isCancelled ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500'
+                        }`}
                       >
                         Fechar
                       </button>

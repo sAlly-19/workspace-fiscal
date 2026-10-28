@@ -60,4 +60,33 @@ describe('Import Routes', () => {
     expect(setImmediateSpy).toHaveBeenCalled();
     setImmediateSpy.mockRestore();
   });
+
+  it('handles POST /api/import/:jobId/cancel and returns 404 for non-existent job', async () => {
+    const res = await fetch(`${baseUrl}/api/import/non-existent-id/cancel`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe('Job não encontrado.');
+  });
+
+  it('cancels an active import job via POST /api/import/:jobId/cancel and updates status', async () => {
+    const { importService } = await import('../services/import.service');
+    const job = await importService.createImportJob(10);
+    expect(importService.isJobCancelled(job.id)).toBe(false);
+
+    const cancelRes = await fetch(`${baseUrl}/api/import/${job.id}/cancel`, {
+      method: 'POST',
+    });
+    expect(cancelRes.status).toBe(200);
+    const cancelBody = await cancelRes.json();
+    expect(cancelBody.message).toContain('cancelada');
+    expect(importService.isJobCancelled(job.id)).toBe(true);
+
+    const statusRes = await fetch(`${baseUrl}/api/import/${job.id}`);
+    expect(statusRes.status).toBe(200);
+    const statusBody = await statusRes.json();
+    expect(statusBody.status).toBe('cancelled');
+    expect(statusBody.statusRaw).toBe('CANCELLED');
+  });
 });
